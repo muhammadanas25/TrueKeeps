@@ -16,5 +16,5 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
-  base: "/", // This will be set to your repository name for GitHub Pages
+  base: "/YOUR_REPO_NAME/", // Replace YOUR_REPO_NAME with your actual repository name
 });
