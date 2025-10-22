@@ -1,0 +1,694 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrueKeeps - Transform Digital Memories into Physical Treasures</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                }
+            },
+            fontFamily: {
+                sans: ["Outfit", "Inter", "system-ui", "sans-serif"],
+            }
+        }
+    };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --background: hsl(210 40% 98%);
+            --foreground: hsl(222.2 84% 4.9%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222.2 84% 4.9%);
+            --popover: hsl(0 0% 100%);
+            --popover-foreground: hsl(222.2 84% 4.9%);
+            --primary: hsl(246 100% 26%); /* #06097e */
+            --primary-foreground: hsl(210 40% 98%);
+            --secondary: hsl(330 60% 55%); /* #d04c8a */
+            --secondary-foreground: hsl(222.2 84% 4.9%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215.4 16.3% 46.9%);
+            --accent: hsl(190 70% 65%); /* #5ac7e6 */
+            --accent-foreground: hsl(222.2 84% 4.9%);
+            --destructive: hsl(0 84.2% 60.2%);
+            --destructive-foreground: hsl(210 40% 98%);
+            --border: hsl(214.3 31.8% 91.4%);
+            --input: hsl(214.3 31.8% 91.4%);
+            --ring: hsl(246 100% 26%);
+            --radius: 0.75rem;
+        }
+        
+        .hero-bg {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+        
+        .promotion-banner-bg {
+            background: linear-gradient(90deg, var(--accent) 0%, var(--secondary) 100%);
+        }
+    </style>
+</head>
+<body class="bg-background font-sans">
+    <!-- Promotional Top Banner -->
+    <div class="promotion-banner-bg text-white text-center py-2 px-4">
+        <div class="flex items-center justify-center gap-2 text-sm">
+            <span>Up to 50% off + an extra 10% off & free shipping</span>
+            <a href="#" class="underline hover:no-underline">See details</a>
+            <span>|</span>
+            <span>Ends: 09/31</span>
+            <span>|</span>
+            <span>Code: LONGWKND</span>
+            <button class="bg-white text-accent-foreground px-3 py-1 rounded text-xs font-medium hover:bg-muted transition-colors">
+                Apply
+            </button>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <!-- @COMPONENT: Header [navigation, search, auth, cart] -->
+    <header class="bg-white border-b border-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <a href="#" class="flex items-center space-x-2">
+                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <span class="text-primary-foreground font-bold text-lg">T</span>
+                        </div>
+                        <span class="text-xl font-bold text-primary">truekeeps.</span>
+                    </a>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="flex-1 max-w-lg mx-8">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            placeholder="Search for products" 
+                            class="w-full px-4 py-2 pl-10 pr-4 border border-input rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent"
+                            data-implementation="Implement search functionality with product filtering"
+                        >
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                    </div>
+                </div>
+
+                <!-- Right Navigation -->
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-1">
+                        <i class="fas fa-flag text-muted-foreground"></i>
+                        <span class="text-sm text-muted-foreground">USA</span>
+                    </div>
+                    <button class="text-sm text-muted-foreground hover:text-foreground transition-colors" data-event="click:handleLogin">
+                        Login
+                    </button>
+                    <button class="text-sm text-primary hover:text-primary/80 transition-colors" data-event="click:handleSignUp">
+                        Sign Up
+                    </button>
+                    <button class="text-muted-foreground hover:text-foreground transition-colors relative" data-event="click:handleCart">
+                        <i class="fas fa-shopping-cart text-lg"></i>
+                        <span class="absolute -top-2 -right-2 bg-secondary text-white text-xs rounded-full w-5 h-5 flex items-center justify-center" data-bind="cartCount">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="border-t border-border">
+                <div class="flex items-center space-x-8 py-4">
+                    <a href="#" class="text-foreground hover:text-primary font-medium transition-colors">PhotoBooks</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Wedding</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Deals</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+
+    <!-- Hero Section -->
+    <!-- @COMPONENT: HeroSection [main CTA, background image] -->
+    <section class="relative overflow-hidden">
+        <!-- A warm, cozy scene of someone holding a beautifully crafted photo album with golden hour lighting -->
+        <div 
+            class="hero-bg min-h-[500px] flex items-center justify-center relative"
+            style="background-image: linear-gradient(rgba(6, 9, 126, 0.7), rgba(208, 76, 138, 0.7)), url('https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1920&h=1080'); background-size: cover; background-position: center;"
+        >
+            <div class="text-center text-white max-w-4xl mx-auto px-4">
+                <h1 class="text-5xl md:text-6xl font-bold mb-6">
+                    Transform Digital Memories<br>Into Physical Treasures
+                </h1>
+                <p class="text-xl md:text-2xl mb-8 opacity-90">
+                    From newborn moments to wedding memories - preserve your digital photos in beautiful physical albums, frames, and portraits
+                </p>
+                <button 
+                    class="bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-4 rounded-lg text-lg font-semibold transition-colors shadow-lg"
+                    data-event="click:handleCreatePhotoBook"
+                    data-implementation="Navigate to photo upload and customization flow"
+                >
+                    <i class="fas fa-upload mr-2"></i>
+                    Upload Your Photos & Start Creating
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: HeroSection -->
+
+    <!-- Flash Sale Banner -->
+    <!-- @COMPONENT: PromotionalBanner [sale information, CTA] -->
+    <section class="py-8 px-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="promotion-banner-bg rounded-xl p-6 text-white">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2">Flash Sale</h3>
+                        <p class="text-lg opacity-90">Up to 50% off + an extra 10% off & free shipping</p>
+                        <p class="text-sm opacity-75">Code: <span class="font-bold">LONGWKND</span> | Ends 9/31</p>
+                    </div>
+                    <button class="bg-white text-accent-foreground px-6 py-3 rounded-lg font-semibold hover:bg-muted transition-colors">
+                        Apply Code
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: PromotionalBanner -->
+
+    <!-- More Ways to TrueKeep -->
+    <!-- @COMPONENT: ProductCategories [category cards with images] -->
+    <section class="py-16 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-12 text-foreground">More ways to TrueKeep</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <!-- @MAP: productCategories.map(category => ( -->
+                <div class="text-center group cursor-pointer" data-event="click:handleCategorySelect">
+                    <!-- A collection of beautiful photo books arranged on a rustic wooden shelf -->
+                    <div class="bg-muted rounded-2xl p-6 mb-4 group-hover:bg-muted/80 transition-colors">
+                        <img 
+                            src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="PhotoBooks collection" 
+                            class="w-full h-32 object-cover rounded-xl"
+                        >
+                    </div>
+                    <h3 class="font-semibold text-foreground">PhotoBooks</h3>
+                </div>
+
+                <div class="text-center group cursor-pointer" data-event="click:handleCategorySelect">
+                    <!-- An elegant wedding photo displayed in a beautiful gold frame -->
+                    <div class="bg-muted rounded-2xl p-6 mb-4 group-hover:bg-muted/80 transition-colors">
+                        <img 
+                            src="https://images.unsplash.com/photo-1469371670807-013ccf25f16a?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Wedding photo in elegant frame" 
+                            class="w-full h-32 object-cover rounded-xl"
+                        >
+                    </div>
+                    <h3 class="font-semibold text-foreground">Wedding</h3>
+                </div>
+
+                <div class="text-center group cursor-pointer" data-event="click:handleCategorySelect">
+                    <!-- Multiple photo frames with family pictures arranged on a mantle -->
+                    <div class="bg-muted rounded-2xl p-6 mb-4 group-hover:bg-muted/80 transition-colors">
+                        <img 
+                            src="https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Family photo frames on mantle" 
+                            class="w-full h-32 object-cover rounded-xl"
+                        >
+                    </div>
+                    <h3 class="font-semibold text-foreground">Frames</h3>
+                </div>
+
+                <div class="text-center group cursor-pointer" data-event="click:handleCategorySelect">
+                    <!-- Special deals and discount tags arranged artistically -->
+                    <div class="bg-muted rounded-2xl p-6 mb-4 group-hover:bg-muted/80 transition-colors">
+                        <img 
+                            src="https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Special deals and discounts" 
+                            class="w-full h-32 object-cover rounded-xl"
+                        >
+                    </div>
+                    <h3 class="font-semibold text-foreground">Deals</h3>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: ProductCategories -->
+
+    <!-- Theme Selection -->
+    <!-- @COMPONENT: ThemeGallery [category tabs, template grid] -->
+    <section class="py-16 px-4 bg-muted">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl font-bold text-center mb-4 text-foreground">Pick the perfect theme for your keeps</h2>
+            
+            <!-- Category Tabs -->
+            <div class="flex justify-center mb-12">
+                <div class="flex space-x-8 border-b border-border">
+                    <button class="px-4 py-2 font-medium text-primary border-b-2 border-primary" data-event="click:handleThemeCategory">
+                        Travel
+                    </button>
+                    <button class="px-4 py-2 font-medium text-muted-foreground hover:text-foreground transition-colors" data-event="click:handleThemeCategory">
+                        Simple
+                    </button>
+                    <button class="px-4 py-2 font-medium text-muted-foreground hover:text-foreground transition-colors" data-event="click:handleThemeCategory">
+                        Family
+                    </button>
+                    <button class="px-4 py-2 font-medium text-muted-foreground hover:text-foreground transition-colors" data-event="click:handleThemeCategory">
+                        Wedding
+                    </button>
+                    <button class="px-4 py-2 font-medium text-muted-foreground hover:text-foreground transition-colors" data-event="click:handleThemeCategory">
+                        All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Template Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+                <!-- @MAP: templates.map(template => ( -->
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect" data-implementation="Open template customization modal">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A stunning European cathedral architecture with blue sky background -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1515542622106-78bda8ba0e5b?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Europe Travel theme template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Europe Travel</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A minimalist nature scene with mountains and forests -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Minimalist National Parks template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Minimalist National Parks</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A tropical beach scene with turquoise water and palm trees -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Tropical Getaway template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Tropical Getaway</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A city skyline at sunset with warm golden lighting -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="City Adventures template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">City Adventures</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A serene mountain lake with reflection and morning mist -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Mountain Escape template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Mountain Escape</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A charming cobblestone street in a European old town -->
+                        <img 
+                            src="https://pixabay.com/get/g95d125e55b3701dcd2d0c545dcebfbd0d934108ab8ea164c0a4363a549cf6320a83503aec91fa0b77e56b8e39bb8151393e5a4594c77d2a01b763bfd471a80b6_1280.jpg" 
+                            alt="Vintage Europe template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Vintage Europe</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A modern architectural building with clean geometric lines -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Modern Architecture template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Modern Architecture</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+
+                <div class="group cursor-pointer" data-event="click:handleTemplateSelect">
+                    <div class="bg-white rounded-xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                        <!-- A rustic countryside scene with rolling hills and farmhouse -->
+                        <img 
+                            src="https://images.unsplash.com/photo-1500076656116-558758c991c1?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=300" 
+                            alt="Countryside Memories template" 
+                            class="w-full h-48 object-cover rounded-lg mb-3"
+                        >
+                        <h4 class="font-medium text-foreground group-hover:text-primary transition-colors">Countryside Memories</h4>
+                        <p class="text-sm text-muted-foreground">Starting at <span data-bind="template.price">$14.99</span></p>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+
+            <!-- Explore More Button -->
+            <div class="text-center">
+                <button class="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-lg font-semibold transition-colors">
+                    <i class="fas fa-compass mr-2"></i>
+                    Explore travel themes
+                </button>
+                <button class="ml-4 text-primary hover:text-primary/80 transition-colors font-medium">
+                    See all themes <i class="fas fa-arrow-right ml-1"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: ThemeGallery -->
+
+    <!-- Photo Upload & Visualization Feature -->
+    <!-- @COMPONENT: PhotoUploadSection [upload area, preview, customization options] -->
+    <section class="py-16 px-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-foreground mb-4">Upload & Visualize Your Memories</h2>
+                <p class="text-lg text-muted-foreground">See exactly how your photos will look before you order</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <!-- Upload Area -->
+                <div class="space-y-6">
+                    <div class="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer" data-event="click:handlePhotoUpload" data-implementation="Implement file upload with drag-and-drop">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-muted-foreground mb-4"></i>
+                        <h3 class="text-lg font-semibold text-foreground mb-2">Upload Your Photos</h3>
+                        <p class="text-muted-foreground mb-4">Drag and drop or click to select photos from your device</p>
+                        <button class="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-lg font-medium transition-colors">
+                            Choose Files
+                        </button>
+                    </div>
+
+                    <!-- Customization Options -->
+                    <div class="space-y-4">
+                        <h4 class="font-semibold text-foreground">Customize Your Keep</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <select class="px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring" data-implementation="Implement product type selection">
+                                <option>Photo Album</option>
+                                <option>Canvas Print</option>
+                                <option>Framed Photo</option>
+                                <option>Metal Print</option>
+                            </select>
+                            <select class="px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring" data-implementation="Implement size selection">
+                                <option>8x10 inches</option>
+                                <option>11x14 inches</option>
+                                <option>16x20 inches</option>
+                                <option>20x24 inches</option>
+                            </select>
+                        </div>
+                        <select class="w-full px-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-ring" data-implementation="Implement frame type selection">
+                            <option>No Frame</option>
+                            <option>Classic Black Frame</option>
+                            <option>Modern White Frame</option>
+                            <option>Rustic Wood Frame</option>
+                            <option>Elegant Gold Frame</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Visualization Preview -->
+                <div class="space-y-6">
+                    <div class="bg-muted rounded-xl p-6">
+                        <h4 class="font-semibold text-foreground mb-4 flex items-center">
+                            <i class="fas fa-eye mr-2 text-primary"></i>
+                            Live Preview
+                        </h4>
+                        <!-- A realistic mockup of a photo album on a wooden table -->
+                        <div class="relative">
+                            <img 
+                                src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=600&h=400" 
+                                alt="Photo album preview mockup" 
+                                class="w-full h-64 object-cover rounded-lg"
+                            >
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="bg-white/90 backdrop-blur-sm rounded-lg p-4 text-center">
+                                    <i class="fas fa-images text-2xl text-muted-foreground mb-2"></i>
+                                    <p class="text-sm text-muted-foreground">Upload photos to see preview</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="w-full bg-secondary hover:bg-secondary/90 text-white px-6 py-3 rounded-lg font-semibold transition-colors" data-event="click:handleStartDesigning" data-implementation="Navigate to full design interface">
+                        <i class="fas fa-palette mr-2"></i>
+                        Start Designing
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: PhotoUploadSection -->
+
+    <!-- Footer -->
+    <!-- @COMPONENT: Footer [links, social media, newsletter] -->
+    <footer class="bg-foreground text-white py-16 px-4">
+        <div class="max-w-6xl mx-auto">
+            <div class="grid md:grid-cols-4 gap-8 mb-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-lg">T</span>
+                        </div>
+                        <span class="text-xl font-bold">truekeeps.</span>
+                    </div>
+                    <p class="text-gray-400 mb-4">Transform your digital memories into beautiful physical keepsakes that last a lifetime.</p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fab fa-facebook text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fab fa-instagram text-xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                            <i class="fab fa-twitter text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Products</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-colors">Photo Books</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Canvas Prints</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Framed Photos</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Metal Prints</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Support</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white transition-colors">Help Center</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Contact Us</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Shipping Info</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Returns</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold mb-4">Stay Connected</h4>
+                    <p class="text-gray-400 mb-4">Get updates on new themes and special offers</p>
+                    <div class="flex">
+                        <input 
+                            type="email" 
+                            placeholder="Enter your email" 
+                            class="flex-1 px-4 py-2 rounded-l-lg border-0 text-foreground"
+                            data-implementation="Implement newsletter subscription"
+                        >
+                        <button class="bg-primary hover:bg-primary/90 px-4 py-2 rounded-r-lg transition-colors">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-700 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 TrueKeeps. All rights reserved. | Privacy Policy | Terms of Service</p>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+
+    <!-- Template Preview Modal -->
+    <!-- @COMPONENT: TemplateModal [template details, customization options] -->
+    <!-- @STATE: isModalOpen:boolean = false -->
+    <div id="templateModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4" data-event="click:handleModalClose">
+        <div class="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-foreground" data-bind="selectedTemplate.name">Europe Travel</h3>
+                    <button class="text-muted-foreground hover:text-foreground" data-event="click:handleModalClose">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Template Preview -->
+                <div class="mb-6">
+                    <!-- A detailed view of the Europe travel photo book template with sample images -->
+                    <img 
+                        src="https://images.unsplash.com/photo-1515542622106-78bda8ba0e5b?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=800&h=500" 
+                        alt="Europe Travel template preview" 
+                        class="w-full h-64 object-cover rounded-lg"
+                        data-bind="selectedTemplate.image"
+                    >
+                </div>
+
+                <!-- Template Details -->
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-center text-sm text-muted-foreground">
+                        <i class="fas fa-book mr-2"></i>
+                        <span data-bind="selectedTemplate.pages">26 pages included</span>
+                    </div>
+                    <div class="flex items-center text-sm text-muted-foreground">
+                        <i class="fas fa-palette mr-2"></i>
+                        <span>100% fully customizable</span>
+                    </div>
+                    <div class="flex items-center text-sm text-muted-foreground">
+                        <i class="fas fa-shipping-fast mr-2"></i>
+                        <span>Order now, get it by <span data-bind="selectedTemplate.deliveryDate">September 09</span></span>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex space-x-4">
+                    <button class="flex-1 border border-border text-foreground px-6 py-3 rounded-lg font-medium hover:bg-muted transition-colors" data-event="click:handleViewDetails">
+                        View product details
+                    </button>
+                    <button class="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-lg font-medium transition-colors" data-event="click:handleStartDesigning">
+                        Start Designing
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: TemplateModal -->
+
+    <script>
+        // Template selection and modal functionality
+        (() => {
+            const modal = document.getElementById('templateModal');
+            const templateCards = document.querySelectorAll('[data-event="click:handleTemplateSelect"]');
+            
+            templateCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                    // TODO: Populate modal with selected template data
+                });
+            });
+
+            // Close modal functionality
+            document.querySelectorAll('[data-event="click:handleModalClose"]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                });
+            });
+
+            // Theme category switching
+            document.querySelectorAll('[data-event="click:handleThemeCategory"]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Remove active state from all tabs
+                    document.querySelectorAll('[data-event="click:handleThemeCategory"]').forEach(tab => {
+                        tab.classList.remove('text-primary', 'border-primary');
+                        tab.classList.add('text-muted-foreground');
+                    });
+                    
+                    // Add active state to clicked tab
+                    e.target.classList.remove('text-muted-foreground');
+                    e.target.classList.add('text-primary', 'border-b-2', 'border-primary');
+                    
+                    // TODO: Filter templates based on category
+                });
+            });
+
+            // Photo upload simulation
+            document.querySelector('[data-event="click:handlePhotoUpload"]')?.addEventListener('click', () => {
+                // TODO: Implement file upload with drag-and-drop functionality
+                console.log('Photo upload triggered');
+            });
+
+            // Navigation functionality placeholders
+            document.querySelector('[data-event="click:handleLogin"]')?.addEventListener('click', () => {
+                // TODO: Implement login modal or redirect
+                console.log('Login triggered');
+            });
+
+            document.querySelector('[data-event="click:handleSignUp"]')?.addEventListener('click', () => {
+                // TODO: Implement sign up modal or redirect
+                console.log('Sign up triggered');
+            });
+
+            document.querySelector('[data-event="click:handleCart"]')?.addEventListener('click', () => {
+                // TODO: Open cart sidebar or redirect to cart page
+                console.log('Cart opened');
+            });
+        })();
+    </script>
+</body>
+</html>

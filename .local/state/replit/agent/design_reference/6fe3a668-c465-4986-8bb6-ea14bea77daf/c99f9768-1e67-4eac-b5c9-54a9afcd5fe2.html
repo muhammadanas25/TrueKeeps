@@ -1,0 +1,681 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrueKeeps - Keeping Memories Alive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                }
+            },
+            fontFamily: {
+                sans: ["Inter", "sans-serif"],
+            }
+        }
+    };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --background: hsl(210 40% 98%);
+            --foreground: hsl(222.2 84% 4.9%);
+            --card: hsl(0 0% 100%);
+            --card-foreground: hsl(222.2 84% 4.9%);
+            --popover: hsl(0 0% 100%);
+            --popover-foreground: hsl(222.2 84% 4.9%);
+            --primary: hsl(221 83% 53%);
+            --primary-foreground: hsl(210 40% 98%);
+            --secondary: hsl(210 40% 96%);
+            --secondary-foreground: hsl(222.2 84% 4.9%);
+            --muted: hsl(210 40% 96%);
+            --muted-foreground: hsl(215.4 16.3% 46.9%);
+            --accent: hsl(328 85% 70%);
+            --accent-foreground: hsl(222.2 84% 4.9%);
+            --destructive: hsl(0 84.2% 60.2%);
+            --destructive-foreground: hsl(210 40% 98%);
+            --border: hsl(214.3 31.8% 91.4%);
+            --input: hsl(214.3 31.8% 91.4%);
+            --ring: hsl(221 83% 53%);
+            --radius: 12px;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, hsl(221 83% 53% / 0.05) 0%, hsl(328 85% 70% / 0.05) 100%);
+        }
+        
+        .product-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .product-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+        }
+        
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .template-grid {
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <!-- @COMPONENT: Header [Navigation with logo, search, user actions] -->
+    <header class="bg-card border-b border-border sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="text-2xl font-bold text-primary">truekeeps<span class="text-accent">.</span></div>
+                    <span class="ml-3 text-sm text-muted-foreground hidden sm:block">keeping memories alive</span>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="hidden md:flex space-x-8">
+                    <a href="#" class="text-foreground hover:text-primary transition-colors font-medium">Photo Books</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Frames</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Portraits</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Albums</a>
+                    <a href="#" class="text-muted-foreground hover:text-primary transition-colors">Templates</a>
+                </nav>
+                
+                <!-- Search and Actions -->
+                <div class="flex items-center space-x-4">
+                    <div class="hidden lg:block relative">
+                        <input 
+                            type="text" 
+                            placeholder="Search for themes, occasions & more"
+                            class="w-64 pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                        />
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                    </div>
+                    <button class="text-muted-foreground hover:text-primary transition-colors">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <button class="text-muted-foreground hover:text-primary transition-colors relative">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="absolute -top-2 -right-2 bg-accent text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">2</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: Header -->
+    
+    <!-- @COMPONENT: Hero Section [Main value proposition and CTA] -->
+    <section class="hero-gradient py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-6xl font-bold text-foreground mb-6">
+                    Transform Digital Memories<br>
+                    Into <span class="text-primary">Physical Treasures</span>
+                </h1>
+                <p class="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
+                    Bring back the magic of physical photos. Create stunning photo books, frames, and albums 
+                    that preserve your precious moments forever.
+                </p>
+                
+                <!-- Photo Upload Area -->
+                <div class="max-w-2xl mx-auto mb-8">
+                    <div class="border-2 border-dashed border-border rounded-xl p-8 bg-card hover:border-primary transition-colors cursor-pointer" data-mock="true">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-muted-foreground mb-4"></i>
+                        <h3 class="text-lg font-semibold mb-2">Upload Your Photos</h3>
+                        <p class="text-muted-foreground mb-4">Drag & drop your photos here or click to browse</p>
+                        <button class="bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                            Choose Photos
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button class="bg-primary text-primary-foreground px-8 py-4 rounded-lg hover:bg-primary/90 transition-colors font-semibold text-lg">
+                        Create Photo Book
+                    </button>
+                    <button class="border border-border text-foreground px-8 py-4 rounded-lg hover:bg-secondary transition-colors font-semibold text-lg">
+                        Browse Templates
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Hero Section -->
+    
+    <!-- @COMPONENT: Product Categories [Main product types] -->
+    <section class="py-16 bg-card">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-foreground mb-4">Choose Your Memory Format</h2>
+                <p class="text-muted-foreground text-lg">From intimate albums to wall art masterpieces</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Photo Books -->
+                <div class="product-hover bg-card border border-border rounded-xl p-6 text-center cursor-pointer">
+                    <!-- Beautiful photo book showcase with wedding photos -->
+                    <img src="https://images.unsplash.com/photo-1606216794074-735e91aa2c92?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400" alt="Elegant photo book with wedding memories" class="w-full h-48 object-cover rounded-lg mb-6" />
+                    <h3 class="text-xl font-semibold mb-3">Photo Books</h3>
+                    <p class="text-muted-foreground mb-4">Professional photo books starting at $19.99</p>
+                    <ul class="text-sm text-muted-foreground space-y-1 mb-6">
+                        <li>• Multiple sizes available</li>
+                        <li>• Premium paper quality</li>
+                        <li>• Custom layouts</li>
+                    </ul>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                        Start Creating
+                    </button>
+                </div>
+                
+                <!-- Frames & Portraits -->
+                <div class="product-hover bg-card border border-border rounded-xl p-6 text-center cursor-pointer">
+                    <!-- Gallery wall with framed family photos -->
+                    <img src="https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400" alt="Gallery wall with beautifully framed family portraits" class="w-full h-48 object-cover rounded-lg mb-6" />
+                    <h3 class="text-xl font-semibold mb-3">Frames & Portraits</h3>
+                    <p class="text-muted-foreground mb-4">Custom frames starting at $24.99</p>
+                    <ul class="text-sm text-muted-foreground space-y-1 mb-6">
+                        <li>• Canvas, metal, acrylic options</li>
+                        <li>• Various frame styles</li>
+                        <li>• Ready to hang</li>
+                    </ul>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                        Design Frame
+                    </button>
+                </div>
+                
+                <!-- Custom Albums -->
+                <div class="product-hover bg-card border border-border rounded-xl p-6 text-center cursor-pointer">
+                    <!-- Vintage-style photo album with family memories -->
+                    <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=400" alt="Vintage photo album filled with cherished family memories" class="w-full h-48 object-cover rounded-lg mb-6" />
+                    <h3 class="text-xl font-semibold mb-3">Custom Albums</h3>
+                    <p class="text-muted-foreground mb-4">Personalized albums starting at $34.99</p>
+                    <ul class="text-sm text-muted-foreground space-y-1 mb-6">
+                        <li>• Leather & fabric covers</li>
+                        <li>• Magnetic or bound pages</li>
+                        <li>• Heirloom quality</li>
+                    </ul>
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                        Create Album
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Product Categories -->
+    
+    <!-- @COMPONENT: Template Gallery [Popular templates showcase] -->
+    <section class="py-16 bg-background">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-foreground mb-4">Pick the Perfect Theme for Your Story</h2>
+                <p class="text-muted-foreground text-lg">Professional designs for every occasion</p>
+            </div>
+            
+            <!-- Category Tabs -->
+            <div class="flex justify-center mb-8">
+                <div class="flex space-x-1 bg-muted p-1 rounded-lg">
+                    <button class="px-6 py-2 rounded-md bg-primary text-primary-foreground font-medium">Travel</button>
+                    <button class="px-6 py-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">Wedding</button>
+                    <button class="px-6 py-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">Family</button>
+                    <button class="px-6 py-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">Baby</button>
+                    <button class="px-6 py-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">All</button>
+                </div>
+            </div>
+            
+            <!-- Template Grid -->
+            <div class="template-grid mb-8">
+                <!-- @MAP: templates.map(template => ( -->
+                <!-- Europe Travel Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="europe-travel">
+                    <!-- European cityscape with vintage architecture -->
+                    <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="European cityscape with historic architecture and canals" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Europe Travel</h3>
+                        <p class="text-sm text-muted-foreground mb-3">20 pages • Starting at $18.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">1.2K+ books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modern Wedding Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="modern-wedding">
+                    <!-- Elegant wedding couple in golden hour lighting -->
+                    <img src="https://images.unsplash.com/photo-1519741497674-611481863552?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="Elegant wedding couple in beautiful golden hour lighting" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Modern Wedding</h3>
+                        <p class="text-sm text-muted-foreground mb-3">26 pages • Starting at $24.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">2.8K+ books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Adventure Travel Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="adventure-travel">
+                    <!-- Mountain hiking adventure with scenic landscape -->
+                    <img src="https://images.unsplash.com/photo-1551632811-561732d1e306?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="Mountain hiking adventure with breathtaking scenic landscape" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Adventure Travel</h3>
+                        <p class="text-sm text-muted-foreground mb-3">24 pages • Starting at $21.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">956 books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Family Moments Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="family-moments">
+                    <!-- Happy family gathering with multiple generations -->
+                    <img src="https://images.unsplash.com/photo-1511895426328-dc8714191300?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="Happy multi-generational family gathering with warm smiles" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Family Moments</h3>
+                        <p class="text-sm text-muted-foreground mb-3">20 pages • Starting at $19.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">3.4K+ books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Vintage Summer Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="vintage-summer">
+                    <!-- Vintage summer beach scene with retro styling -->
+                    <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="Vintage summer beach scene with retro aesthetic and warm tones" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Vintage Summer</h3>
+                        <p class="text-sm text-muted-foreground mb-3">22 pages • Starting at $20.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">1.7K+ books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Baby's First Year Template -->
+                <div class="product-hover bg-card border border-border rounded-xl overflow-hidden cursor-pointer" data-template-id="baby-first-year">
+                    <!-- Adorable newborn baby in soft, gentle lighting -->
+                    <img src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" alt="Adorable newborn baby in soft, gentle lighting with tender moment" class="w-full h-48 object-cover" />
+                    <div class="p-4">
+                        <h3 class="font-semibold text-foreground mb-2">Baby's First Year</h3>
+                        <p class="text-sm text-muted-foreground mb-3">30 pages • Starting at $26.99</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">2.1K+ books created</span>
+                            <button class="text-primary hover:text-primary/80 transition-colors">
+                                <i class="far fa-heart"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+            
+            <div class="text-center">
+                <button class="border border-border text-foreground px-8 py-3 rounded-lg hover:bg-secondary transition-colors font-medium">
+                    View All Templates
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Template Gallery -->
+    
+    <!-- @COMPONENT: Features Section [Key value propositions] -->
+    <section class="py-16 bg-card">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-foreground mb-4">Why Choose TrueKeeps?</h2>
+                <p class="text-muted-foreground text-lg">Professional quality meets emotional value</p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-magic text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="font-semibold mb-2">AI-Powered Design</h3>
+                    <p class="text-muted-foreground text-sm">Smart layouts that automatically arrange your photos beautifully</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-gem text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="font-semibold mb-2">Premium Quality</h3>
+                    <p class="text-muted-foreground text-sm">Museum-grade materials that last generations</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-eye text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="font-semibold mb-2">Live Preview</h3>
+                    <p class="text-muted-foreground text-sm">See exactly how your product will look before ordering</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-shipping-fast text-2xl text-primary"></i>
+                    </div>
+                    <h3 class="font-semibold mb-2">Fast Delivery</h3>
+                    <p class="text-muted-foreground text-sm">Your memories delivered safely in 3-5 business days</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Features Section -->
+    
+    <!-- @COMPONENT: Testimonials [Social proof] -->
+    <section class="py-16 bg-background">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-foreground mb-4">Loved by Families Everywhere</h2>
+                <p class="text-muted-foreground text-lg">Join thousands who've brought their memories to life</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-card p-6 rounded-xl border border-border">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-muted-foreground mb-4" data-mock="true">"TrueKeeps turned our wedding photos into the most beautiful album. The quality is incredible and the design process was so easy!"</p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold mr-3">SM</div>
+                        <div>
+                            <p class="font-semibold" data-mock="true">Sarah Mitchell</p>
+                            <p class="text-sm text-muted-foreground" data-mock="true">Wedding Album</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-card p-6 rounded-xl border border-border">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-muted-foreground mb-4" data-mock="true">"Perfect for preserving our baby's first year. The templates made it so simple to create something we'll treasure forever."</p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold mr-3">JD</div>
+                        <div>
+                            <p class="font-semibold" data-mock="true">James Davis</p>
+                            <p class="text-sm text-muted-foreground" data-mock="true">Baby Photo Book</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-card p-6 rounded-xl border border-border">
+                    <div class="flex items-center mb-4">
+                        <div class="flex text-yellow-400">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                    <p class="text-muted-foreground mb-4" data-mock="true">"The travel album from our European trip looks amazing on our coffee table. Guests always ask where we got it made!"</p>
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold mr-3">AL</div>
+                        <div>
+                            <p class="font-semibold" data-mock="true">Anna Lopez</p>
+                            <p class="text-sm text-muted-foreground" data-mock="true">Travel Photo Book</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: Testimonials -->
+    
+    <!-- @COMPONENT: CTA Section [Final conversion opportunity] -->
+    <section class="py-20 bg-gradient-to-r from-primary to-accent">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl font-bold text-white mb-6">Ready to Bring Your Memories to Life?</h2>
+            <p class="text-xl text-white/90 mb-8">Start creating your personalized photo products today. No design experience needed.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button class="bg-white text-primary px-8 py-4 rounded-lg hover:bg-gray-100 transition-colors font-semibold text-lg">
+                    Start Creating Now
+                </button>
+                <button class="border-2 border-white text-white px-8 py-4 rounded-lg hover:bg-white hover:text-primary transition-colors font-semibold text-lg">
+                    Browse Templates
+                </button>
+            </div>
+        </div>
+    </section>
+    <!-- @END_COMPONENT: CTA Section -->
+    
+    <!-- @COMPONENT: Footer [Company info and links] -->
+    <footer class="bg-card border-t border-border py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div>
+                    <div class="text-xl font-bold text-primary mb-4">truekeeps<span class="text-accent">.</span></div>
+                    <p class="text-muted-foreground text-sm mb-4">Keeping memories alive through premium photo products.</p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Products</h4>
+                    <ul class="space-y-2 text-sm text-muted-foreground">
+                        <li><a href="#" class="hover:text-primary transition-colors">Photo Books</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Canvas Prints</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Photo Albums</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Custom Frames</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Support</h4>
+                    <ul class="space-y-2 text-sm text-muted-foreground">
+                        <li><a href="#" class="hover:text-primary transition-colors">Help Center</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Shipping Info</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Returns</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Contact Us</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-semibold mb-4">Company</h4>
+                    <ul class="space-y-2 text-sm text-muted-foreground">
+                        <li><a href="#" class="hover:text-primary transition-colors">About Us</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Terms of Service</a></li>
+                        <li><a href="#" class="hover:text-primary transition-colors">Careers</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-border mt-8 pt-8 text-center">
+                <p class="text-muted-foreground text-sm">© 2024 TrueKeeps. All rights reserved. Keeping memories alive.</p>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+    
+    <!-- @COMPONENT: Template Preview Modal [Hidden by default] -->
+    <div id="templateModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-2xl font-bold text-foreground">Europe Travel</h3>
+                            <p class="text-muted-foreground">Starting at $18.99 for 20 pages</p>
+                        </div>
+                        <button id="closeModal" class="text-muted-foreground hover:text-foreground transition-colors">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <div>
+                            <!-- European architecture and travel scenes collage -->
+                            <img src="https://pixabay.com/get/g93ea1025a577a1ea402b205a4ff0838b7fd5c170a79a0885798b11b1d221276c9ea8797ad32ae4a58694871a4c03355eb9831dc83381fb203a6d78b5e0d69af4_1280.jpg" alt="Beautiful European travel photo book layout with historic architecture" class="w-full rounded-lg mb-4" />
+                            <div class="flex space-x-2">
+                                <button class="bg-secondary text-foreground px-3 py-1 rounded text-sm">Square</button>
+                                <button class="border border-border text-muted-foreground px-3 py-1 rounded text-sm">Portrait</button>
+                                <button class="border border-border text-muted-foreground px-3 py-1 rounded text-sm">Landscape</button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="space-y-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-book text-primary mr-3"></i>
+                                    <span class="text-sm">1.2K+ books created with this theme</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-palette text-primary mr-3"></i>
+                                    <span class="text-sm">100% fully customizable</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <i class="fas fa-truck text-primary mr-3"></i>
+                                    <span class="text-sm">Order with Rush to get it by September 15</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-8 space-y-3">
+                                <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors font-medium">
+                                    Start Designing
+                                </button>
+                                <button class="w-full border border-border text-foreground py-3 rounded-lg hover:bg-secondary transition-colors">
+                                    View Product Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: Template Preview Modal -->
+    
+    <script>
+        // TODO: Implement business logic, API calls, and state management
+        (function() {
+            // Template modal functionality
+            const templateCards = document.querySelectorAll('[data-template-id]');
+            const modal = document.getElementById('templateModal');
+            const closeModal = document.getElementById('closeModal');
+            
+            templateCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    modal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                });
+            });
+            
+            closeModal.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                }
+            });
+            
+            // Photo upload drag and drop placeholder
+            const uploadArea = document.querySelector('[data-mock="true"]');
+            if (uploadArea && uploadArea.textContent.includes('Upload Your Photos')) {
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.style.borderColor = 'var(--primary)';
+                });
+                
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.style.borderColor = 'var(--border)';
+                });
+                
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.style.borderColor = 'var(--border)';
+                    // TODO: Handle file upload logic
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
