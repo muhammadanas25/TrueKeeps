@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 export function HeroSection() {
   return (
@@ -21,13 +22,15 @@ export function HeroSection() {
           <p className="text-xl md:text-2xl mb-8 opacity-90" data-testid="text-hero-subtitle">
             Transform your digital memories into timeless keepsakes
           </p>
-          <Button 
-            size="lg"
-            className="bg-secondary text-secondary-foreground px-8 py-4 text-lg font-semibold hover:opacity-90 transform hover:scale-105 transition-all"
-            data-testid="button-create-photobook"
-          >
-            Create your photo book
-          </Button>
+          <Link href="/templates">
+            <Button 
+              size="lg"
+              className="bg-secondary text-secondary-foreground px-8 py-4 text-lg font-semibold hover:opacity-90 transform hover:scale-105 transition-all"
+              data-testid="button-create-photobook"
+            >
+              Create your photo book
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

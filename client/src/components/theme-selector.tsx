@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { Link } from "wouter";
 
 const themeCategories = ["Travel", "Simple", "Family", "Wedding", "All"];
 
@@ -112,21 +113,25 @@ export function ThemeSelector() {
         </div>
 
         <div className="text-center mt-12">
-          <Button 
-            size="lg"
-            className="bg-primary text-primary-foreground px-8 py-3 font-semibold hover:opacity-90 mr-4"
-            data-testid="button-explore-themes"
-          >
-            Explore travel themes
-          </Button>
-          <Button 
-            variant="outline"
-            size="lg"
-            className="border border-border text-foreground px-8 py-3 font-semibold hover:bg-muted"
-            data-testid="button-see-all-themes"
-          >
-            See all themes
-          </Button>
+          <Link href="/templates?category=Travel">
+            <Button 
+              size="lg"
+              className="bg-primary text-primary-foreground px-8 py-3 font-semibold hover:opacity-90 mr-4"
+              data-testid="button-explore-themes"
+            >
+              Explore travel themes
+            </Button>
+          </Link>
+          <Link href="/templates">
+            <Button 
+              variant="outline"
+              size="lg"
+              className="border border-border text-foreground px-8 py-3 font-semibold hover:bg-muted"
+              data-testid="button-see-all-themes"
+            >
+              See all themes
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
