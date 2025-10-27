@@ -12,9 +12,12 @@ export function NavigationHeader() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="gradient-text text-2xl font-bold" data-testid="logo">
-              truekeeps.
-            </div>
+            <img 
+              src="/attached_assets/Turekeeps - Logo - 500x500_1756580943388.png"
+              alt="TrueKeeps"
+              className="h-8 w-auto"
+              data-testid="logo"
+            />
           </div>
 
           {/* Search Bar */}
