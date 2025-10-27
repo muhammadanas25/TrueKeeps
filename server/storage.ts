@@ -82,7 +82,13 @@ export class MemStorage implements IStorage {
     
     sampleThemes.forEach((theme) => {
       const id = randomUUID();
-      this.themes.set(id, { ...theme, id, createdAt: new Date() });
+      this.themes.set(id, { 
+        ...theme, 
+        id, 
+        createdAt: new Date(),
+        imageUrl: theme.imageUrl || null,
+        pageCount: theme.pageCount || 20,
+      });
     });
   }
 
@@ -119,7 +125,13 @@ export class MemStorage implements IStorage {
 
   async createTheme(insertTheme: InsertTheme): Promise<Theme> {
     const id = randomUUID();
-    const theme: Theme = { ...insertTheme, id, createdAt: new Date() };
+    const theme: Theme = { 
+      ...insertTheme, 
+      id, 
+      createdAt: new Date(),
+      imageUrl: insertTheme.imageUrl || null,
+      pageCount: insertTheme.pageCount || 20,
+    };
     this.themes.set(id, theme);
     return theme;
   }
@@ -139,6 +151,9 @@ export class MemStorage implements IStorage {
     const project: Project = { 
       ...insertProject, 
       id, 
+      status: insertProject.status || "draft",
+      userId: insertProject.userId || null,
+      themeId: insertProject.themeId || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -175,7 +190,13 @@ export class MemStorage implements IStorage {
 
   async createProjectPage(insertPage: InsertProjectPage): Promise<ProjectPage> {
     const id = randomUUID();
-    const page: ProjectPage = { ...insertPage, id, createdAt: new Date() };
+    const page: ProjectPage = { 
+      ...insertPage, 
+      id, 
+      layoutId: insertPage.layoutId || null,
+      backgroundUrl: insertPage.backgroundUrl || null,
+      createdAt: new Date(),
+    };
     this.projectPages.set(id, page);
     return page;
   }
@@ -205,7 +226,17 @@ export class MemStorage implements IStorage {
 
   async createPagePhoto(insertPhoto: InsertPagePhoto): Promise<PagePhoto> {
     const id = randomUUID();
-    const photo: PagePhoto = { ...insertPhoto, id, createdAt: new Date() };
+    const photo: PagePhoto = { 
+      ...insertPhoto, 
+      id, 
+      x: insertPhoto.x ?? 0,
+      y: insertPhoto.y ?? 0,
+      width: insertPhoto.width ?? 100,
+      height: insertPhoto.height ?? 100,
+      rotation: insertPhoto.rotation ?? 0,
+      zIndex: insertPhoto.zIndex ?? 0,
+      createdAt: new Date(),
+    };
     this.pagePhotos.set(id, photo);
     return photo;
   }
@@ -235,7 +266,13 @@ export class MemStorage implements IStorage {
 
   async createUploadedPhoto(insertPhoto: InsertUploadedPhoto): Promise<UploadedPhoto> {
     const id = randomUUID();
-    const photo: UploadedPhoto = { ...insertPhoto, id, uploadedAt: new Date() };
+    const photo: UploadedPhoto = { 
+      ...insertPhoto, 
+      id, 
+      userId: insertPhoto.userId || null,
+      projectId: insertPhoto.projectId || null,
+      uploadedAt: new Date(),
+    };
     this.uploadedPhotos.set(id, photo);
     return photo;
   }
