@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhotobookPreview } from "@/components/PhotobookPreview";
 
 export default function Create() {
   const [, navigate] = useLocation();
@@ -44,6 +45,9 @@ export default function Create() {
   const [showPreview, setShowPreview] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [draggedPhoto, setDraggedPhoto] = useState<UploadedPhoto | null>(null);
+  const [canvasDropActive, setCanvasDropActive] = useState(false);
+  const [show3DPreview, setShow3DPreview] = useState(false);
 
   // Fetch existing project if projectId exists
   const { data: existingProject } = useQuery<Project>({
@@ -75,6 +79,62 @@ export default function Create() {
       setProjectName(existingProject.name);
     }
   }, [existingProject, projectName]);
+
+  // Query pages for this project
+  const { data: pages = [] } = useQuery<ProjectPage[]>({
+    queryKey: ["/api/projects", projectId, "pages"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/projects/${projectId}/pages`);
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  // Get current page
+  const currentPageData = pages.find(p => p.pageNumber === currentPage);
+
+  // Query photos on current page
+  const { data: placedPhotos = [] } = useQuery<PagePhoto[]>({
+    queryKey: ["/api/pages", currentPageData?.id, "photos"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/pages/${currentPageData?.id}/photos`);
+      return response.json();
+    },
+    enabled: !!currentPageData?.id,
+  });
+
+  // Query all page photos for 3D preview
+  const { data: allPagePhotos = {} } = useQuery<Record<string, PagePhoto[]>>({
+    queryKey: ["/api/projects", projectId, "all-photos"],
+    queryFn: async () => {
+      const photosByPage: Record<string, PagePhoto[]> = {};
+      for (const page of pages) {
+        const response = await apiRequest("GET", `/api/pages/${page.id}/photos`);
+        const photos = await response.json();
+        photosByPage[page.id] = photos;
+      }
+      return photosByPage;
+    },
+    enabled: !!projectId && pages.length > 0 && show3DPreview,
+  });
+
+  // Create default page if none exist
+  useEffect(() => {
+    const createDefaultPage = async () => {
+      if (projectId && pages.length === 0) {
+        try {
+          await apiRequest("POST", `/api/projects/${projectId}/pages`, {
+            projectId,
+            pageNumber: 1,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "pages"] });
+        } catch (error) {
+          console.error("Failed to create default page:", error);
+        }
+      }
+    };
+    createDefaultPage();
+  }, [projectId, pages.length]);
 
   // Create project mutation
   const createProjectMutation = useMutation({
@@ -195,11 +255,123 @@ export default function Create() {
     }
   }, []);
 
-  const handleAutoLayout = () => {
+  const handleAutoLayout = async () => {
+    if (!projectId || !currentPageData) {
+      toast({
+        title: "Error",
+        description: "Please create a page first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Auto-arrange photos in a grid
+    const photosPerRow = 3;
+    const gridSpacing = 20;
+    const photoWidth = 200;
+    const photoHeight = 200;
+
+    for (let i = 0; i < uploadedPhotos.length; i++) {
+      const row = Math.floor(i / photosPerRow);
+      const col = i % photosPerRow;
+      
+      await apiRequest("POST", `/api/pages/${currentPageData.id}/photos`, {
+        photoUrl: uploadedPhotos[i].url,
+        x: col * (photoWidth + gridSpacing) + 50,
+        y: row * (photoHeight + gridSpacing) + 50,
+        width: photoWidth,
+        height: photoHeight,
+        rotation: 0,
+        zIndex: i,
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/pages", currentPageData.id, "photos"] });
     toast({
       title: "Auto-layout applied",
       description: "AI has automatically arranged your photos",
     });
+  };
+
+  // Photo drag handlers
+  const handlePhotoDragStart = (e: React.DragEvent, photo: UploadedPhoto) => {
+    setDraggedPhoto(photo);
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("photoId", photo.id);
+  };
+
+  const handlePhotoDragEnd = () => {
+    setDraggedPhoto(null);
+    setCanvasDropActive(false);
+  };
+
+  // Canvas drop handlers
+  const handleCanvasDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setCanvasDropActive(true);
+  };
+
+  const handleCanvasDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setCanvasDropActive(false);
+  };
+
+  const handleCanvasDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setCanvasDropActive(false);
+
+    if (!draggedPhoto || !currentPageData) {
+      toast({
+        title: "Error",
+        description: "Please select a valid photo and page",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get canvas bounds
+    const canvas = e.currentTarget.getBoundingClientRect();
+    
+    // Calculate position relative to canvas
+    let x = e.clientX - canvas.left;
+    let y = e.clientY - canvas.top;
+
+    // Snap to grid (20px grid)
+    const gridSize = 20;
+    x = Math.round(x / gridSize) * gridSize;
+    y = Math.round(y / gridSize) * gridSize;
+
+    // Default photo size
+    const defaultWidth = 200;
+    const defaultHeight = 200;
+
+    try {
+      await apiRequest("POST", `/api/pages/${currentPageData.id}/photos`, {
+        photoUrl: draggedPhoto.url,
+        x,
+        y,
+        width: defaultWidth,
+        height: defaultHeight,
+        rotation: 0,
+        zIndex: placedPhotos.length,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", currentPageData.id, "photos"] });
+      
+      toast({
+        title: "Photo placed",
+        description: "Your photo has been added to the page.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to place photo on page",
+        variant: "destructive",
+      });
+    }
+
+    setDraggedPhoto(null);
   };
 
   const handleSave = () => {
@@ -340,14 +512,17 @@ export default function Create() {
               {uploadedPhotos.map((photo) => (
                 <div 
                   key={photo.id}
-                  className="relative group cursor-pointer"
+                  className="relative group cursor-move"
+                  draggable={selectedMode === "advanced"}
+                  onDragStart={(e) => handlePhotoDragStart(e, photo)}
+                  onDragEnd={handlePhotoDragEnd}
                   onClick={() => setSelectedPhotoId(photo.id)}
                   data-testid={`img-uploaded-${photo.id}`}
                 >
                   <img 
                     src={photo.url}
                     alt={photo.originalFilename}
-                    className="w-full aspect-square object-cover rounded-lg border border-border"
+                    className="w-full aspect-square object-cover rounded-lg border border-border pointer-events-none"
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                     <Button
@@ -363,6 +538,11 @@ export default function Create() {
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
+                  {selectedMode === "advanced" && (
+                    <div className="absolute top-1 right-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded">
+                      <Move className="h-3 w-3" />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -417,22 +597,77 @@ export default function Create() {
               </div>
             ) : (
               <div className="w-full max-w-6xl">
-                <Card className="bg-white aspect-[8.5/11] shadow-2xl relative" data-testid="canvas-advanced">
-                  {selectedPhotoId && uploadedPhotos.find(p => p.id === selectedPhotoId) && (
-                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <Card 
+                  className={`bg-white aspect-[8.5/11] shadow-2xl relative overflow-hidden ${
+                    canvasDropActive ? "ring-4 ring-primary ring-offset-4" : ""
+                  }`}
+                  data-testid="canvas-advanced"
+                  onDragOver={handleCanvasDragOver}
+                  onDragLeave={handleCanvasDragLeave}
+                  onDrop={handleCanvasDrop}
+                >
+                  {/* Grid overlay for visual guidance */}
+                  {canvasDropActive && (
+                    <div 
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage: `
+                          linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                          linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px)
+                        `,
+                        backgroundSize: "20px 20px",
+                      }}
+                    />
+                  )}
+
+                  {/* Placed photos */}
+                  {placedPhotos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="absolute cursor-move hover:ring-2 hover:ring-primary transition-all"
+                      style={{
+                        left: `${photo.x}px`,
+                        top: `${photo.y}px`,
+                        width: `${photo.width}px`,
+                        height: `${photo.height}px`,
+                        transform: `rotate(${photo.rotation}deg)`,
+                        zIndex: photo.zIndex,
+                      }}
+                      data-testid={`placed-photo-${photo.id}`}
+                    >
                       <img 
-                        src={uploadedPhotos.find(p => p.id === selectedPhotoId)?.url}
-                        alt="Placed"
-                        className="max-w-md shadow-lg"
+                        src={photo.photoUrl}
+                        alt="Placed photo"
+                        className="w-full h-full object-cover rounded shadow-lg"
                         draggable={false}
                       />
                     </div>
-                  )}
-                  {!selectedPhotoId && (
+                  ))}
+
+                  {/* Drop zone hint */}
+                  {placedPhotos.length === 0 && !canvasDropActive && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-muted-foreground">
-                        Click a photo from your library to place it here
-                      </p>
+                      <div className="text-center">
+                        <Grid3x3 className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-muted-foreground">
+                          Drag photos from your library to place them here
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Photos will snap to a 20px grid
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active drag indicator */}
+                  {canvasDropActive && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-primary/10 pointer-events-none">
+                      <div className="text-center">
+                        <Plus className="h-16 w-16 mx-auto mb-2 text-primary" />
+                        <p className="text-primary font-semibold">
+                          Drop photo here
+                        </p>
+                      </div>
                     </div>
                   )}
                 </Card>
