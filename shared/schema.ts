@@ -67,8 +67,19 @@ export const uploadedPhotos = pgTable("uploaded_photos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id"),
   projectId: varchar("project_id"),
+  /** Servable URL of the original (media-store public URL; legacy rows may hold data: URLs) */
   url: text("url").notNull(),
   originalFilename: text("original_filename").notNull(),
+  /** Media-store object key of the original; null for legacy data-URL rows */
+  storageKey: text("storage_key"),
+  /** Servable URL of the ~400px thumbnail derivative (set async by the image pipeline) */
+  thumbUrl: text("thumb_url"),
+  /** Servable URL of the ~1200px preview derivative (set async by the image pipeline) */
+  previewUrl: text("preview_url"),
+  /** Pixel dimensions of the (EXIF-rotated) original; set async by the image pipeline */
+  width: integer("width"),
+  height: integer("height"),
+  sizeBytes: integer("size_bytes"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 

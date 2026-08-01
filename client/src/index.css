@@ -1,8 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Archivo:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── v1 (legacy) variables ─────────────────────────────── */
 :root {
   --background: hsl(0, 0%, 98%);
   --foreground: hsl(0, 0%, 23%);
@@ -40,6 +42,99 @@
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
   --radius: 0.75rem;
+
+  /* ─── v2 TrueKeep brand tokens (available globally) ───────────────
+     Source of truth: TrueKeeps Design System v2 (colors_and_type.css,
+     updated bundle namespace TrueKeepsDesignSystem_019dee).
+     Approach: the full primitive + semantic token set lives in :root so
+     the landing (features/landing) and the book builder (features/builder)
+     CSS — both ported from the design-system prototypes — resolve
+     identically inside the app without needing their own token files. */
+  --tk-cobalt:         #1D46A0;   /* Primary CTA, active states (brand: Cobalt Blue) */
+  --tk-cobalt-light:   #2a5cc0;   /* Hover variant */
+  --tk-cobalt-dark:    #163880;   /* Deep sections, book spines */
+  --tk-cobalt-dim:     rgba(29, 70, 160, 0.08);  /* Tint bg */
+  --tk-cobalt-ring:    rgba(29, 70, 160, 0.15);  /* Focus ring */
+  --tk-raspberry:      #DB3069;   /* Accent, badges (brand: Razzmatazz) */
+  --tk-raspberry-light:#e8467d;   /* Hover variant */
+  --tk-raspberry-dim:  rgba(219, 48, 105, 0.08); /* Tint bg */
+  --tk-gold:           #F5D547;   /* Royal Gold — highlight, premium accent */
+  --tk-gold-light:     #f8e07a;   /* Hover / glow */
+  --tk-gold-deep:      #d8b62e;   /* Gold text on light, borders */
+  --tk-gold-dim:       rgba(245, 213, 71, 0.16); /* Tint bg */
+  --tk-cream:          #EBEBD3;   /* Page bg, selection fill (brand: Beige) */
+  --tk-cream-muted:    #F4F2E8;   /* Muted section bg */
+  --tk-cream-warm:     #FAFAF7;   /* Near-white warm surface */
+  --tk-gunmetal:       #3C3C3B;   /* Body text, icons */
+  --tk-gunmetal-light: #6b6b69;   /* Secondary text */
+  --tk-gunmetal-faint: #9b9b97;   /* Placeholder, captions */
+  --tk-white:          #FFFFFF;
+
+  /* Semantic foreground/border tokens used by the ported prototype CSS */
+  --color-fg1:         var(--tk-gunmetal);
+  --color-fg2:         var(--tk-gunmetal-light);
+  --color-fg3:         var(--tk-gunmetal-faint);
+  --color-border:      #d8d5c5;
+
+  --font-display: 'Clash Display', 'Outfit', system-ui, sans-serif;
+  --font-body:    'Archivo', 'Outfit', system-ui, sans-serif;
+
+  /* Weight / tracking primitives (design-system scale) */
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --ls-tight: -0.02em;
+
+  /* Radius scale */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-base: 12px;   /* inputs, small cards */
+  --radius-lg: 16px;     /* standard cards */
+  --radius-xl: 20px;     /* wizard cards, panels */
+  --radius-2xl: 24px;    /* hero mode cards, upload zone */
+  --radius-pill: 9999px; /* buttons, chips */
+
+  /* Elevation scale */
+  --shadow-xs: 0 1px 3px rgba(60, 60, 59, 0.06);
+  --shadow-sm: 0 2px 8px rgba(60, 60, 59, 0.08);
+  --shadow-md: 0 4px 16px rgba(60, 60, 59, 0.10);
+  --shadow-lg: 0 8px 24px rgba(60, 60, 59, 0.12);
+  --shadow-xl: 0 16px 48px rgba(60, 60, 59, 0.14);
+  --shadow-focus: 0 0 0 4px rgba(29, 70, 160, 0.15);
+  --shadow-selected: 0 0 0 4px rgba(29, 70, 160, 0.12);
+
+  /* Motion tokens */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+  --duration-flip: 580ms; /* book page-turn */
+}
+
+/* ─── v2 theme override — activated by .theme-v2 on <body> ─ */
+.theme-v2 {
+  --background: #EBEBD3;
+  --foreground: #3C3C3B;
+  --card: #FFFFFF;
+  --card-foreground: #3C3C3B;
+  --popover: #FFFFFF;
+  --popover-foreground: #3C3C3B;
+  --primary: #1D46A0;
+  --primary-foreground: #FFFFFF;
+  --secondary: #DB3069;
+  --secondary-foreground: #FFFFFF;
+  --muted: #F4F2E8;
+  --muted-foreground: #6b6b69;
+  --accent: #DB3069;
+  --accent-foreground: #FFFFFF;
+  --border: #d8d5c5;
+  --input: #d8d5c5;
+  --ring: #1D46A0;
+  --font-sans: 'Archivo', system-ui, sans-serif;
 }
 
 .dark {
@@ -73,34 +168,71 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply font-sans antialiased bg-background text-foreground;
-  }
+  * { @apply border-border; }
+  body { @apply font-sans antialiased bg-background text-foreground; }
 }
 
 @layer utilities {
+  /* ── Typography helpers ── */
+  .font-display { font-family: var(--font-display); }
+  .font-body    { font-family: var(--font-body); }
+
+  /* ── Gradient helpers ── */
   .gradient-text {
-    background: linear-gradient(135deg, hsl(238, 91%, 26%), hsl(332, 58%, 56%));
+    background: linear-gradient(135deg, #1D4BA6, #D85365);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
   .hero-bg {
-    background: linear-gradient(135deg, hsla(238, 91%, 26%, 0.7), hsla(332, 58%, 56%, 0.6));
+    background: linear-gradient(135deg, rgba(29,75,166,0.82), rgba(216,83,101,0.60));
   }
-  
-  .theme-card:hover {
-    transform: translateY(-4px);
-    transition: all 0.3s ease;
+
+  /* ── Card hover effects ── */
+  .theme-card:hover   { transform: translateY(-4px); transition: all 0.3s ease; }
+  .product-card:hover { transform: scale(1.02);      transition: all 0.3s ease; }
+
+  /* ── Wizard step transitions ── */
+  .step-enter        { opacity: 0; transform: translateX(32px); }
+  .step-enter-active { opacity: 1; transform: translateX(0);    transition: opacity 280ms ease, transform 280ms ease; }
+  .step-exit         { opacity: 1; transform: translateX(0); }
+  .step-exit-active  { opacity: 0; transform: translateX(-32px); transition: opacity 280ms ease, transform 280ms ease; }
+
+  /* ── Page flip (used in PageReview step) ── */
+  .page-flip-container { perspective: 1200px; }
+  .page-flip {
+    transform-style: preserve-3d;
+    transition: transform 580ms cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: left center;
   }
-  
-  .product-card:hover {
-    transform: scale(1.02);
-    transition: all 0.3s ease;
+  .page-flip.flipped { transform: rotateY(-180deg); }
+  .page-face         { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .page-face-back    { transform: rotateY(180deg); }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed #d8d5c5;
+    transition: border-color 0.2s, background 0.2s;
   }
+  .upload-zone.active {
+    border-color: #1D4BA6;
+    background: rgba(29, 75, 166, 0.04);
+  }
+
+  /* ── Option chip / pill ── */
+  .option-chip {
+    @apply px-4 py-2 rounded-full border border-border text-sm font-medium cursor-pointer transition-all select-none;
+  }
+  .option-chip.selected {
+    background: #1D4BA6;
+    color: #fff;
+    border-color: #1D4BA6;
+  }
+
+  /* ── Selection card ── */
+  .select-card {
+    @apply rounded-2xl border-2 border-border cursor-pointer transition-all p-4;
+  }
+  .select-card:hover   { border-color: #1D4BA6; box-shadow: 0 0 0 4px rgba(29,75,166,0.08); }
+  .select-card.selected { border-color: #1D4BA6; box-shadow: 0 0 0 4px rgba(29,75,166,0.12); }
 }

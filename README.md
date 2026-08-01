@@ -104,7 +104,7 @@ Connect your local IDE to Replit using SSH:
 
 5. **Open your browser**:
    ```
-   http://localhost:5000
+   http://localhost:5001
    ```
 
 ## Project Structure

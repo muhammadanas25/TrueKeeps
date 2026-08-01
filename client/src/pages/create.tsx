@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PhotobookPreview } from "@/components/PhotobookPreview";
+import { displayUrl, uploadPhotoFile } from "@/lib/uploads";
 
 export default function Create() {
   const [, navigate] = useLocation();
@@ -40,9 +41,9 @@ export default function Create() {
   const [projectId, setProjectId] = useState<string | null>(existingProjectId);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedMode, setSelectedMode] = useState<"quick" | "advanced">("quick");
-  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  // the photo selected ON THE CANVAS — what the properties panel edits
+  const [selectedPlacedId, setSelectedPlacedId] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [draggedPhoto, setDraggedPhoto] = useState<UploadedPhoto | null>(null);
@@ -191,22 +192,13 @@ export default function Create() {
     enabled: !!projectId,
   });
 
-  // Upload photos mutation
+  // Upload photos mutation — compress → presigned PUT → register
+  // (bytes go straight to the media store, never through express.json;
+  // thumbnails attach asynchronously via the server image pipeline)
   const uploadPhotoMutation = useMutation({
     mutationFn: async (file: File) => {
-      const reader = new FileReader();
-      return new Promise<UploadedPhoto>((resolve, reject) => {
-        reader.onload = async () => {
-          const response = await apiRequest("POST", "/api/uploads", {
-            projectId,
-            url: reader.result as string,
-            originalFilename: file.name,
-          });
-          resolve(await response.json());
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      if (!projectId) throw new Error("No project");
+      return uploadPhotoFile(file, projectId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "uploads"] });
@@ -374,11 +366,93 @@ export default function Create() {
     setDraggedPhoto(null);
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Project saved",
-      description: "Your changes have been saved",
-    });
+  // ── Placed-photo editing (properties panel) ──────────────────────
+  // Every edit PATCHes the photo record immediately — the editor has no
+  // separate "save" step; all mutations persist as they happen.
+
+  const selectedPlaced = placedPhotos.find((p) => p.id === selectedPlacedId) ?? null;
+
+  const updatePlacedPhoto = async (
+    id: string,
+    patch: Partial<Pick<PagePhoto, "x" | "y" | "width" | "height" | "rotation" | "zIndex">>,
+  ) => {
+    if (!currentPageData) return;
+    try {
+      await apiRequest("PATCH", `/api/photos/${id}`, patch);
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", currentPageData.id, "photos"] });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update photo", variant: "destructive" });
+    }
+  };
+
+  const removePlacedPhoto = async (id: string) => {
+    if (!currentPageData) return;
+    try {
+      await apiRequest("DELETE", `/api/photos/${id}`);
+      setSelectedPlacedId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", currentPageData.id, "photos"] });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to remove photo", variant: "destructive" });
+    }
+  };
+
+  // ── Layout templates ──────────────────────────────────────────────
+  // Rearranges the photos already placed on the current page into a
+  // named arrangement (positions in canvas px). Photos beyond the
+  // template's slot count keep their position.
+  const LAYOUT_TEMPLATES: Record<string, Array<{ x: number; y: number; width: number; height: number; rotation: number }>> = {
+    single: [{ x: 150, y: 180, width: 500, height: 560, rotation: 0 }],
+    dual: [
+      { x: 60, y: 220, width: 320, height: 380, rotation: 0 },
+      { x: 420, y: 220, width: 320, height: 380, rotation: 0 },
+    ],
+    grid: [
+      { x: 50, y: 50, width: 220, height: 220, rotation: 0 },
+      { x: 290, y: 50, width: 220, height: 220, rotation: 0 },
+      { x: 530, y: 50, width: 220, height: 220, rotation: 0 },
+      { x: 50, y: 290, width: 220, height: 220, rotation: 0 },
+      { x: 290, y: 290, width: 220, height: 220, rotation: 0 },
+      { x: 530, y: 290, width: 220, height: 220, rotation: 0 },
+    ],
+    collage: [
+      { x: 80, y: 80, width: 330, height: 330, rotation: -3 },
+      { x: 400, y: 170, width: 280, height: 280, rotation: 4 },
+      { x: 220, y: 430, width: 310, height: 310, rotation: 1 },
+    ],
+  };
+
+  const applyLayoutTemplate = async (name: string) => {
+    if (!currentPageData || placedPhotos.length === 0) {
+      toast({
+        title: "No photos on this page",
+        description: "Drag photos onto the canvas first, then apply a layout",
+      });
+      return;
+    }
+    const slots = LAYOUT_TEMPLATES[name] ?? [];
+    const targets = placedPhotos.slice(0, slots.length);
+    try {
+      await Promise.all(targets.map((photo, i) => apiRequest("PATCH", `/api/photos/${photo.id}`, slots[i])));
+      queryClient.invalidateQueries({ queryKey: ["/api/pages", currentPageData.id, "photos"] });
+      toast({ title: "Layout applied", description: `${targets.length} photo(s) arranged as ${name}` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to apply layout", variant: "destructive" });
+    }
+  };
+
+  // ── Pages ─────────────────────────────────────────────────────────
+  const addPage = async () => {
+    if (!projectId) return;
+    try {
+      await apiRequest("POST", `/api/projects/${projectId}/pages`, {
+        projectId,
+        pageNumber: pages.length + 1,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "pages"] });
+      setCurrentPage(pages.length + 1);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add page", variant: "destructive" });
+    }
   };
 
   return (
@@ -449,18 +523,20 @@ export default function Create() {
             </TabsList>
           </Tabs>
           
-          <Button 
-            variant="outline" 
-            onClick={() => setShowPreview(true)}
+          <Button
+            variant="outline"
+            onClick={() => setShow3DPreview(true)}
+            disabled={pages.length === 0}
             data-testid="button-3d-preview"
           >
             <Eye className="h-4 w-4 mr-2" />
             3D Preview
           </Button>
-          <Button onClick={handleSave} data-testid="button-save">
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
+          {/* every edit persists via the API as it happens — no save step */}
+          <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid="text-autosave">
+            <Save className="h-3 w-3" />
+            Saves automatically
+          </span>
         </div>
       </div>
 
@@ -516,12 +592,12 @@ export default function Create() {
                   draggable={selectedMode === "advanced"}
                   onDragStart={(e) => handlePhotoDragStart(e, photo)}
                   onDragEnd={handlePhotoDragEnd}
-                  onClick={() => setSelectedPhotoId(photo.id)}
                   data-testid={`img-uploaded-${photo.id}`}
                 >
-                  <img 
-                    src={photo.url}
+                  <img
+                    src={displayUrl(photo)}
                     alt={photo.originalFilename}
+                    loading="lazy"
                     className="w-full aspect-square object-cover rounded-lg border border-border pointer-events-none"
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
@@ -605,6 +681,7 @@ export default function Create() {
                   onDragOver={handleCanvasDragOver}
                   onDragLeave={handleCanvasDragLeave}
                   onDrop={handleCanvasDrop}
+                  onClick={() => setSelectedPlacedId(null)}
                 >
                   {/* Grid overlay for visual guidance */}
                   {canvasDropActive && (
@@ -620,22 +697,28 @@ export default function Create() {
                     />
                   )}
 
-                  {/* Placed photos */}
+                  {/* Placed photos — click selects for the properties panel */}
                   {placedPhotos.map((photo) => (
                     <div
                       key={photo.id}
-                      className="absolute cursor-move hover:ring-2 hover:ring-primary transition-all"
+                      className={`absolute cursor-move transition-all ${
+                        selectedPlacedId === photo.id ? "ring-2 ring-primary ring-offset-2" : "hover:ring-2 hover:ring-primary"
+                      }`}
                       style={{
                         left: `${photo.x}px`,
                         top: `${photo.y}px`,
                         width: `${photo.width}px`,
                         height: `${photo.height}px`,
                         transform: `rotate(${photo.rotation}deg)`,
-                        zIndex: photo.zIndex,
+                        zIndex: photo.zIndex ?? 0,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPlacedId(photo.id);
                       }}
                       data-testid={`placed-photo-${photo.id}`}
                     >
-                      <img 
+                      <img
                         src={photo.photoUrl}
                         alt="Placed photo"
                         className="w-full h-full object-cover rounded shadow-lg"
@@ -684,8 +767,8 @@ export default function Create() {
             <div>
               <label className="text-sm font-medium mb-2 block">Page Navigation</label>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
@@ -694,89 +777,155 @@ export default function Create() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="flex-1 text-center text-sm" data-testid="text-current-page">
-                  Page {currentPage} of 20
+                  Page {currentPage} of {Math.max(pages.length, 1)}
                 </span>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(Math.min(20, currentPage + 1))}
-                  disabled={currentPage === 20}
+                  onClick={() => setCurrentPage(Math.min(pages.length, currentPage + 1))}
+                  disabled={currentPage >= pages.length}
                   data-testid="button-next-page"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                onClick={addPage}
+                disabled={!projectId}
+                data-testid="button-add-page"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add page
+              </Button>
             </div>
 
-            {selectedMode === "advanced" && selectedPhotoId && (
+            {selectedMode === "advanced" && selectedPlaced && (
               <>
-                <div>
+                {/* key remounts sliders when selection changes so
+                    defaultValue reflects the newly selected photo */}
+                <div key={selectedPlaced.id}>
                   <label className="text-sm font-medium mb-2 block">Position</label>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs w-8">X:</span>
-                      <Slider defaultValue={[50]} max={100} step={1} />
+                      <Slider
+                        defaultValue={[selectedPlaced.x]}
+                        max={800}
+                        step={10}
+                        onValueCommit={([x]) => updatePlacedPhoto(selectedPlaced.id, { x })}
+                        data-testid="slider-x"
+                      />
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs w-8">Y:</span>
-                      <Slider defaultValue={[50]} max={100} step={1} />
+                      <Slider
+                        defaultValue={[selectedPlaced.y]}
+                        max={1000}
+                        step={10}
+                        onValueCommit={([y]) => updatePlacedPhoto(selectedPlaced.id, { y })}
+                        data-testid="slider-y"
+                      />
                     </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Size</label>
-                  <Slider defaultValue={[75]} max={100} step={1} />
-                </div>
+                  <label className="text-sm font-medium mb-2 mt-4 block">Size</label>
+                  <Slider
+                    defaultValue={[selectedPlaced.width]}
+                    min={60}
+                    max={600}
+                    step={10}
+                    onValueCommit={([width]) =>
+                      // keep the photo's aspect ratio while scaling
+                      updatePlacedPhoto(selectedPlaced.id, {
+                        width,
+                        height: Math.round((width * selectedPlaced.height) / selectedPlaced.width),
+                      })
+                    }
+                    data-testid="slider-size"
+                  />
 
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Rotation</label>
+                  <label className="text-sm font-medium mb-2 mt-4 block">Rotation</label>
                   <div className="flex items-center gap-2">
-                    <Slider defaultValue={[0]} min={-180} max={180} step={1} className="flex-1" />
-                    <Button variant="outline" size="sm">
+                    <Slider
+                      defaultValue={[selectedPlaced.rotation]}
+                      min={-180}
+                      max={180}
+                      step={1}
+                      className="flex-1"
+                      onValueCommit={([rotation]) => updatePlacedPhoto(selectedPlaced.id, { rotation })}
+                      data-testid="slider-rotation"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => updatePlacedPhoto(selectedPlaced.id, { rotation: 0 })}
+                      title="Reset rotation"
+                      data-testid="button-reset-rotation"
+                    >
                       <RotateCw className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full mt-4"
+                    onClick={() => removePlacedPhoto(selectedPlaced.id)}
+                    data-testid="button-remove-placed"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Remove from page
+                  </Button>
                 </div>
               </>
+            )}
+
+            {selectedMode === "advanced" && !selectedPlaced && (
+              <p className="text-xs text-muted-foreground">
+                Click a photo on the canvas to edit its position, size, and rotation.
+              </p>
             )}
 
             <div>
               <label className="text-sm font-medium mb-2 block">Layout Templates</label>
               <div className="grid grid-cols-2 gap-2">
                 {["Single", "Dual", "Grid", "Collage"].map((layout) => (
-                  <Button 
+                  <Button
                     key={layout}
-                    variant="outline" 
+                    variant="outline"
                     size="sm"
-                    className="h-20"
+                    className="h-20 flex-col gap-1"
+                    onClick={() => applyLayoutTemplate(layout.toLowerCase())}
+                    disabled={placedPhotos.length === 0}
                     data-testid={`button-layout-${layout.toLowerCase()}`}
                   >
                     <Grid3x3 className="h-6 w-6" />
+                    <span className="text-xs">{layout}</span>
                   </Button>
                 ))}
               </div>
+              {placedPhotos.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Place photos on the page to use layouts.
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3D Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>3D Preview</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 bg-gradient-to-br from-muted to-background rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <Eye className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                3D preview will show your photobook as it will appear in print
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* 3D flip-book preview of all pages */}
+      {show3DPreview && (
+        <PhotobookPreview
+          pages={pages}
+          placedPhotos={allPagePhotos}
+          onClose={() => setShow3DPreview(false)}
+          themeName={existingProject?.name || projectName || theme?.name}
+        />
+      )}
     </div>
   );
 }

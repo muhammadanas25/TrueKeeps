@@ -1,0 +1,197 @@
+# TrueKeep — Product Gap Analysis & Full-Stack Architecture
+
+## Status — updated 2026-07-11
+
+**Phase 0 is implemented and verified** (0 TS errors, production build clean, full flow driven in a headless browser):
+
+- ✅ New landing page live at `/` — ported from the updated prototype (`client/src/features/landing/`): Nav, Hero, TrustStrip, HowItWorks, Showcase, Occasions (deep-link to builder with `?occasion=`), Proof, FinalCTA, Footer, scroll-reveal hook.
+- ✅ Quiz-first book builder live at `/wizard` (`client/src/features/builder/`): quiz (occasion → vibe → title) → real photo upload → generating → reveal (3 themes) → 3-D flip preview → customize (layouts, true photo swap, captions, drag-to-reorder pages, theme/density) → order → confirm. Typed state machine + localStorage draft persistence.
+- ✅ Old 6-step wizard kept at `/wizard-classic` for comparison.
+- ✅ Full v2 token set (gold, dims, semantic, shadows, radii, motion) in `client/src/index.css`; brand colors updated to #1D46A0 / #DB3069.
+- ✅ Route-level code splitting in `App.tsx` (builder ≈ 40KB chunk; editor and classic wizard out of the entry bundle).
+- ✅ Dead UI fixed in `create.tsx`: position/size/rotation sliders now PATCH the selected canvas photo; layout template buttons arrange placed photos; page nav shows real page count + "Add page"; 3D Preview opens the real `PhotobookPreview`; fake Save replaced with truthful "Saves automatically"; emoji removed from OrderSummary.
+
+**Phase 1 is implemented and verified 2026-07-14** (0 TS errors, tested against real local Postgres 16 + browser-driven):
+
+- ✅ **Postgres persistence** — `DrizzleStorage` (`server/storage-pg.ts`) behind the existing `IStorage` interface; factory in `server/storage.ts` picks by `DATABASE_URL` (unset → in-memory, zero-setup dev unchanged). Themes auto-seed into an empty DB. Verified: draft + uploads **survive server restart**.
+- ✅ **N+1 elimination** — `GET /api/projects/:id/full` returns project + pages + placed photos + library in a fixed number of queries (`inArray` fan-out).
+- ✅ **Media store** (`server/media.ts`) — photo bytes out of the DB/JSON path: presign → direct PUT → complete. Local disk store (`.local/media`) in dev; Cloudflare R2/S3 via env (`S3_*` in `.env.example`) with identical client flow.
+- ✅ **Image pipeline** (`server/jobs.ts`) — pg-boss-shaped in-process queue; sharp job applies EXIF rotation, probes dimensions, emits `.thumb.webp` (400px) + `.preview.webp` (1200px) derivatives, patches the row async.
+- ✅ **Client uploads** (`client/src/lib/uploads.ts`) — Web-Worker compression (≤2.5MB/2400px) → presigned PUT → register. Builder auto-creates its backing project on first upload; **photos now survive page reloads** (server URLs persist in the draft; offline falls back to session-only data URLs). `create.tsx` uses the same path + lazy-loaded thumbnails.
+- ✅ ADRs: `docs/adr/001` (optional Postgres), `002` (media store/presign), `003` (queue + pipeline). Schema fields added: `storageKey`, `thumbUrl`, `previewUrl`, `width`, `height`, `sizeBytes`.
+
+Local Postgres for dev: `createdb truekeep_dev`, then in `.env`:
+`DATABASE_URL=postgresql://<user>@localhost/truekeep_dev?host=/var/run/postgresql` and run `npm run db:push` once.
+
+**Next up:** Phase 2 (sessions + guest auth, orders schema, payment provider interface, order status + emails). Payment gateway choice (Stripe vs regional) still needs the user's call.
+
+Note: `npm run dev` currently fails on this machine with `ENOSPC` (inotify watcher limit). Fix once with:
+`sudo sysctl fs.inotify.max_user_watches=524288` (persist in /etc/sysctl.conf). `npm run build && PORT=5001 npm start` works meanwhile.
+
+---
+
+## Context
+
+The wizard + canvas editor UI has been redesigned with the TrueKeeps Design System and looks production-quality, but exploration confirms the app is currently a **front-end prototype**: photos are stored as base64 strings in memory, there is no auth, no real checkout (the button fires a toast), no print-ready export, no image processing, and the "AI auto-layout" is a hardcoded grid. This document is (1) a product/UX gap analysis with an AI strategy, and (2) the FE/BE/infra architecture to take it from prototype → sellable product at 100 → 1k → 10k users, followed by a phased build roadmap.
+
+---
+
+# Part 1 — Product & UX (PM hat)
+
+## Updated design references (use these as source of truth)
+User supplied newer design-system files in `~/Downloads` — these supersede the older `TrueKeeps Design System` folder where they overlap:
+- `~/Downloads/app.jsx` — **new builder prototype**: quiz-first flow `quiz (occasion/vibe/title) → upload → generating → reveal ("pick a feel") → preview → customize | order → confirm`, with localStorage persistence, back-map navigation, layout-density regeneration, themes (ivory/cobalt/blush/gallery), cover styles, and a copy-voice toggle (warm/concise).
+- `~/Downloads/landing.jsx` — new landing composition: `Nav → Hero → TrustStrip → HowItWorks → Showcase → Occasions → Proof → FinalCTA → Footer`, with IntersectionObserver scroll-reveal (incl. headless/no-IO fallback).
+- `~/Downloads/_ds_bundle.js`, `_ds_manifest.json` (namespace `TrueKeepsDesignSystem_019dee`), `components.html` — updated TKLogo/TKMark/TKButton/TKBadge components + preview cards (hero pattern, cards, chips, inputs, wizard components, tokens).
+
+**Product decision this implies:** adopt the quiz-first prototype flow as the primary (autopilot) path — it front-loads intent (occasion/vibe) so auto-generation can be smart, and it compresses the current 6-step wizard to 3 perceived steps with "customize" as an optional branch rather than a separate upfront path. The current 6-step wizard's components (BookSettings, PhotoUpload, etc.) get reused inside this flow, not thrown away.
+
+## Guiding principle: Autopilot by default, customization on demand
+
+Every step should produce a good result with **zero decisions** (smart defaults), and expose a single "Customize" affordance for power users. Concretely:
+
+| Step | Autopilot (default) | Power-user escape hatch |
+|---|---|---|
+| Settings | Pre-selected best-seller size/pages/finish | Full option grid (already built) |
+| Upload | AI curates: dedup, blur-cull, chronological order | Manual select/reorder, keep-all toggle |
+| Layout/Theme | AI suggests theme from photo palette + occasion | Full theme grid + category filter (built) |
+| Pages | Auto-generated spreads | **"Edit this page" → opens canvas editor scoped to that one spread** |
+| Cover | Best-quality hero photo auto-picked | Photo picker + style variants (built) |
+| Order | One-click checkout with saved details | Qty/shipping options |
+
+The "Edit this page" bridge is the key missing link — it unifies the two paths (auto users never see the canvas; tinkerers drop in per-page) instead of forcing an upfront auto-vs-custom fork.
+
+## Functionality gaps (ranked)
+
+**P0 — cannot take money without these:**
+1. **Real persistence** — Postgres wired up (Drizzle schema exists, MemStorage is used). Drafts die on server restart today.
+2. **Object storage for photos** — base64-in-DB will not survive real usage (a 50-photo book ≈ 150MB+ of JSON). Presigned direct uploads to R2/S3 + thumbnails.
+3. **Checkout & orders** — orders table, payment gateway, order-confirmation email, order status page. Guest checkout first (email-only), account optional.
+4. **Print-ready export** — render each spread to 300-DPI PDF with bleed/trim marks. Without this there is literally no product to ship to a printer.
+5. **Image pipeline** — HEIC conversion (iPhone users = majority of photo uploads), EXIF rotation, client-side compression before upload, server-side originals kept for print.
+
+**P1 — experience gaps that will hurt conversion:**
+6. **Photo reordering** in PageReview (drag to swap between pages) — the UI hints at it, it's unimplemented.
+7. **Captions/text** — no text layer exists at all (not even in the schema). The design system's `book_builder/data.jsx` already has occasion presets with suggested titles + per-photo captions — port that data model into the app.
+8. **Wire the dead controls** in create.tsx: position/size/rotation sliders (defaultValue only), layout-template buttons, Save, 3D preview, hardcoded "of 20" page count. **Dead UI is worse than missing UI** — it destroys trust.
+9. **Apply the layout choice** — Step 3's layout style (classic/editorial/grid…) is stored but never affects page generation.
+10. Duplicate detection, undo/redo, multi-draft support, shareable preview link ("show grandma before ordering" — also a viral loop).
+
+**P2:** filters, stickers, promo codes, collaboration.
+
+## Design gaps
+- OrderSummary uses emoji ("Order placed 🎉") — violates the design system's no-emoji rule (Lucide only).
+- The custom path: `?mode=custom` currently runs the identical 6 steps — it should route into the canvas editor after upload, per the spec.
+- Canvas editor is desktop-only; wizard is mobile-first — accept this (edit on desktop, review/order on mobile) but detect and message it.
+- Empty states, upload-failure recovery, and preflight warnings (photo will print blurry at this size / face falls in the gutter) are missing — preflight is a differentiator most competitors lack.
+
+## AI strategy — "the best photobook, automatically"
+
+Ordered by impact-per-effort:
+1. **Smart curation (biggest win, cheapest):** perceptual-hash dedup + blur/exposure scoring + burst best-shot pick. Runs with `sharp` + a small heuristic model — no LLM needed, near-zero cost.
+2. **Smart ordering & chaptering:** EXIF timestamps + GPS clustering → chronological chapters ("Day 1 — Rome"). Pure algorithm, no AI cost.
+3. **Aspect-aware auto-layout:** pick spread templates by photo orientations/count instead of the current fixed grid. Algorithmic.
+4. **Claude Vision for captions & titles** (batch, async): occasion detection, per-page captions, book title suggestions. Use Haiku 4.5 for cost (~$0.01–0.03/book with batching). This is the "wow" feature — market it as "AI writes your story."
+5. **Theme suggestion from photo color palette** — extract dominant palette, map to nearest theme.
+6. **Preflight "Make it better" pass:** one button that re-runs curation/layout and shows a before/after diff.
+
+## Ordering & commerce
+- Guest checkout with email; magic-link to reclaim drafts ("finish your book" recovery email = the highest-ROI email in this category, cart abandonment is huge for 30-min creation flows).
+- Order state machine: `created → paid → rendering → sent_to_print → shipped → delivered`, webhook-driven, visible to the user.
+- Reorder/reprint past books in one click (books are gifts; repeat prints are free margin).
+- Payment gateway is region-dependent: Stripe Checkout if available; otherwise a local gateway (e.g. PayFast/Safepay for PK) behind the same `PaymentProvider` interface. **Assumption to confirm with user.**
+- Print fulfillment: start with **manual PDF handoff to a local printer** (zero integration cost), design the pipeline so a print-API (Peecho/Gelato/Cloudprinter) can slot in later.
+
+---
+
+# Part 2 — Architecture (Lead Architect hat)
+
+## Stack decision: keep it, harden it
+React 18 + Vite + TanStack Query + Express + Drizzle/Postgres is fine to 10k users. No rewrite. Add: object storage, a job queue, `sharp`, and a PDF renderer.
+
+## Frontend
+- **Kill base64.** Client compresses (`browser-image-compression`, in a Web Worker, keeps UI at 60fps during 100-photo uploads), then uploads **directly to object storage via presigned URLs** — files never transit the API server. Server only receives metadata.
+- **Route-level code splitting:** `React.lazy` for `/wizard`, `/create`, `/templates` — the canvas editor (Framer Motion + full editor) shouldn't be in the landing bundle. Target <150KB gz initial.
+- **Image delivery:** all grids/thumbnails load resized derivatives (200px/800px) via CDN, never originals; `loading="lazy"` + intersection observer; virtualize the photo library (`@tanstack/react-virtual`) — 300 uploaded photos must not mean 300 live DOM nodes.
+- **Draft persistence:** move from localStorage (5MB cap, why photos are stripped today) to **IndexedDB** for local blobs + background sync of state to server. Draft survives refresh AND device switch (via email link).
+- TanStack Query with optimistic updates for reorder/edit; debounced server autosave of wizard state.
+
+## Backend
+- **Postgres (Neon)** — schema mostly exists; add `orders`, `order_events`, `captions`/text-layer, `render_jobs`. Indexes on every FK used in lookups (`projectId`, `pageId`, `userId`).
+- **N+1 elimination:** loading a project currently implies 1 + N(pages) + N×M(photos) queries. Replace with **one query per entity type using `inArray`** (3 queries total regardless of book size), assembled in memory. Add a `GET /api/projects/:id/full` endpoint returning the whole book in one round trip.
+- **Object storage: Cloudflare R2** — S3-compatible, **zero egress fees** (photos are the dominant bandwidth cost; S3 egress would be the #1 bill at scale). Presigned PUT for upload, signed GET / public CDN for derivatives.
+- **Job queue:** start with **pg-boss** (queue inside Postgres — no Redis to run/pay for). Jobs: thumbnail generation (`sharp`), HEIC fallback conversion, AI caption batches, **PDF rendering**, emails. Swap to BullMQ+Redis only when job volume demands it (~10k tier); same handler code.
+- **PDF rendering:** render spreads server-side with the same layout math as the client → 300-DPI CMYK-safe PDF via headless Chromium (`puppeteer` printing the actual React page templates = pixel-perfect WYSIWYG, one layout codebase) with `pdf-lib` for imposition/bleed/trim marks. Runs as a queue job, never in a request handler.
+- **Auth:** session-based (deps already installed: `express-session` + `connect-pg-simple`), guest sessions promoted to accounts at checkout via email magic link.
+- **API hardening:** zod validation on every route (schemas exist via `drizzle-zod`), rate limiting, upload size/MIME validation, all photo access authorized by project ownership.
+
+## Infra & scaling tiers
+
+| | ~100 users | ~1k users | ~10k users |
+|---|---|---|---|
+| App | 1 small VPS or Railway/Fly instance (API + worker in one process) | Same host, **worker split to own process** | 2–3 API replicas behind LB; autoscaled worker pool for renders |
+| DB | Neon free tier | Neon Launch (~$19) | Neon Scale + connection pooling (built-in pgbouncer) |
+| Storage/CDN | R2 + Cloudflare CDN (free tier CDN) | same | same (this is why R2: egress stays $0) |
+| Queue | pg-boss in Postgres | pg-boss | BullMQ + managed Redis |
+| Cost/mo | **~$5–15** | **~$40–80** | **~$300–600** |
+
+- PDF render (Chromium) is the only heavy compute — it's queued and horizontally scalable independently of the API, so a launch-day order spike queues renders instead of taking the site down.
+- Observability from day one: Sentry (FE+BE, free tier), pino structured logs, uptime check on `/health`. At 1k+, add basic metrics (queue depth, render duration, p95 latency).
+- Deploy: Dockerfile + GitHub Actions → Railway/Fly (or Hetzner + Coolify if optimizing cost). Env-based config already started in `.env.example`.
+
+---
+
+# Part 3 — Code quality, structure & maintainability standards
+
+These apply to every phase below; existing code gets brought up to standard as each file is touched.
+
+## Frontend structure & React best practices
+- **Feature-folder layout** — group by domain, not by file type:
+  ```
+  client/src/
+    features/
+      wizard/        # steps, hooks, wizard state machine
+      editor/        # canvas editor, tools, properties panel
+      checkout/      # order summary, payment, status
+      library/       # photo upload, grid, curation
+    components/ui/   # shadcn primitives only (dumb, reusable)
+    lib/             # config, api client, utils
+    hooks/           # cross-feature hooks only
+  ```
+- **State ownership rules (strict):** server data → TanStack Query only (no copying into useState); wizard flow → one `useReducer` state machine in `wizard-types.ts` (typed actions, no scattered setters); ephemeral UI (hover, open/closed) → local state. No global store until proven necessary.
+- **Component patterns:** composition over prop-drilling (children/slots); container components own data + handlers, presentational components are pure props-in/JSX-out; any component >~150 lines or with >1 responsibility gets split; logic extracted into custom hooks (`usePhotoUpload`, `usePageSpreads`, `useAutosave`) so components stay declarative and hooks stay unit-testable.
+- **React correctness:** no derived state in `useEffect` (compute during render or `useMemo`); stable `key`s from IDs never array index (photo reordering breaks otherwise); `React.lazy` + `Suspense` per route with error boundaries per feature (a canvas crash must not kill checkout); `memo`/`useCallback` only where profiling shows re-render cost (photo grid, canvas items) — not sprinkled everywhere.
+- **Types at boundaries:** all API responses parsed with zod schemas from `shared/` — one source of truth shared FE/BE, so a schema change is a compile error on both sides, not a runtime surprise.
+
+## Backend structure
+- **Layered:** `routes/` (HTTP only: parse → validate → call service → shape response) → `services/` (business logic, transactions, no Express types) → `storage/` (the existing `IStorage` interface — repository pattern, already the right shape; Postgres impl swaps in behind it) → `jobs/` (queue handlers, thin wrappers over services).
+- One module per domain (`projects`, `media`, `orders`, `render`), each with its route file, service, and zod schemas. No business logic in route handlers — this is what keeps the checkout/render logic testable without HTTP.
+- Errors: typed `AppError` hierarchy + one Express error middleware; services throw, routes never `try/catch` individually.
+
+## Documentation & commenting standard (aggressive, by request)
+- **Every module/service file** opens with a header block: what it does, the approach chosen, why (trade-offs considered), and links to related modules.
+- **Every exported function/hook/component** gets JSDoc: purpose, params, return, and non-obvious behavior (e.g. "debounced 800ms — see autosave rationale in wizard/README").
+- **Every non-trivial algorithm** (spread pairing, layout selection, dedup hashing, price calc) gets a step-by-step comment narrative explaining the approach, not just the syntax.
+- **Architecture Decision Records:** `docs/adr/NNN-title.md` for each significant choice (R2 over S3, pg-boss over Redis, puppeteer rendering…) so future contributors get the "why" without archaeology.
+- Per-feature `README.md` in each `features/*` folder describing the flow and its state machine.
+
+## Tooling & tests
+- ESLint (+ the design system's `_adherence.oxlintrc.json` brand rules) + Prettier, enforced via pre-commit hook and CI; `npm run check` (tsc) stays at 0 errors.
+- Tests where they pay: vitest unit tests for pure logic (pricing, spread pairing, curation scoring), Testing Library for wizard step transitions, supertest integration tests for API routes against a test DB. No snapshot-everything busywork.
+- CI (GitHub Actions): lint → typecheck → test → build on every PR.
+
+---
+
+# Build roadmap (when we implement)
+
+- **Phase 0 — Truthful UI + updated design (2–3 days):** wire or remove dead controls in `create.tsx` (sliders, layout buttons, Save, 3D preview, "of 20"); remove emoji; apply Step-3 layout choice to page generation. Port the updated landing composition from `~/Downloads/landing.jsx` into `client/src/pages/home.tsx` (TrustStrip/HowItWorks/Showcase/Occasions/Proof/FinalCTA sections, scroll-reveal as a `useScrollReveal` hook) and restructure the wizard to the quiz-first flow from `~/Downloads/app.jsx` (quiz screen with occasion/vibe → upload → generating → reveal → preview, "Customize" branch into the canvas editor), converted to typed TSX with the state machine in `wizard-types.ts`.
+- **Phase 1 — Real persistence & media (core):** enable Postgres in `server/storage.ts`; R2 presigned uploads; client compression worker; `sharp` thumbnail job via pg-boss; HEIC + EXIF handling. Files: `server/storage.ts`, `server/routes.ts`, new `server/media.ts`, `server/queue.ts`, `client/src/components/wizard/PhotoUpload.tsx`.
+- **Phase 2 — Commerce:** sessions + guest auth, `orders` schema, payment provider interface (gateway TBD with user), order status page, confirmation + draft-recovery emails.
+- **Phase 3 — Print pipeline:** puppeteer render job → print PDF in R2 → manual printer handoff; preflight warnings in PageReview.
+- **Phase 4 — AI:** dedup/quality scoring → EXIF chaptering → aspect-aware layouts → Claude Haiku captions (port occasion/caption model from design system's `book_builder/data.jsx`).
+
+## Verification
+- Each phase: `npm run check` (0 TS errors) + `npm run dev` on :5001 and drive the full wizard end-to-end with real photos (incl. one HEIC, one 20MB image).
+- Phase 1: restart server mid-draft → draft survives; check R2 objects + thumbnails exist.
+- Phase 2: test-mode payment → order row + email + status page.
+- Phase 3: open generated PDF, verify DPI/bleed at physical size.
