@@ -18,7 +18,7 @@
  * exactly like a fresh dev server.
  */
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   themes,
   projects,
@@ -27,11 +27,11 @@ import {
   uploadedPhotos,
   users,
   type User,
-  type InsertUser,
   type Theme,
   type InsertTheme,
   type Project,
-  type InsertProject,
+  type NewProject,
+  type UpdateProject,
   type ProjectPage,
   type InsertProjectPage,
   type PagePhoto,
@@ -39,8 +39,9 @@ import {
   type UploadedPhoto,
   type InsertUploadedPhoto,
 } from "@shared/schema";
+import type { BuilderDocument } from "@shared/document";
 import { getDb } from "./db";
-import { SEED_THEMES, type IStorage, type ProjectFull } from "./storage";
+import { SEED_THEMES, denormalise, type IStorage, type ProjectFull, type ProjectSummary, type SaveDocumentResult } from "./storage";
 
 export class DrizzleStorage implements IStorage {
   private db = getDb();
@@ -60,13 +61,30 @@ export class DrizzleStorage implements IStorage {
     return rows[0];
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const rows = await this.db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const rows = await this.db.select().from(users).where(eq(users.email, email.toLowerCase()));
     return rows[0];
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const rows = await this.db.insert(users).values(user).returning();
+  /** One transaction: projects + uploads change hands together or not at all. */
+  async reassignOwner(fromUserId: string, toUserId: string): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const p = await tx
+        .update(projects)
+        .set({ userId: toUserId, claimTokenHash: null, updatedAt: new Date() })
+        .where(eq(projects.userId, fromUserId))
+        .returning({ id: projects.id });
+      const u = await tx
+        .update(uploadedPhotos)
+        .set({ userId: toUserId })
+        .where(eq(uploadedPhotos.userId, fromUserId))
+        .returning({ id: uploadedPhotos.id });
+      return p.length + u.length;
+    });
+  }
+
+  async updateUser(id: string, patch: Partial<Pick<User, "marketingOptOut" | "phone" | "lastSeenAt" | "name">>): Promise<User | undefined> {
+    const rows = await this.db.update(users).set({ ...patch, updatedAt: new Date() }).where(eq(users.id, id)).returning();
     return rows[0];
   }
 
@@ -97,26 +115,103 @@ export class DrizzleStorage implements IStorage {
     return rows[0];
   }
 
-  async getProjectsByUserId(userId: string): Promise<Project[]> {
-    return this.db.select().from(projects).where(eq(projects.userId, userId));
+  /**
+   * "My books" list: one query with a lateral-free correlated subquery
+   * pair for cover + count. Deliberately excludes `document` (can be
+   * 100s of KB per row) — the list never needs it.
+   */
+  async listProjectSummaries(userId: string): Promise<ProjectSummary[]> {
+    // NB: inside a correlated subquery drizzle renders `${projects.id}` as a
+    // bare "id", which Postgres binds to the INNER table. Qualify it by hand.
+    const outerId = sql.raw(`"projects"."id"`);
+    const coverSql = sql<string | null>`(
+      select coalesce(u.thumb_url, u.preview_url, u.url)
+      from uploaded_photos u
+      where u.project_id = ${outerId}
+      order by u.uploaded_at asc
+      limit 1
+    )`;
+    const countSql = sql<number>`(select count(*)::int from uploaded_photos u where u.project_id = ${outerId})`;
+    return this.db
+      .select({
+        id: projects.id,
+        name: projects.name,
+        status: projects.status,
+        occasion: projects.occasion,
+        themeKey: projects.themeKey,
+        coverUrl: coverSql,
+        photoCount: countSql,
+        updatedAt: projects.updatedAt,
+        createdAt: projects.createdAt,
+      })
+      .from(projects)
+      .where(and(eq(projects.userId, userId), isNull(projects.deletedAt)))
+      .orderBy(desc(projects.updatedAt));
   }
 
-  async createProject(project: InsertProject): Promise<Project> {
+  async createProject(project: NewProject): Promise<Project> {
     const rows = await this.db.insert(projects).values(project).returning();
     return rows[0];
   }
 
-  async updateProject(id: string, update: Partial<InsertProject>): Promise<Project | undefined> {
+  async updateProject(id: string, update: UpdateProject): Promise<Project | undefined> {
     const rows = await this.db
       .update(projects)
       .set({ ...update, updatedAt: new Date() })
-      .where(eq(projects.id, id))
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
       .returning();
     return rows[0];
   }
 
+  /**
+   * Compare-and-set on document_version: the WHERE clause carries the
+   * expected version, so two tabs saving at once can never interleave —
+   * the loser gets zero rows back and we report the conflict with the
+   * current row so the client can reconcile.
+   */
+  async updateProjectDocument(id: string, document: BuilderDocument, expectedVersion: number): Promise<SaveDocumentResult> {
+    const rows = await this.db
+      .update(projects)
+      .set({
+        ...denormalise(document),
+        document,
+        documentVersion: sql`${projects.documentVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(projects.id, id), eq(projects.documentVersion, expectedVersion), isNull(projects.deletedAt)))
+      .returning();
+    if (rows[0]) return { ok: true, project: rows[0] };
+    const current = await this.getProject(id);
+    if (!current || current.deletedAt) return { ok: false, reason: "not_found" };
+    return { ok: false, reason: "conflict", project: current };
+  }
+
+  /**
+   * Claim = "this browser created it as a guest and lost the cookie".
+   * Once a MEMBER owns the project the token is dead: a leaked
+   * localStorage must never pull a book out of someone's account.
+   */
+  async claimProject(id: string, claimTokenHash: string, userId: string): Promise<Project | undefined> {
+    return this.db.transaction(async (tx) => {
+      const ownerIsGuest = sql`exists (select 1 from ${users} u where u.id = ${projects.userId} and u.is_anonymous = true)`;
+      const rows = await tx
+        .update(projects)
+        .set({ userId, claimTokenHash: null, updatedAt: new Date() })
+        .where(and(eq(projects.id, id), eq(projects.claimTokenHash, claimTokenHash), isNull(projects.deletedAt), ownerIsGuest))
+        .returning();
+      const project = rows[0];
+      if (!project) return undefined;
+      await tx.update(uploadedPhotos).set({ userId }).where(eq(uploadedPhotos.projectId, id));
+      return project;
+    });
+  }
+
   async deleteProject(id: string): Promise<boolean> {
-    const rows = await this.db.delete(projects).where(eq(projects.id, id)).returning({ id: projects.id });
+    const rows = await this.db
+      .update(projects)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(projects.id, id), isNull(projects.deletedAt)))
+      .returning({ id: projects.id });
     return rows.length > 0;
   }
 

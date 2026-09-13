@@ -22,7 +22,7 @@
  * URL until thumbUrl/previewUrl appear.
  */
 
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { derivativeKey, mediaStore } from "./media";
 import { storage } from "./storage";
 
@@ -83,7 +83,18 @@ async function makeDerivatives(payload: unknown): Promise<void> {
 
   // .rotate() with no args = apply EXIF orientation, then strip it.
   const base = sharp(original).rotate();
-  const meta = await base.metadata();
+  let meta: Metadata;
+  try {
+    meta = await base.metadata();
+  } catch (err) {
+    // Not an image sharp can decode (mislabelled file, corrupt upload).
+    // Mark it so the client can show a "couldn't use this photo" tile and
+    // the print pipeline never tries to place it. Don't retry — it won't
+    // become an image on the second attempt.
+    await storage.updateUploadedPhoto(photoId, { status: "invalid" });
+    console.warn(`[jobs] media.derivatives: undecodable upload ${photoId}:`, err);
+    return;
+  }
 
   const [thumb, preview] = await Promise.all([
     base.clone().resize({ width: THUMB_WIDTH, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer(),
@@ -102,6 +113,7 @@ async function makeDerivatives(payload: unknown): Promise<void> {
     previewUrl: mediaStore.publicUrl(previewKey),
     width: meta.width ?? null,
     height: meta.height ?? null,
+    status: "ready",
   });
 }
 

@@ -15,11 +15,11 @@
 
 import {
   type User,
-  type InsertUser,
   type Theme,
   type InsertTheme,
   type Project,
-  type InsertProject,
+  type NewProject,
+  type UpdateProject,
   type ProjectPage,
   type InsertProjectPage,
   type PagePhoto,
@@ -27,8 +27,31 @@ import {
   type UploadedPhoto,
   type InsertUploadedPhoto,
 } from "@shared/schema";
+import type { BuilderDocument } from "@shared/document";
 import { randomUUID } from "crypto";
 import { DrizzleStorage } from "./storage-pg";
+import { memDb } from "./mem-db";
+import { config } from "./config";
+
+/** Result of a versioned document save (see updateProjectDocument). */
+export type SaveDocumentResult =
+  | { ok: true; project: Project }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "conflict"; project: Project };
+
+/** Lightweight row for the "My books" list — no document payload. */
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  status: string;
+  occasion: string | null;
+  themeKey: string | null;
+  /** first photo's thumb/preview URL, if any */
+  coverUrl: string | null;
+  photoCount: number;
+  updatedAt: Date;
+  createdAt: Date;
+}
 
 /** A whole book in one payload: project + pages + placed photos + library. */
 export interface ProjectFull {
@@ -53,9 +76,13 @@ export const SEED_THEMES: InsertTheme[] = [
 ];
 
 export interface IStorage {
+  /* users are CREATED by better-auth (server/auth.ts); storage only reads
+     and performs the guest → member ownership hand-off */
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  /** Move every project + upload from one user to another; returns rows moved. */
+  reassignOwner(fromUserId: string, toUserId: string): Promise<number>;
+  updateUser(id: string, patch: Partial<Pick<User, "marketingOptOut" | "phone" | "lastSeenAt" | "name">>): Promise<User | undefined>;
   
   getThemes(): Promise<Theme[]>;
   getThemesByCategory(category: string): Promise<Theme[]>;
@@ -63,9 +90,20 @@ export interface IStorage {
   createTheme(theme: InsertTheme): Promise<Theme>;
   
   getProject(id: string): Promise<Project | undefined>;
-  getProjectsByUserId(userId: string): Promise<Project[]>;
-  createProject(project: InsertProject): Promise<Project>;
-  updateProject(id: string, project: Partial<InsertProject>): Promise<Project | undefined>;
+  /** Non-deleted projects for a user, newest first, without the document blob. */
+  listProjectSummaries(userId: string): Promise<ProjectSummary[]>;
+  createProject(project: NewProject): Promise<Project>;
+  updateProject(id: string, project: UpdateProject): Promise<Project | undefined>;
+  /**
+   * Optimistic-concurrency document save: applies only when the stored
+   * document_version equals `expectedVersion`, bumping it by one.
+   * Denormalised columns (occasion/theme/binding…) are refreshed from
+   * the document so analytics never has to open the JSON.
+   */
+  updateProjectDocument(id: string, document: BuilderDocument, expectedVersion: number): Promise<SaveDocumentResult>;
+  /** Hand a project to `userId` if the claim token hash matches (and clears it). */
+  claimProject(id: string, claimTokenHash: string, userId: string): Promise<Project | undefined>;
+  /** Soft delete — row stays for orders/analytics, disappears from lists. */
   deleteProject(id: string): Promise<boolean>;
   /** Whole book in one call — fixed query count, no per-page N+1. */
   getProjectFull(id: string): Promise<ProjectFull | undefined>;
@@ -90,8 +128,23 @@ export interface IStorage {
   deleteUploadedPhoto(id: string): Promise<boolean>;
 }
 
+/**
+ * Columns mirrored out of the document on every save so SQL can group
+ * by occasion/theme/binding without touching JSON (shared by both backends).
+ */
+export function denormalise(doc: BuilderDocument): Pick<Project, "name" | "occasion" | "vibe" | "themeKey" | "binding" | "coverStyle" | "density"> {
+  return {
+    name: doc.title.trim() || "Untitled book",
+    occasion: doc.occasion,
+    vibe: doc.vibe,
+    themeKey: doc.themeId,
+    binding: doc.binding,
+    coverStyle: doc.coverStyle,
+    density: doc.density,
+  };
+}
+
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
   private themes: Map<string, Theme>;
   private projects: Map<string, Project>;
   private projectPages: Map<string, ProjectPage>;
@@ -99,7 +152,6 @@ export class MemStorage implements IStorage {
   private uploadedPhotos: Map<string, UploadedPhoto>;
 
   constructor() {
-    this.users = new Map();
     this.themes = new Map();
     this.projects = new Map();
     this.projectPages = new Map();
@@ -121,21 +173,39 @@ export class MemStorage implements IStorage {
     });
   }
 
+  /* users live in memDb.user (shared with better-auth's memory adapter) */
+
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    return memDb.user.find((u) => u.id === id) as User | undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const e = email.toLowerCase();
+    return memDb.user.find((u) => String(u.email).toLowerCase() === e) as User | undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id, createdAt: new Date() };
-    this.users.set(id, user);
-    return user;
+  async reassignOwner(fromUserId: string, toUserId: string): Promise<number> {
+    let moved = 0;
+    for (const [id, p] of Array.from(this.projects)) {
+      if (p.userId === fromUserId) {
+        this.projects.set(id, { ...p, userId: toUserId, claimTokenHash: null, updatedAt: new Date() });
+        moved++;
+      }
+    }
+    for (const [id, u] of Array.from(this.uploadedPhotos)) {
+      if (u.userId === fromUserId) {
+        this.uploadedPhotos.set(id, { ...u, userId: toUserId });
+        moved++;
+      }
+    }
+    return moved;
+  }
+
+  async updateUser(id: string, patch: Partial<Pick<User, "marketingOptOut" | "phone" | "lastSeenAt" | "name">>): Promise<User | undefined> {
+    const u = memDb.user.find((x) => x.id === id);
+    if (!u) return undefined;
+    Object.assign(u, patch, { updatedAt: new Date() });
+    return u as User;
   }
 
   async getThemes(): Promise<Theme[]> {
@@ -169,42 +239,98 @@ export class MemStorage implements IStorage {
     return this.projects.get(id);
   }
 
-  async getProjectsByUserId(userId: string): Promise<Project[]> {
-    return Array.from(this.projects.values()).filter(
-      (project) => project.userId === userId,
-    );
+  async listProjectSummaries(userId: string): Promise<ProjectSummary[]> {
+    const rows = Array.from(this.projects.values())
+      .filter((p) => p.userId === userId && !p.deletedAt)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    return rows.map((p) => {
+      const uploads = Array.from(this.uploadedPhotos.values()).filter((u) => u.projectId === p.id);
+      const first = uploads[0];
+      return {
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        occasion: p.occasion,
+        themeKey: p.themeKey,
+        coverUrl: first ? first.thumbUrl ?? first.previewUrl ?? first.url : null,
+        photoCount: uploads.length,
+        updatedAt: p.updatedAt,
+        createdAt: p.createdAt,
+      };
+    });
   }
 
-  async createProject(insertProject: InsertProject): Promise<Project> {
+  async createProject(input: NewProject): Promise<Project> {
     const id = randomUUID();
-    const project: Project = { 
-      ...insertProject, 
-      id, 
-      status: insertProject.status || "draft",
-      userId: insertProject.userId || null,
-      themeId: insertProject.themeId || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const now = new Date();
+    const project: Project = {
+      id,
+      userId: input.userId,
+      name: input.name,
+      themeId: input.themeId ?? null,
+      status: input.status ?? "draft",
+      source: input.source ?? "builder",
+      occasion: input.occasion ?? null,
+      vibe: input.vibe ?? null,
+      themeKey: input.themeKey ?? null,
+      binding: input.binding ?? null,
+      coverStyle: input.coverStyle ?? null,
+      density: input.density ?? null,
+      document: input.document ?? null,
+      documentVersion: 0,
+      claimTokenHash: input.claimTokenHash ?? null,
+      lastReminderAt: null,
+      reminderStage: 0,
+      deletedAt: null,
+      createdAt: now,
+      updatedAt: now,
     };
     this.projects.set(id, project);
     return project;
   }
 
-  async updateProject(id: string, update: Partial<InsertProject>): Promise<Project | undefined> {
+  async updateProject(id: string, update: UpdateProject): Promise<Project | undefined> {
     const project = this.projects.get(id);
     if (!project) return undefined;
-    
-    const updated: Project = { 
-      ...project, 
-      ...update,
-      updatedAt: new Date(),
-    };
+    const updated: Project = { ...project, ...(update as Partial<Project>), updatedAt: new Date() };
     this.projects.set(id, updated);
     return updated;
   }
 
+  async updateProjectDocument(id: string, document: BuilderDocument, expectedVersion: number): Promise<SaveDocumentResult> {
+    const project = this.projects.get(id);
+    if (!project || project.deletedAt) return { ok: false, reason: "not_found" };
+    if (project.documentVersion !== expectedVersion) return { ok: false, reason: "conflict", project };
+    const updated: Project = {
+      ...project,
+      ...denormalise(document),
+      document,
+      documentVersion: project.documentVersion + 1,
+      updatedAt: new Date(),
+    };
+    this.projects.set(id, updated);
+    return { ok: true, project: updated };
+  }
+
+  async claimProject(id: string, claimTokenHash: string, userId: string): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project || project.deletedAt || !project.claimTokenHash || project.claimTokenHash !== claimTokenHash) return undefined;
+    const owner = memDb.user.find((u) => u.id === project.userId);
+    if (!owner?.isAnonymous) return undefined; // member-owned books are never claimable
+    const from = project.userId;
+    const updated: Project = { ...project, userId, claimTokenHash: null, updatedAt: new Date() };
+    this.projects.set(id, updated);
+    for (const [uid, u] of Array.from(this.uploadedPhotos)) {
+      if (u.projectId === id && u.userId === from) this.uploadedPhotos.set(uid, { ...u, userId });
+    }
+    return updated;
+  }
+
   async deleteProject(id: string): Promise<boolean> {
-    return this.projects.delete(id);
+    const project = this.projects.get(id);
+    if (!project || project.deletedAt) return false;
+    this.projects.set(id, { ...project, deletedAt: new Date(), updatedAt: new Date() });
+    return true;
   }
 
   async getProjectFull(id: string): Promise<ProjectFull | undefined> {
@@ -310,8 +436,7 @@ export class MemStorage implements IStorage {
     const photo: UploadedPhoto = {
       ...insertPhoto,
       id,
-      userId: insertPhoto.userId || null,
-      projectId: insertPhoto.projectId || null,
+      status: insertPhoto.status ?? "pending",
       storageKey: insertPhoto.storageKey ?? null,
       thumbUrl: insertPhoto.thumbUrl ?? null,
       previewUrl: insertPhoto.previewUrl ?? null,
@@ -338,13 +463,13 @@ export class MemStorage implements IStorage {
 }
 
 /* ── Factory ─────────────────────────────────────────────────────────
-   DATABASE_URL set  → Postgres (DrizzleStorage; run `npm run db:push`
-                       once to create tables, seeding is automatic)
+   DATABASE_URL set  → Postgres (DrizzleStorage; run `npm run db:migrate`
+                       to create/upgrade tables, theme seeding is automatic)
    DATABASE_URL unset → in-memory (zero-setup dev; data dies with the
                        process — fine for UI work, not for real drafts) */
 
 function createStorage(): IStorage {
-  if (process.env.DATABASE_URL) {
+  if (config.databaseUrl) {
     const pg = new DrizzleStorage();
     // fire-and-forget: seeds starter themes into an empty database
     pg.seedIfEmpty().catch((err) => console.error("[storage] theme seeding failed:", err));

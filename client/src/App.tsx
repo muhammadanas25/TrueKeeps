@@ -16,6 +16,8 @@ const Templates = lazy(() => import("@/pages/templates"));
 const Create = lazy(() => import("@/pages/create"));
 const BookBuilder = lazy(() => import("@/features/builder"));
 const WizardClassic = lazy(() => import("@/pages/wizard"));
+const Books = lazy(() => import("@/pages/books"));
+const Account = lazy(() => import("@/pages/account"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 /** Minimal, brand-neutral fallback while a route chunk loads. */
@@ -34,6 +36,9 @@ function Router() {
         <Route path="/wizard" component={BookBuilder} />
         {/* previous 6-step wizard, kept reachable for comparison */}
         <Route path="/wizard-classic" component={WizardClassic} />
+        {/* account area (Phase 2A) */}
+        <Route path="/books" component={Books} />
+        <Route path="/account" component={Account} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

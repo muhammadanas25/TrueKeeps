@@ -1,76 +1,65 @@
+/**
+ * Server entry — middleware order is the whole story here.
+ *
+ *   config (validated env)          → refuse to boot misconfigured
+ *   security headers + trust proxy  → before anything touches cookies
+ *   request logger                  → structured, redacted
+ *   CORS                            → allow-list only
+ *   /api/auth/*  (better-auth)      → BEFORE express.json: it parses
+ *                                     its own bodies
+ *   express.json (1 MB)             → bytes never come through here
+ *                                     (uploads use presigned PUTs)
+ *   origin check (CSRF)             → mutating /api calls only
+ *   domain routes                   → all owner-checked
+ *   error handler                   → JSON, never re-throws
+ *   Vite (dev) / static (prod)      → SPA catch-all, last
+ */
+
 import express, { type Request, Response, NextFunction } from "express";
-import cors from 'cors';
+import cors from "cors";
+import { toNodeHandler } from "better-auth/node";
+import { config } from "./config";
+import { log, httpLogger } from "./logger";
+import { auth } from "./auth";
+import { applySecurity } from "./middleware/security";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { corsConfig } from './cors';
+import { setupVite, serveStatic } from "./vite";
+import { corsConfig } from "./cors";
 
 const app = express();
+
+applySecurity(app);
+app.use(httpLogger);
 app.use(cors(corsConfig));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// better-auth owns everything under /api/auth — sign-in, OAuth callback,
+// magic-link verify, session, sign-out. Must precede the body parser.
+app.all("/api/auth/*", toNodeHandler(auth));
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || (err.type === "entity.too.large" ? 413 : 500);
     // Log and respond — never re-throw here: an exception thrown from an
     // Express error handler escapes the request cycle and kills the process.
-    console.error(err);
-    res.status(status).json({ message });
+    if (status >= 500) log.error({ err, reqId: (req as { id?: string }).id }, "unhandled error");
+    res.status(status).json({ error: status >= 500 ? "Internal Server Error" : err.message || "Request failed" });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Vite only in development and after all API routes so its catch-all
+  // doesn't shadow them.
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5002', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  // Railway injects PORT; serves API + client on the one open port.
+  server.listen({ port: config.port, host: "0.0.0.0", reusePort: true }, () => {
+    log.info({ port: config.port, env: config.nodeEnv, appUrl: config.appUrl }, "serving");
   });
 })();

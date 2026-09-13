@@ -23,7 +23,15 @@
 Local Postgres for dev: `createdb truekeep_dev`, then in `.env`:
 `DATABASE_URL=postgresql://<user>@localhost/truekeep_dev?host=/var/run/postgresql` and run `npm run db:push` once.
 
-**Next up:** Phase 2 (sessions + guest auth, orders schema, payment provider interface, order status + emails). Payment gateway choice (Stripe vs regional) still needs the user's call.
+**Phase 2A is implemented and verified 2026-09-13** (0 TS errors, prod build clean, migrations tested on fresh + pre-auth databases, headless E2E: guest build → autosave → save prompt → order gate → magic link → guest promoted → /books → resume from server → lost-cookie claim):
+- ✅ Accounts via better-auth (`server/auth.ts`, docs/adr/004): Google, email magic link, anonymous guest sessions promoted on sign-in; `/api/me`, `/books`, `/account`; sign-in sheet + account menu in landing and builder navs.
+- ✅ Owned books: `projects.user_id` NOT NULL with real FKs/indexes; versioned `document` autosave (`client/src/features/builder/sync.ts` ⇄ `PUT /api/projects/:id/document`, 409 on conflict); resume via `/wizard?project=`; one-time claim tokens for lost cookies.
+- ✅ Hardening: every route owner-checked + zod-validated (`server/routes/*`), helmet + CSP report-only, Origin/CSRF check, fail-closed CORS, rate limits, 1 MB JSON limit, pino redacted logs, validated env (`server/config.ts`).
+- ✅ Versioned migrations (`migrations/`, `npm run db:migrate`, Railway pre-deploy; docs/adr/007). Email provider interface (`server/email`, console in dev, Resend when `RESEND_API_KEY` is set).
+
+**Decisions locked 2026-09-13 (see ~/.claude/plans/we-have-implemented-and-glistening-feather.md):** Pakistan-only, PKR (integer paisa); Safepay hosted checkout behind a `PaymentProvider` interface (no Stripe in PK; PayFast rejected on MDR/DX); prepaid only, no COD; registered business → start Safepay onboarding now.
+
+**Next up:** Phase 2B — orders + Safepay + transactional email (pg-boss queue, order state machine, address form in PKR, `/orders/:id` status page, admin order list), then Phase 2C — draft reminders, partitioned `events` table, lifecycle nudges.
 
 Note: `npm run dev` currently fails on this machine with `ENOSPC` (inotify watcher limit). Fix once with:
 `sudo sysctl fs.inotify.max_user_watches=524288` (persist in /etc/sysctl.conf). `npm run build && PORT=5001 npm start` works meanwhile.

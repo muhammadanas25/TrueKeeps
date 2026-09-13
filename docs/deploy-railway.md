@@ -51,17 +51,24 @@ the process 24/7, reads `railway.json` for build/start/healthcheck, and injects
    | `S3_BUCKET` | `truekeep-media` |
    | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | from the R2 API token |
    | `S3_PUBLIC_BASE_URL` | the bucket's public domain |
-   | `FRONTEND_URL` | the app's public URL (CORS allowlist) |
+   | `APP_URL` | `https://thetruekeeps.com` — public origin. Drives OAuth callbacks, magic-link URLs, CORS and the CSRF origin check. **Required.** (`FRONTEND_URL` still works as an alias.) |
+   | `BETTER_AUTH_SECRET` | `openssl rand -base64 48` — signs session cookies. **Required.** Rotating it signs everyone out. |
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud → APIs & Services → Credentials (OAuth client, type "Web application"). Authorised redirect URI: `https://thetruekeeps.com/api/auth/callback/google`. Omit both to hide the Google button. |
+   | `ADMIN_EMAILS` | comma-separated; these get `role=admin` on first sign-in |
+   | `RESEND_API_KEY` / `EMAIL_FROM` | transactional email (magic links). Without a key, emails are only logged — sign-in by email will NOT work in prod. |
 
    Don't set `PORT` — Railway injects it.
 
-6. **Create the tables**: from your machine, with `DATABASE_URL` pointing at
-   the prod database:
+6. **Migrations run before every deploy** (`railway.json` →
+   `preDeployCommand: npm run db:migrate:prod`, which runs the bundled `dist/migrate.js`). The first deploy after Phase 2A
+   applies `migrations/0000_baseline.sql` (idempotent on an existing DB) and
+   `0001_phase2a_auth_ownership.sql`, which also backfills pre-auth rows under
+   a "legacy" user. To run by hand instead:
    ```
-   DATABASE_URL=<prod-url> npm run db:push
+   DATABASE_URL=<prod-url> npm run db:migrate
    ```
-   (Neon URLs work directly; for Railway Postgres use the *public* connection
-   string shown on the Postgres service.)
+   Never use `db:push` against production — it diffs interactively and can
+   drop columns (docs/adr/007).
 
 7. **Deploy** happens automatically on push to `main`. The healthcheck
    (`/api/health`) gates the cutover, so a failed boot never replaces the
@@ -70,6 +77,13 @@ the process 24/7, reads `railway.json` for build/start/healthcheck, and injects
 ## Verifying a deploy
 
 - `https://<app>/api/health` → `{"status":"ok"}`
+- `curl -I https://<app>/` shows `strict-transport-security`, `x-content-type-options: nosniff`
+  and NO `x-powered-by`.
+- `curl -s https://<app>/api/projects` → `401` (was an open list before Phase 2A).
+- `curl -sI -H "Origin: https://evil.example" https://<app>/api/projects | grep -i access-control`
+  → no `access-control-allow-origin` header.
+- Sign in with Google and with a magic link; both must land back on the site
+  signed in. Check Resend's log for the magic-link email.
 - Boot logs must show `[media] using S3-compatible store` — if you see the
   local-disk WARNING, the `S3_*` vars are missing/incomplete.
 - Run the wizard end-to-end: quiz → upload a photo → generate → preview.
@@ -80,4 +94,8 @@ the process 24/7, reads `railway.json` for build/start/healthcheck, and injects
 - Jobs (sharp derivatives) run in-process, so keep the service at exactly
   1 replica until the queue moves to real pg-boss (docs/adr/003).
 - Custom domain: service → Settings → Networking → Custom Domain, then update
-  `FRONTEND_URL` and the R2 CORS origin to match.
+  `APP_URL`, the Google OAuth redirect URI and the R2 CORS origin to match.
+- Put Cloudflare's proxy (orange cloud) in front of the Railway domain: free
+  WAF/DDoS protection, and the R2 bucket is on the same account anyway.
+- Email deliverability: add Resend's SPF/DKIM/DMARC records for
+  thetruekeeps.com before enabling magic links for real users.

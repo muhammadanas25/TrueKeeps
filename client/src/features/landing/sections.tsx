@@ -31,6 +31,7 @@ import {
   Truck,
 } from "lucide-react";
 import { MiniBook, Ph, Stars, TKLogo, tintFor, type BookTone } from "./primitives";
+import { AccountMenu } from "@/features/auth/AccountMenu";
 
 /** Route the marketing CTAs land on — the quiz-first book builder. */
 const BUILDER_PATH = "/wizard";
@@ -55,7 +56,7 @@ export function Nav() {
           <a href="#reviews">Reviews</a>
         </div>
         <div className="lp-nav-cta">
-          <button className="lp-nav-signin">Sign in</button>
+          <AccountMenu signInClassName="lp-nav-signin" />
           <Link href={BUILDER_PATH} className="lp-btn lp-btn-cobalt lp-btn-sm">
             Start free
           </Link>

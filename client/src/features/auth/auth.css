@@ -1,0 +1,111 @@
+/*
+ * Auth + account styles (prefix `au-`).
+ *
+ * Reuses builder tokens (bb-modal/bb-btn are imported by the builder;
+ * pages outside the builder — /books, /account — load builder.css too
+ * so the same primitives apply). Tokens come from client/src/index.css.
+ */
+
+/* ── Sign-in sheet ─────────────────────────────────── */
+.au-sheet { max-width: 440px; }
+.au-veil { z-index: 80; }
+.au-close { padding: 8px; }
+.au-sub { margin: 0 0 18px; color: var(--color-fg2); font-size: 15px; line-height: 1.5; }
+
+.au-google {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--font-body); font-weight: var(--fw-semibold); font-size: 15px;
+  padding: 14px 18px; border-radius: var(--radius-pill); cursor: pointer;
+  background: #fff; color: var(--tk-gunmetal); border: 1.5px solid var(--color-border);
+  transition: border-color var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out);
+}
+.au-google:hover { border-color: var(--tk-gunmetal-light); background: rgba(60,60,59,0.03); }
+.au-google[disabled] { opacity: 0.5; pointer-events: none; }
+
+.au-or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--color-fg3); font-size: 13px; }
+.au-or::before, .au-or::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+
+.au-form { display: flex; flex-direction: column; gap: 10px; }
+.au-label { font-size: 13px; font-weight: var(--fw-semibold); color: var(--color-fg2); }
+.au-field {
+  display: flex; align-items: center; gap: 10px; padding: 0 14px;
+  border: 1.5px solid var(--color-border); border-radius: var(--radius-lg); background: #fff;
+  color: var(--color-fg3);
+}
+.au-field:focus-within { border-color: var(--tk-cobalt); box-shadow: 0 0 0 4px var(--tk-cobalt-ring); }
+.au-field input { flex: 1; border: none; outline: none; background: none; font-size: 16px; padding: 13px 0; min-width: 0; }
+.au-submit { width: 100%; margin-top: 4px; }
+.au-error { margin: 2px 0 0; color: var(--tk-raspberry); font-size: 14px; }
+.au-fine { margin: 6px 0 0; color: var(--color-fg3); font-size: 12.5px; line-height: 1.45; }
+.au-later { align-self: center; margin-top: 10px; }
+
+.au-sent { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 6px 0 4px; }
+.au-sent-ic { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--tk-cobalt-dim); color: var(--tk-cobalt); }
+.au-sent p { margin: 0; color: var(--color-fg2); font-size: 15px; line-height: 1.55; }
+
+/* ── Nav account menu ──────────────────────────────── */
+.au-avatar {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--tk-cobalt-dim); color: var(--tk-cobalt); font-weight: var(--fw-semibold); font-size: 14px;
+  overflow: hidden; border: none; cursor: pointer; padding: 0;
+}
+.au-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.au-menu { position: relative; }
+.au-menu-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 200px; background: #fff;
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); border: 1px solid var(--color-border);
+  padding: 6px; z-index: 70; display: flex; flex-direction: column;
+}
+.au-menu-pop a, .au-menu-pop button {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md);
+  font-size: 14px; color: var(--color-fg1); text-decoration: none; background: none; border: none; cursor: pointer; text-align: left;
+  font-family: var(--font-body);
+}
+.au-menu-pop a:hover, .au-menu-pop button:hover { background: rgba(60,60,59,0.05); }
+.au-menu-email { padding: 8px 12px 10px; font-size: 12.5px; color: var(--color-fg3); border-bottom: 1px solid var(--color-border); margin-bottom: 4px; word-break: break-all; }
+
+/* ── Save-status pill (builder nav) ─────────────────── */
+.au-save { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-fg3); white-space: nowrap; }
+.au-save.err { color: var(--tk-raspberry); }
+
+/* ── Account pages (/books, /account) ───────────────── */
+.au-page { flex: 1; width: 100%; max-width: 1040px; margin: 0 auto; padding: 36px clamp(16px, 4vw, 40px) 80px; }
+.au-page h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 38px); font-weight: var(--fw-semibold); letter-spacing: -0.02em; margin: 6px 0 6px; }
+.au-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
+.au-page-sub { margin: 0; color: var(--color-fg2); font-size: 15px; }
+
+.au-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+.au-card {
+  background: #fff; border-radius: var(--radius-xl); border: 1px solid var(--color-border);
+  overflow: hidden; display: flex; flex-direction: column; text-decoration: none; color: inherit;
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
+}
+.au-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.au-card-cover { aspect-ratio: 1; background: var(--tk-cream); position: relative; overflow: hidden; }
+.au-card-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.au-card-cover .ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-fg3); }
+.au-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.au-card-title { font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: 17px; line-height: 1.25; }
+.au-card-meta { font-size: 12.5px; color: var(--color-fg3); }
+.au-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+.au-card-actions .bb-btn-ghost { padding: 8px 10px; font-size: 13px; }
+.au-badge { display: inline-block; font-size: 11px; font-weight: var(--fw-semibold); letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; background: var(--tk-cobalt-dim); color: var(--tk-cobalt); align-self: flex-start; }
+.au-badge.draft { background: var(--tk-gold-dim); color: var(--tk-gold-deep); }
+
+.au-empty { text-align: center; padding: 60px 20px; border: 1.5px dashed var(--color-border); border-radius: var(--radius-xl); color: var(--color-fg2); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.au-empty h2 { font-family: var(--font-display); font-size: 22px; margin: 0; color: var(--color-fg1); }
+
+.au-section { background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: 22px 24px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 14px; }
+.au-section h2 { font-family: var(--font-display); font-size: 19px; font-weight: var(--fw-semibold); margin: 0; }
+.au-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.au-row-text { display: flex; flex-direction: column; gap: 2px; }
+.au-row-text b { font-size: 15px; }
+.au-row-text span { font-size: 13px; color: var(--color-fg3); }
+.au-toggle { position: relative; width: 44px; height: 26px; border-radius: 99px; background: var(--color-border); border: none; cursor: pointer; transition: background var(--duration-base); flex: none; }
+.au-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform var(--duration-base) var(--ease-out); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.au-toggle.on { background: var(--tk-cobalt); }
+.au-toggle.on::after { transform: translateX(18px); }
+.au-danger { color: var(--tk-raspberry); }
+
+.au-spin { animation: au-rot 900ms linear infinite; }
+@keyframes au-rot { to { transform: rotate(360deg); } }

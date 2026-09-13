@@ -27,6 +27,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { GetObjectCommand, PutObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { config } from "./config";
 
 /** What the client needs to upload one file and reference it after. */
 export interface PresignedUpload {
@@ -181,17 +182,16 @@ export class S3MediaStore implements MediaStore {
 /* ── Factory ────────────────────────────────────────────────── */
 
 function createMediaStore(): MediaStore {
-  const { S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_PUBLIC_BASE_URL, S3_ENDPOINT, S3_REGION } =
-    process.env;
-  if (S3_BUCKET && S3_ACCESS_KEY_ID && S3_SECRET_ACCESS_KEY && S3_PUBLIC_BASE_URL) {
-    console.log(`[media] using S3-compatible store (bucket=${S3_BUCKET})`);
+  const s3 = config.s3;
+  if (s3.bucket && s3.accessKeyId && s3.secretAccessKey && s3.publicBaseUrl) {
+    console.log(`[media] using S3-compatible store (bucket=${s3.bucket})`);
     return new S3MediaStore({
-      endpoint: S3_ENDPOINT,
-      region: S3_REGION || "auto", // "auto" is what R2 expects
-      bucket: S3_BUCKET,
-      accessKeyId: S3_ACCESS_KEY_ID,
-      secretAccessKey: S3_SECRET_ACCESS_KEY,
-      publicBaseUrl: S3_PUBLIC_BASE_URL,
+      endpoint: s3.endpoint,
+      region: s3.region || "auto", // "auto" is what R2 expects
+      bucket: s3.bucket,
+      accessKeyId: s3.accessKeyId,
+      secretAccessKey: s3.secretAccessKey,
+      publicBaseUrl: s3.publicBaseUrl,
     });
   }
   // Local disk is a dev convenience. On PaaS hosts (Railway, Render, Fly)
@@ -199,7 +199,7 @@ function createMediaStore(): MediaStore {
   // a photo product means losing all user uploads. Warn loudly rather than
   // crash so a first smoke-test deploy still boots, but this must not be
   // how production actually runs.
-  if (process.env.NODE_ENV === "production") {
+  if (config.isProd) {
     console.warn(
       "[media] WARNING: production is using the LOCAL DISK media store. " +
         "Uploads will be LOST on every deploy/restart. Set S3_BUCKET, " +

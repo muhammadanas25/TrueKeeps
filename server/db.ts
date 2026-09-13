@@ -15,12 +15,13 @@
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "@shared/schema";
+import { config } from "./config";
 
 let db: NodePgDatabase<typeof schema> | null = null;
 
 export function getDb(): NodePgDatabase<typeof schema> {
   if (db) return db;
-  const url = process.env.DATABASE_URL;
+  const url = config.databaseUrl;
   if (!url) {
     throw new Error("getDb() called without DATABASE_URL — storage factory should have used MemStorage");
   }
