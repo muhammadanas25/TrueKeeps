@@ -42,6 +42,9 @@ import * as schema from "@shared/schema";
 
 const MAGIC_LINK_MINUTES = 15;
 
+/** Set by server/index.ts from Express's proxy-aware req.ip (never from the client). */
+export const CLIENT_IP_HEADER = "x-tk-client-ip";
+
 function makeDatabase() {
   if (config.databaseUrl) {
     // getDb() creates the pg Pool lazily, so importing it is free in no-DB mode
@@ -68,6 +71,7 @@ export const auth = betterAuth({
   advanced: {
     database: { generateId: "uuid" }, // keep ids uniform with the rest of the schema
     useSecureCookies: config.isProd,
+    ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     defaultCookieAttributes: { sameSite: "lax", httpOnly: true, secure: config.isProd },
   },
 

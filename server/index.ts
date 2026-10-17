@@ -20,7 +20,7 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 import { config } from "./config";
 import { log, httpLogger } from "./logger";
-import { auth } from "./auth";
+import { auth, CLIENT_IP_HEADER } from "./auth";
 import { applySecurity } from "./middleware/security";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
@@ -34,7 +34,16 @@ app.use(cors(corsConfig));
 
 // better-auth owns everything under /api/auth — sign-in, OAuth callback,
 // magic-link verify, session, sign-out. Must precede the body parser.
-app.all("/api/auth/*", toNodeHandler(auth));
+//
+// Client IP for its rate limiter: behind Railway's proxy better-auth sees
+// only a multi-hop X-Forwarded-For, which it (rightly) won't trust, and
+// would put every visitor in ONE bucket — 3 magic links/min site-wide.
+// Express already resolved the real client via `trust proxy`; pass that
+// through a header we always overwrite, so clients can't spoof it.
+app.all("/api/auth/*", (req, _res, next) => {
+  req.headers[CLIENT_IP_HEADER] = req.ip ?? "";
+  next();
+}, toNodeHandler(auth));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
