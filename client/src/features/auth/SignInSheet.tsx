@@ -11,11 +11,13 @@
  * lands the user back on `callbackURL` with the session cookie set and
  * their guest draft already merged (server/auth.ts onLinkAccount).
  *
- * Styling reuses the builder's modal tokens so it feels native there;
- * own classes are prefixed `au-` (client/src/features/auth/auth.css).
+ * Self-contained styling (`au-` classes in auth.css, design tokens from
+ * index.css) — it must look identical on the landing page, which never
+ * loads builder.css, and inside the builder.
  */
 
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Mail, X, Check, ArrowRight } from "lucide-react";
 import { sendMagicLink, signInWithGoogle } from "./client";
 import { useSession } from "./useSession";
@@ -96,18 +98,21 @@ export function SignInSheet({
     setSent(value);
   };
 
-  return (
-    <div className="bb-modal-veil au-veil" role="dialog" aria-modal="true" aria-labelledby="au-title">
-      <div className="bb-modal au-sheet">
-        <div className="bb-modal-head">
+  // Portalled to <body>: the landing nav uses backdrop-filter, which makes
+  // it the containing block for position:fixed children — rendered inline,
+  // the overlay would be trapped inside the 70px header.
+  return createPortal(
+    <div className="au-veil" role="dialog" aria-modal="true" aria-labelledby="au-title">
+      <div className="au-sheet">
+        <div className="au-head">
           <h3 id="au-title">{sent ? "Check your inbox" : copy.title}</h3>
           {onClose ? (
-            <button className="bb-btn bb-btn-ghost au-close" onClick={onClose} aria-label="Close">
+            <button className="au-btn au-btn-ghost au-close" onClick={onClose} aria-label="Close">
               <X size={18} />
             </button>
           ) : null}
         </div>
-        <div className="bb-modal-body">
+        <div className="au-body">
           {sent ? (
             <div className="au-sent">
               <span className="au-sent-ic">
@@ -116,7 +121,7 @@ export function SignInSheet({
               <p>
                 We sent a sign-in link to <b>{sent}</b>. Open it on this device and your book comes with you.
               </p>
-              <button className="bb-btn bb-btn-ghost" onClick={() => setSent(null)}>
+              <button className="au-btn au-btn-ghost" onClick={() => setSent(null)}>
                 Use a different email
               </button>
             </div>
@@ -150,14 +155,14 @@ export function SignInSheet({
                     disabled={busy}
                   />
                 </div>
-                <button className="bb-btn bb-btn-primary bb-btn-lg au-submit" type="submit" disabled={busy}>
+                <button className="au-btn au-btn-primary au-submit" type="submit" disabled={busy}>
                   Send me a sign-in link <ArrowRight size={17} />
                 </button>
                 {error ? <p className="au-error">{error}</p> : null}
                 <p className="au-fine">No password needed. The link works once and expires in 15 minutes.</p>
               </form>
               {intent === "save" && onClose ? (
-                <button className="bb-btn bb-btn-ghost au-later" onClick={onClose}>
+                <button className="au-btn au-btn-ghost au-later" onClick={onClose}>
                   Maybe later
                 </button>
               ) : null}
@@ -165,6 +170,7 @@ export function SignInSheet({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

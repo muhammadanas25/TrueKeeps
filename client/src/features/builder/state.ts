@@ -19,7 +19,7 @@
  * roadmap moves originals to object storage and removes this caveat).
  */
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
@@ -247,17 +247,36 @@ export function useBuilderState(initial?: Partial<BuilderState>) {
     () => loadState() ?? { ...DEFAULT_STATE, ...initial },
   );
 
-  // persist (debounced) — cheap JSON, photos stripped of data URLs
+  // persist (debounced) — cheap JSON, photos stripped of data URLs.
+  //
+  // The debounce must never DROP a write: the last edit before the user
+  // leaves (in-app link to /books, closing the tab) happens inside the
+  // 350 ms window by definition. So a pending write is flushed, not
+  // cancelled, on unmount and on `pagehide`.
+  const latest = useRef(state);
+  latest.current = state;
+  const pending = useRef(false);
+  const write = () => {
+    pending.current = false;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable(latest.current)));
+    } catch {
+      /* quota exceeded or private mode — draft just won't survive reload */
+    }
+  };
   useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable(state)));
-      } catch {
-        /* quota exceeded or private mode — draft just won't survive reload */
-      }
-    }, 350);
+    pending.current = true;
+    const t = setTimeout(write, 350);
     return () => clearTimeout(t);
   }, [state]);
+  useEffect(() => {
+    const flush = () => pending.current && write();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush(); // unmount (route change) with a write still pending
+    };
+  }, []);
 
   const set = (patch: Partial<BuilderState>) => dispatch({ type: "patch", patch });
   const reset = () => {

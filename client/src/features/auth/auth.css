@@ -6,10 +6,41 @@
  * so the same primitives apply). Tokens come from client/src/index.css.
  */
 
-/* ── Sign-in sheet ─────────────────────────────────── */
-.au-sheet { max-width: 440px; }
-.au-veil { z-index: 80; }
-.au-close { padding: 8px; }
+/* ── Sign-in sheet (self-contained: used on pages without builder.css) ── */
+.au-veil {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(60,60,59,0.42); backdrop-filter: blur(4px);
+  font-family: var(--font-body); color: var(--color-fg1); -webkit-font-smoothing: antialiased;
+  animation: au-fade 180ms var(--ease-out) both;
+}
+.au-veil *, .au-veil *::before, .au-veil *::after { box-sizing: border-box; }
+.au-veil svg { display: block; }
+.au-sheet {
+  width: 100%; max-width: 440px; max-height: calc(100vh - 40px); overflow-y: auto;
+  background: #fff; border-radius: var(--radius-2xl); box-shadow: var(--shadow-xl);
+  animation: au-pop 240ms var(--ease-out) both;
+}
+@keyframes au-fade { from { opacity: 0; } }
+@keyframes au-pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.au-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 24px 0; }
+.au-head h3 { font-family: var(--font-display); font-size: 21px; font-weight: var(--fw-semibold); letter-spacing: -0.01em; margin: 0; line-height: 1.25; }
+.au-body { padding: 14px 24px 24px; display: flex; flex-direction: column; }
+
+/* buttons (scoped: no UA button styles leak in outside the builder) */
+.au-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-body); font-weight: var(--fw-semibold); font-size: 15px; line-height: 1;
+  border: none; border-radius: var(--radius-pill); cursor: pointer; white-space: nowrap; color: inherit; background: none;
+  transition: background var(--duration-base) var(--ease-out), opacity var(--duration-base) var(--ease-out), transform 120ms var(--ease-out);
+}
+.au-btn:active { transform: scale(0.97); }
+.au-btn:focus-visible { outline: 2px solid var(--tk-raspberry); outline-offset: 2px; }
+.au-btn[disabled] { opacity: 0.45; pointer-events: none; }
+.au-btn-primary { background: var(--tk-cobalt); color: #fff; padding: 16px 24px; font-size: 16px; box-shadow: var(--shadow-sm); }
+.au-btn-primary:hover { background: var(--tk-cobalt-light); }
+.au-btn-ghost { color: var(--color-fg2); padding: 10px 14px; font-size: 14px; font-weight: var(--fw-medium); }
+.au-btn-ghost:hover { background: rgba(60,60,59,0.05); color: var(--color-fg1); }
+.au-close { padding: 8px; flex: none; }
 .au-sub { margin: 0 0 18px; color: var(--color-fg2); font-size: 15px; line-height: 1.5; }
 
 .au-google {
