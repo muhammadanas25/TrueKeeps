@@ -45,7 +45,16 @@ const envSchema = z.object({
   /** comma-separated emails that get role=admin on first sign-in */
   ADMIN_EMAILS: z.string().default(""),
 
-  /** Email delivery (Phase 2B wires Resend; console until then) */
+  /** Safepay (Phase 2B). Names match the existing .env / Railway vars.
+   *  API key = "sec_…" from Developer → API; secret key = the v1 secret;
+   *  webhook secret = Developer → Endpoints → "View shared secret". */
+  API_KEY_SAFE_PAY: z.string().optional(),
+  SAFE_PAY_SECRET_KEY: z.string().optional(),
+  SAFE_PAY_WEBHOOK_SECRET: z.string().optional(),
+  /** https://sandbox.api.getsafepay.com (sandbox) or https://api.getsafepay.com (live) */
+  SAFE_PAY_API_URL: z.string().url().default("https://sandbox.api.getsafepay.com"),
+
+  /** Email delivery (Resend when a key is set; console otherwise) */
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("TrueKeep <hello@thetruekeeps.com>"),
 
@@ -62,6 +71,9 @@ const envSchema = z.object({
 });
 
 const parsed = envSchema.safeParse(process.env);
+if (parsed.success && !/(^|\.)getsafepay\.com$/.test(new URL(parsed.data.SAFE_PAY_API_URL).hostname)) {
+  console.warn(`[config] SAFE_PAY_API_URL host is not getsafepay.com — payments will fail (${new URL(parsed.data.SAFE_PAY_API_URL).hostname})`);
+}
 if (!parsed.success) {
   console.error("[config] invalid environment:", parsed.error.flatten().fieldErrors);
   process.exit(1);
@@ -100,6 +112,17 @@ export const config = {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   },
+  safepay:
+    env.API_KEY_SAFE_PAY && env.SAFE_PAY_SECRET_KEY && env.SAFE_PAY_WEBHOOK_SECRET
+      ? {
+          apiKey: env.API_KEY_SAFE_PAY,
+          v1Secret: env.SAFE_PAY_SECRET_KEY,
+          webhookSecret: env.SAFE_PAY_WEBHOOK_SECRET,
+          baseUrl: env.SAFE_PAY_API_URL.replace(/\/$/, ""),
+          // the SDK wants an environment name, not a URL
+          environment: /sandbox/.test(env.SAFE_PAY_API_URL) ? ("sandbox" as const) : ("production" as const),
+        }
+      : null,
   email: {
     resendApiKey: env.RESEND_API_KEY ?? null,
     from: env.EMAIL_FROM,
