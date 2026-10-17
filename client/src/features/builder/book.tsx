@@ -16,9 +16,25 @@
  * timer fallbacks so a missed transitionend can never wedge the book.
  */
 
-import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
-import { Repeat } from "lucide-react";
-import { themeById, type BookPage, type BookTheme, type BuilderPhoto, type CoverStyleId, type Occasion, type Spread } from "./data";
+import { memo, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
+import { GripVertical, ImageOff } from "lucide-react";
+import {
+  DEFAULT_FRAMING,
+  LAYOUT_SLOTS,
+  placement,
+  themeById,
+  type BookPage,
+  type BookTheme,
+  type BuilderPhoto,
+  type CoverStyleId,
+  type Occasion,
+  type PageLayoutId,
+  type Placement,
+  type Spread,
+} from "./data";
+import { clampTilt, slotAspect, tiltCover } from "./print";
+import { mix } from "./palette";
+import { SlotHit } from "./reframe";
 
 /* ── Photo tile ─────────────────────────────────────────────── */
 
@@ -34,86 +50,340 @@ export function shiftColor(hex: string, amt: number): string {
 }
 
 /**
+ * Geometry for the quarter-turn wrapper: a box centred on the slot,
+ * sized so that rotating it lands exactly on the slot.
+ *
+ * For a slot w×h (aspect a = w/h) and a 90°/270° turn, the wrapper is
+ * laid out h wide by w tall — i.e. (100/a)% × (100·a)% of the slot,
+ * since percentage width resolves against w and percentage height
+ * against h. Offsetting each axis by half the overflow centres it, and
+ * a centred rotation then maps h×w back onto w×h with no gap and no
+ * overdraw. 180° needs no resize, only the centred rotation.
+ */
+function turnBox(turn: Placement["turn"], aspect: number): CSSProperties {
+  const rotate = { transform: `rotate(${turn}deg)`, transformOrigin: "50% 50%" };
+  if (turn !== 90 && turn !== 270) return rotate;
+  // A non-finite or zero aspect can only come from a bad call site;
+  // falling back to square keeps the photo on screen instead of
+  // collapsing it to nothing.
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const w = 100 / a;
+  const h = 100 * a;
+  return { ...rotate, left: `${(100 - w) / 2}%`, top: `${(100 - h) / 2}%`, width: `${w}%`, height: `${h}%` };
+}
+
+/**
  * Ph — a photo slot. Real image when `photo.url` exists; otherwise the
  * design-system striped placeholder with the photo's label chip.
+ *
+ * Framing (`fx`/`fy`/`zoom`/`turn`) is applied here and ONLY here, so
+ * every surface that shows a photo — the 3-D book, the customize
+ * spread, the mini book, the cover, the upload grid — reframes
+ * identically and for free. The CSS is chosen so the photo can never
+ * distort:
+ *
+ *   object-fit: cover        (in builder.css) never changes the aspect
+ *                            ratio; it scales to fill and crops the
+ *                            overflow
+ *   object-position fx% fy%  aligns the image's (fx,fy) point with the
+ *                            box's (fx,fy) point — which the CSS spec
+ *                            guarantees keeps the box covered for any
+ *                            fx,fy in [0,1]
+ *   scale(zoom) about that   same origin, so the focal point stays
+ *                            pinned under the zoom and coverage holds
+ *                            for any zoom >= 1
+ *
+ * There is deliberately no `width`/`height` override and no non-uniform
+ * scale anywhere in this path: stretching is not something we guard
+ * against at runtime, it is something the render simply cannot express.
+ *
+ * A quarter turn cannot ride on the same transform, for two reasons.
+ * Rotating about the focal origin translates the photo off the slot
+ * (only a rotation about the CENTRE maps the box back onto itself), and
+ * a 90° turn of a box fitted to a w×h slot occupies h×w, which does not
+ * cover that slot unless it is w×h square. So a turn gets its own
+ * wrapper element, pre-sized to the TRANSPOSED slot and rotated about
+ * its centre: it lands back on the slot exactly, and the photo inside
+ * was cover-fitted to the box it actually fills, so the turn costs no
+ * resolution at all. `slotAspect` is how the wrapper learns the shape it
+ * has to transpose — passed down rather than measured, because `Ph`
+ * returns early on a missing photo and so cannot hold hooks.
  */
 export function Ph({
   photo,
   theme,
   className = "",
   showLabel = true,
+  placement,
+  slotAspect = 1,
 }: {
   photo: BuilderPhoto | undefined | null;
   theme?: BookTheme;
   className?: string;
   showLabel?: boolean;
+  /** how this photo sits in its slot; omitted = centred and unzoomed */
+  placement?: Placement | null;
+  /** printed w/h of the slot this tile fills; only read when turned */
+  slotAspect?: number;
 }) {
   if (!photo) return null;
+  // The striped tile is the fallback for BOTH "no image yet" and "the
+  // image failed to load". Built here, once, so the loaded path can hand
+  // it back on error without duplicating the markup.
+  const stripes = <Stripes photo={photo} theme={theme} className={className} showLabel={showLabel} />;
+  if (!photo.url) return stripes;
+  return (
+    <LoadedTile
+      photo={photo}
+      className={className}
+      placement={placement}
+      slotAspect={slotAspect}
+      fallback={stripes}
+    />
+  );
+}
+
+/**
+ * The real photo. Split out of `Ph` purely so it can hold the one piece
+ * of state `Ph` cannot: whether the image 404'd. A dropped media file
+ * used to render as an empty frame with no explanation, which reads as
+ * a design choice rather than a fault — so a failure now falls back to
+ * the same labelled placeholder an un-uploaded photo gets.
+ */
+function LoadedTile({
+  photo,
+  className,
+  placement,
+  slotAspect = 1,
+  fallback,
+}: {
+  photo: BuilderPhoto;
+  className: string;
+  placement?: Placement | null;
+  slotAspect?: number;
+  fallback: JSX.Element;
+}) {
+  const [broken, setBroken] = useState(false);
+  // A new src deserves a fresh attempt — otherwise replacing a missing
+  // photo would keep showing the placeholder for the photo that worked.
+  useEffect(() => setBroken(false), [photo.url]);
+  if (broken) return fallback;
+  const { fx, fy, zoom, turn, tilt } = { ...DEFAULT_FRAMING, ...(placement ?? {}) };
+  // Guard against a corrupt/old draft rather than trusting the type:
+  // a NaN here would blank the photo with no clue why.
+  const px = Number.isFinite(fx) ? Math.min(1, Math.max(0, fx)) * 100 : 50;
+  const py = Number.isFinite(fy) ? Math.min(1, Math.max(0, fy)) * 100 : 50;
+  const z = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
+  const img = (
+    <img
+      src={photo.url}
+      alt={photo.label}
+      draggable={false}
+      onError={() => setBroken(true)}
+      style={{
+        objectPosition: `${px}% ${py}%`,
+        ...(z !== 1 ? { transform: `scale(${z})`, transformOrigin: `${px}% ${py}%` } : null),
+      }}
+    />
+  );
+  const turned = turn ? <div className="bb-ph-turn" style={turnBox(turn, slotAspect)}>{img}</div> : img;
+  /**
+   * Straightening rides on its own wrapper, OUTSIDE the turn wrapper,
+   * for the same reason the turn has one: only a rotation about the
+   * centre maps a box back onto itself, and `scale(zoom)` is anchored
+   * to the focal point, so the two cannot share a transform.
+   *
+   * The wrapper is inset to the slot exactly, then rotated and scaled
+   * up by `tiltCover` about its centre. That scale is the whole safety
+   * argument — it is the smallest factor that guarantees the rotated
+   * wrapper still contains the slot, so no corner of page background
+   * can appear no matter the angle. Everything inside it is unchanged:
+   * the wrapper has the slot's own aspect ratio, so `turnBox` transposes
+   * against the same number it always did, and the photo still meets
+   * its box with plain `object-fit: cover`.
+   */
+  const deg = clampTilt(tilt);
+  return (
+    <div className={"bb-ph has-img " + className}>
+      {deg ? (
+        <div
+          className="bb-ph-tilt"
+          style={{ transform: `rotate(${deg}deg) scale(${tiltCover(deg, slotAspect)})` }}
+        >
+          {turned}
+        </div>
+      ) : (
+        turned
+      )}
+    </div>
+  );
+}
+
+/**
+ * The brand-striped tile. It stands in for a photo whose image is not
+ * there — either not uploaded yet, or uploaded and since lost. When the
+ * tile is labelled (i.e. it is a real page, not a layout wireframe) it
+ * now says which of the two it is, because a silent stripe reads as a
+ * design flourish and users reasonably ask why "the default" keeps
+ * coming back.
+ */
+function Stripes({
+  photo,
+  theme,
+  className,
+  showLabel,
+}: {
+  photo: BuilderPhoto;
+  theme?: BookTheme;
+  className: string;
+  showLabel: boolean;
+}) {
   const t = theme ?? themeById("ivory");
-  if (photo.url) {
-    return (
-      <div className={"bb-ph has-img " + className}>
-        <img src={photo.url} alt={photo.label} draggable={false} />
-      </div>
-    );
-  }
   const mix = [0, 0.06, -0.05][photo.shade ?? 0];
   const a = shiftColor(t.stripeA, mix);
   const b = shiftColor(t.stripeB, mix);
-  const dark = t.id === "cobalt";
+  // `t.dark`, not `t.id === "cobalt"` — with page colours on, any theme
+  // can be sitting on a dark page, and the label has to invert with it.
+  const dark = t.dark;
   return (
     <div className={"bb-ph " + (dark ? "dark " : "") + className} style={{ "--ph-a": a, "--ph-b": b } as CSSProperties}>
-      {showLabel ? <small>{photo.label}</small> : null}
+      {showLabel ? (
+        <small>
+          <ImageOff size={11} style={{ verticalAlign: "-1.5px", marginRight: 4 }} />
+          {photo.label} — image missing
+        </small>
+      ) : null}
     </div>
   );
 }
 
 /* ── Inner page ─────────────────────────────────────────────── */
 
-export function PageFace({
+/**
+ * Memoised, because a drag commits a new framing on every pointer move
+ * and the customize screen re-renders the whole thumbnail rail each
+ * time. Every prop here is either a primitive or a stable reference —
+ * `photos` is the state array, `theme`/`occasion` are singletons from
+ * their lookup tables, and a page object's identity changes only when
+ * that page is edited — so the rail re-renders exactly the one thumb
+ * that actually moved.
+ */
+function PageFaceImpl({
   page,
   photos,
   theme,
   title,
   occasion,
   onSlotClick,
+  onSlotFrame,
+  focusSlot,
+  dnd,
 }: {
   page: BookPage | null | undefined;
   photos: BuilderPhoto[];
   theme: BookTheme;
   title: string;
   occasion: Occasion;
-  /** when provided, photo slots become "swap photo" hit targets */
+  /** when provided, photo slots become draggable, tappable hit targets */
   onSlotClick?: (slotIdx: number) => void;
+  /** live framing updates from a drag; required for panning to do anything */
+  onSlotFrame?: (slotIdx: number, patch: Pick<Placement, "fx" | "fy">) => void;
+  /** which slot currently owns the reframe bar */
+  focusSlot?: number | null;
+  /**
+   * Drag-and-drop wiring, when this page is on the customize spread.
+   *
+   * Native HTML5 drag is used rather than the pointer-based scheme the
+   * rest of the screen uses, and for one reason: the slot's pointer
+   * events are already spoken for by panning, which is the gesture
+   * people reach for a hundred times more often. Dragging a photo OUT of
+   * a slot therefore starts from a small grab handle, and dropping onto
+   * one is a separate event stream that cannot be confused with a pan.
+   */
+  dnd?: {
+    /** encode what is being dragged, for the receiving slot to read */
+    onDragStart: (slotIdx: number, e: React.DragEvent) => void;
+    onDropOnSlot: (slotIdx: number, e: React.DragEvent) => void;
+    /** true while something droppable is in flight, so slots can light up */
+    active: boolean;
+    /** the slot currently under the cursor, or null */
+    over: number | null;
+    onDragOverSlot: (slotIdx: number | null) => void;
+  };
 }) {
   if (!page) return <div className="bb-page" style={{ background: theme.page }}></div>;
-  const ph = (i: number) => photos.find((p) => p.id === page.photoIds[i]);
+  const at = (i: number) => page.slots[i] ?? null;
+  const ph = (i: number) => {
+    const s = at(i);
+    return s ? photos.find((p) => p.id === s.photoId) : undefined;
+  };
 
   // A slot is either a plain tile, or (in customize mode) a tile with a
   // full-cover "Swap photo" button layered on top.
+  // Printed shape of each slot, so a turned photo knows what box it has
+  // to land back on. Comes from print.ts (which transcribes builder.css)
+  // rather than from measuring the DOM, so it is identical in the 72px
+  // rail thumbnail and on the press.
+  const aspect = (i: number) => slotAspect(page.layout, i);
+
   const slot = (i: number, cls?: string) => {
     const photo = ph(i);
     if (!photo) return null;
-    if (!onSlotClick) return <Ph key={i} photo={photo} theme={theme} className={cls || ""} />;
+    if (!onSlotClick)
+      return <Ph key={i} photo={photo} theme={theme} className={cls || ""} placement={at(i)} slotAspect={aspect(i)} />;
     return (
       <div
         key={i}
-        className={"bb-slot-wrap " + (cls || "")}
+        className={
+          "bb-slot-wrap " + (cls || "") + (dnd?.active ? " dnd" : "") + (dnd?.over === i ? " dnd-over" : "")
+        }
         style={{ position: cls ? "absolute" : "relative", flex: cls ? undefined : 1, minHeight: 0, display: "flex" }}
+        onDragOver={
+          dnd
+            ? (e) => {
+                // preventDefault is what makes an element a drop target at
+                // all; without it the browser refuses the drop silently.
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "move";
+                if (dnd.over !== i) dnd.onDragOverSlot(i);
+              }
+            : undefined
+        }
+        onDrop={
+          dnd
+            ? (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dnd.onDropOnSlot(i, e);
+              }
+            : undefined
+        }
       >
-        <Ph photo={photo} theme={theme} />
-        <button
-          className="bb-slot-hit"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSlotClick(i);
-          }}
-          aria-label={"Swap photo: " + photo.label}
-        >
-          <span className="bb-swap-tag">
-            <Repeat size={12} /> Swap photo
+        <Ph photo={photo} theme={theme} placement={at(i)} slotAspect={aspect(i)} />
+        <SlotHit
+          photo={photo}
+          placement={at(i) ?? placement(photo.id)}
+          focused={focusSlot === i}
+          slotAspect={aspect(i)}
+          onTap={() => onSlotClick(i)}
+          onFrame={(patch) => onSlotFrame && onSlotFrame(i, patch)}
+        />
+        {/* The move handle. Small, corner-anchored and only visible on
+            hover or focus, because the slot's main gesture is panning
+            and a large permanent grip would invite the wrong one. */}
+        {dnd ? (
+          <span
+            className="bb-slot-grab"
+            draggable
+            onDragStart={(e) => dnd.onDragStart(i, e)}
+            onDragEnd={() => dnd.onDragOverSlot(null)}
+            title="Drag to another slot"
+            aria-hidden="true"
+          >
+            <GripVertical size={13} />
           </span>
-        </button>
+        ) : null}
       </div>
     );
   };
@@ -131,7 +401,7 @@ export function PageFace({
   if (page.layout === "full") {
     return (
       <div className="bb-page bb-page-full" style={base}>
-        {onSlotClick ? slot(0) : <Ph photo={ph(0)} theme={theme} />}
+        {onSlotClick ? slot(0) : <Ph photo={ph(0)} theme={theme} placement={at(0)} slotAspect={aspect(0)} />}
         {page.caption ? (
           <div className="bb-page-caption" style={{ color: theme.ink }}>
             <span style={{ "--scrim": theme.scrim } as CSSProperties}>{page.caption}</span>
@@ -149,9 +419,31 @@ export function PageFace({
       </div>
     );
   }
-  if (page.layout === "collage") {
+  if (page.layout === "duo-side") {
     return (
-      <div className="bb-page bb-page-collage" style={base}>
+      <div className="bb-page bb-page-duo-side" style={base}>
+        {slot(0)}
+        {slot(1)}
+        {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
+      </div>
+    );
+  }
+  if (page.layout === "trio-strip") {
+    return (
+      <div className="bb-page bb-page-trio-strip" style={base}>
+        {slot(0)}
+        {slot(1)}
+        {slot(2)}
+        {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
+      </div>
+    );
+  }
+  if (page.layout === "collage") {
+    // `mirror` only flips WHERE the tiles sit (a CSS class, see
+    // .bb-mirror). Flipping the page with scaleX would reverse every
+    // face and every sign in the photos themselves.
+    return (
+      <div className={"bb-page bb-page-collage" + (page.mirror ? " bb-mirror" : "")} style={base}>
         {slot(0, "c0")}
         {slot(1, "c1")}
         {slot(2, "c2")}
@@ -164,6 +456,52 @@ export function PageFace({
       {slot(0)}
       {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
     </div>
+  );
+}
+
+export const PageFace = memo(PageFaceImpl);
+
+/**
+ * A tiny wireframe of one layout, for the picker.
+ *
+ * It is built from the REAL page classes — same `.bb-page`, same
+ * `.bb-page-duo`, same `c0/c1/c2` — with `--pw` turned down to thumbnail
+ * size and the tiles flattened to grey. That is the whole point: a
+ * hand-drawn SVG icon set would be four lines of markup cheaper and
+ * would start lying the first time anyone nudged a collage tile. This
+ * cannot drift, because it IS the layout.
+ *
+ * Nobody reads "Framed". Everybody recognises the shape.
+ */
+export function LayoutWire({ id, theme, mirror }: { id: PageLayoutId; theme: BookTheme; mirror?: boolean }) {
+  const tiles = LAYOUT_SLOTS[id];
+  const collage = id === "collage";
+  return (
+    <span
+      className={"bb-wire bb-page bb-page-" + id + (collage && mirror ? " bb-mirror" : "")}
+      /*
+       * The wire's tiles and hairline used to be fixed translucent
+       * greys, which was fine while every page was near-white. On the
+       * Ink or Slate paper a translucent grey on a dark page is a dark
+       * square on a dark square, and the whole layout picker goes
+       * blank. Mixing them off the page toward the theme's own ink and
+       * accent keeps exactly the old appearance on light paper and
+       * inverts by itself on dark.
+       */
+      style={
+        {
+          background: theme.page,
+          "--wire-edge": mix(theme.page, theme.ink, 0.1),
+          "--wire-tile": mix(theme.page, theme.ink, 0.24),
+          "--wire-accent": mix(theme.page, theme.accent, 0.45),
+        } as CSSProperties
+      }
+      aria-hidden="true"
+    >
+      {Array.from({ length: tiles }, (_, i) => (
+        <span key={i} className={"bb-ph" + (collage ? " c" + i : "")} />
+      ))}
+    </span>
   );
 }
 
@@ -280,7 +618,12 @@ export function MiniBook({
       style={(size ? { "--mini": size + "px", "--pw": size + "px" } : { "--pw": "168px" }) as unknown as CSSProperties}
     >
       <div className="bb-mini-inner">
-        <div className="bb-mini-spine" style={{ background: theme.id === "cobalt" ? "#16398a" : "rgba(0,0,0,0.18)" }}></div>
+        {/* A translucent black spine disappears into a dark page, so dark
+            themes get an explicit shade of their own page instead. */}
+        <div
+          className="bb-mini-spine"
+          style={{ background: theme.dark ? shiftColor(theme.page, -0.06) : "rgba(0,0,0,0.18)" }}
+        ></div>
         <div className="bb-mini-pages"></div>
         <div className="bb-mini-cover">
           <CoverFace theme={theme} coverStyle={coverStyle} title={title} occasion={occasion} photos={photos} />

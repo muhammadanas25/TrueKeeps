@@ -34,13 +34,23 @@ export interface BookTheme {
   stripeB: string;
   /** translucent pill behind captions on full-bleed pages */
   scrim: string;
+  /**
+   * True when the page is dark enough that `ink` has to be light.
+   *
+   * This used to be spelled `theme.id === "cobalt"` at each call site,
+   * which was correct while the four themes were the only page colours
+   * in existence. Page colours (see `palette.ts`) break that: an ivory
+   * book on the "Ink" swatch is dark and is not cobalt. So the fact is
+   * carried on the theme rather than re-derived from its id.
+   */
+  dark: boolean;
 }
 
 export const BOOK_THEMES: BookTheme[] = [
-  { id: "ivory", name: "Timeless Ivory", page: "#FAF7EE", ink: "#3C3C3B", accent: "#1D46A0", soft: "#EFEAD9", stripeA: "#EFE9D6", stripeB: "#E5DEC6", scrim: "rgba(250,247,238,0.88)" },
-  { id: "cobalt", name: "Bold Cobalt", page: "#1D46A0", ink: "#FFFFFF", accent: "#F5D547", soft: "#2a5cc0", stripeA: "#2A57B4", stripeB: "#3160BD", scrim: "rgba(20,52,120,0.82)" },
-  { id: "blush", name: "Soft Blush", page: "#F9EEEF", ink: "#3C3C3B", accent: "#DB3069", soft: "#F2DEE0", stripeA: "#F4E2E4", stripeB: "#EBD3D6", scrim: "rgba(249,238,239,0.88)" },
-  { id: "gallery", name: "Gallery White", page: "#FFFFFF", ink: "#3C3C3B", accent: "#3C3C3B", soft: "#F1F1EE", stripeA: "#F1F1EE", stripeB: "#E5E5E0", scrim: "rgba(255,255,255,0.88)" },
+  { id: "ivory", name: "Timeless Ivory", page: "#FAF7EE", ink: "#3C3C3B", accent: "#1D46A0", soft: "#EFEAD9", stripeA: "#EFE9D6", stripeB: "#E5DEC6", scrim: "rgba(250,247,238,0.88)", dark: false },
+  { id: "cobalt", name: "Bold Cobalt", page: "#1D46A0", ink: "#FFFFFF", accent: "#F5D547", soft: "#2a5cc0", stripeA: "#2A57B4", stripeB: "#3160BD", scrim: "rgba(20,52,120,0.82)", dark: true },
+  { id: "blush", name: "Soft Blush", page: "#F9EEEF", ink: "#3C3C3B", accent: "#DB3069", soft: "#F2DEE0", stripeA: "#F4E2E4", stripeB: "#EBD3D6", scrim: "rgba(249,238,239,0.88)", dark: false },
+  { id: "gallery", name: "Gallery White", page: "#FFFFFF", ink: "#3C3C3B", accent: "#3C3C3B", soft: "#F1F1EE", stripeA: "#F1F1EE", stripeB: "#E5E5E0", scrim: "rgba(255,255,255,0.88)", dark: false },
 ];
 
 export const themeById = (id: string | null | undefined): BookTheme =>
@@ -220,10 +230,20 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
 /* ── Photos ─────────────────────────────────────────────────── */
 
 /**
- * A photo in the builder. `url` is a data URL held in memory for the
- * session; it is intentionally NOT persisted to localStorage (quota),
- * so after a reload the tile falls back to its labelled placeholder —
- * the book structure (pages/photoIds/captions) survives regardless.
+ * A photo in the builder. A server `url` (from the media pipeline)
+ * persists in the localStorage draft; a session-only data: URL fallback
+ * does not, so after a reload that tile falls back to its labelled
+ * placeholder — the book structure (pages/slots/captions) survives
+ * regardless.
+ *
+ * `w`/`h` are the TRUE pixel dimensions of the uploaded bytes,
+ * EXIF-rotated, captured at upload time (see lib/uploads.ts). They are
+ * what every print-quality decision keys off: the aspect ratio drives
+ * which slot a photo belongs in, and the pixel count sets the ceiling
+ * on how far the user can zoom before the page would print soft. They
+ * are optional because HEIC can't be decoded in most browsers — an
+ * absent w/h means "unknown", never "zero", and callers must degrade
+ * gracefully rather than assume the worst.
  */
 export interface BuilderPhoto {
   id: string;
@@ -231,18 +251,122 @@ export interface BuilderPhoto {
   /** 0–2, subtly varies the placeholder tint */
   shade: number;
   url?: string;
+  /** natural pixel width, EXIF-rotated; undefined = not measurable */
+  w?: number;
+  /** natural pixel height, EXIF-rotated; undefined = not measurable */
+  h?: number;
 }
 
 /* ── Page generation ────────────────────────────────────────── */
 
-export type PageLayoutId = "title" | "full" | "single" | "duo" | "collage";
+/**
+ * The seven page shapes.
+ *
+ * Seven is a deliberate number. Four (the original set) left obvious
+ * gaps — there was no way to put two portraits beside each other, and no
+ * calm way to show three. Beyond seven the picker stops being a glance
+ * and starts being a decision, which is exactly the clutter we are
+ * avoiding; anything more expressive belongs in per-occasion templates
+ * later, not in the everyday grid.
+ *
+ * The pairing is what makes it legible: each photo count offers one
+ * quiet option and one livelier one.
+ *   1 photo  — full (bleed)        / single (framed, captionable)
+ *   2 photos — duo (stacked)       / duo-side (side by side)
+ *   3 photos — collage (scattered) / trio-strip (a row of three)
+ */
+export type PageLayoutId = "title" | "full" | "single" | "duo" | "duo-side" | "collage" | "trio-strip";
+
+/**
+ * How ONE photo sits inside ONE slot.
+ *
+ * The framing is stored as a normalised focal point plus a zoom factor,
+ * NOT as a crop rectangle in pixels. This matters more than it looks:
+ *
+ *  - A crop rect is expressed in the aspect ratio of the frame it was
+ *    cut for. Change the page layout (full → duo), mirror the spread,
+ *    or reflow the book, and that rect is meaningless — you get either
+ *    a distorted photo or a silent re-centre that throws the user's
+ *    work away.
+ *  - A focal point is aspect-independent. It survives every one of
+ *    those operations, because it says "keep THIS part of the photo in
+ *    view" rather than "show exactly these pixels".
+ *
+ * It also maps 1:1 onto CSS with no arithmetic: `fx`/`fy` become
+ * `object-position`, `zoom` becomes `scale()` about that same origin.
+ * Per the CSS spec, percentage object-position aligns the image's
+ * (fx,fy) point with the box's (fx,fy) point, which guarantees the box
+ * stays fully covered for ANY fx,fy in [0,1] — and scaling about that
+ * same origin preserves the guarantee for any zoom >= 1. So the photo
+ * can never be stretched, letterboxed, or pulled off its own edge.
+ */
+export interface Placement {
+  photoId: string;
+  /** focal point X, 0–1 (0 = show the left edge, 1 = the right) */
+  fx: number;
+  /** focal point Y, 0–1 */
+  fy: number;
+  /** >= 1; 1 means "exactly cover the slot", 2 means "twice as close" */
+  zoom: number;
+  /** quarter turns — free, because a turned photo is cover-fitted to the
+   *  slot's TRANSPOSED box and rotated about its centre, so it lands back
+   *  on the slot exactly and costs no resolution at all (see `turnBox`) */
+  turn: 0 | 90 | 180 | 270;
+  /**
+   * Fine rotation in degrees, for straightening a crooked horizon.
+   * Absent or 0 on almost every placement.
+   *
+   * Unlike a quarter turn this is NOT free: a rectangle rotated by a
+   * non-right angle no longer covers its own box, so the photo has to be
+   * scaled up to hide the corners, and that scale spends resolution.
+   * The cost is exact and knowable — `tiltCover` in print.ts — so it is
+   * folded into the same DPI budget the zoom slider already respects,
+   * which is why the zoom track visibly shortens as you straighten.
+   *
+   * Bounded to ±TILT_MAX. Straightening is a correction, not a
+   * composition tool; past ten degrees you are cropping away a third of
+   * the frame to fix something a re-shoot would fix better.
+   */
+  tilt?: number;
+}
+
+/**
+ * Centred, unzoomed, upright, level — what auto-design produces.
+ *
+ * `tilt` is listed even though it is optional on the interface, because
+ * "Reset" is implemented as `{ ...DEFAULT_FRAMING }`: a key missing here
+ * is a key reset silently fails to clear.
+ */
+export const DEFAULT_FRAMING = { fx: 0.5, fy: 0.5, zoom: 1, turn: 0, tilt: 0 } as const;
+
+/** Build a Placement, defaulting anything unspecified to centred/unzoomed. */
+export const placement = (photoId: string, over: Partial<Omit<Placement, "photoId">> = {}): Placement => ({
+  photoId,
+  ...DEFAULT_FRAMING,
+  ...over,
+});
 
 export interface BookPage {
   id: string;
   layout: PageLayoutId;
-  photoIds: string[];
+  /** one entry per filled slot, in slot order */
+  slots: Placement[];
   caption: string;
+  /**
+   * Flip an asymmetric layout left-to-right. Only `collage` is
+   * asymmetric, so only collage pages ever set it.
+   *
+   * It exists because a collage page facing a collage page across the
+   * gutter leans the same way twice, which reads as a mistake. Mirroring
+   * one of them makes the spread sit level. It is a CSS-only flip of the
+   * tile positions (see `.bb-mirror`), NOT a transform on the photos —
+   * scaleX(-1) on the page would print every face reversed.
+   */
+  mirror?: boolean;
 }
+
+/** Read-only view for the many call sites that only care about identity. */
+export const pagePhotoIds = (page: BookPage): string[] => page.slots.map((s) => s.photoId);
 
 export interface Spread {
   left: BookPage | null;
@@ -250,14 +374,75 @@ export interface Spread {
 }
 
 /** How many photo slots each layout holds. */
-export const LAYOUT_SLOTS: Record<PageLayoutId, number> = { title: 0, full: 1, single: 1, duo: 2, collage: 3 };
+export const LAYOUT_SLOTS: Record<PageLayoutId, number> = {
+  title: 0,
+  full: 1,
+  single: 1,
+  duo: 2,
+  "duo-side": 2,
+  collage: 3,
+  "trio-strip": 3,
+};
 
+/**
+ * The picker's contents, in picker order.
+ *
+ * Names are short and concrete because they sit under a picture of the
+ * layout: the thumbnail says what the shape is, the word only has to
+ * disambiguate it from its neighbour. "Two photos" became "Stacked" for
+ * exactly that reason — the count is already a group header, so spending
+ * the label on it was wasted.
+ */
 export const LAYOUTS: Array<{ id: Exclude<PageLayoutId, "title">; name: string; slots: number }> = [
   { id: "full", name: "Full page", slots: 1 },
   { id: "single", name: "Framed", slots: 1 },
-  { id: "duo", name: "Two photos", slots: 2 },
+  { id: "duo", name: "Stacked", slots: 2 },
+  { id: "duo-side", name: "Side by side", slots: 2 },
   { id: "collage", name: "Collage", slots: 3 },
+  { id: "trio-strip", name: "Row of three", slots: 3 },
 ];
+
+/** Only asymmetric layouts can be mirrored; for the rest it's a no-op. */
+export const isMirrorable = (layout: PageLayoutId): boolean => layout === "collage";
+
+/**
+ * Which layout a page should adopt when its photo count changes under
+ * it — a photo removed, or one dragged in from the filmstrip.
+ *
+ * The page has to re-shape itself, because a layout is a promise about
+ * how many photos are on the page and leaving a collage with two photos
+ * in it would leave a hole. The only question is WHICH layout, and the
+ * answer that surprises people least is the one that looks most like
+ * where they already were. So the map is by character, not by index:
+ * the airy layouts stay airy, the busy ones stay busy, and a page the
+ * user had deliberately made calm does not turn into a collage because
+ * they dragged one more photo onto it.
+ *
+ * Returning null means "this page has no photos left" — the caller
+ * decides whether that is a page to delete or a drop to refuse, which
+ * are different questions this function has no business answering.
+ */
+const LAYOUT_LADDER: Record<Exclude<PageLayoutId, "title">, Array<Exclude<PageLayoutId, "title">>> = {
+  //          1 photo    2 photos      3 photos
+  full: ["full", "duo", "collage"],
+  single: ["single", "duo", "collage"],
+  duo: ["single", "duo", "collage"],
+  "duo-side": ["single", "duo-side", "trio-strip"],
+  collage: ["full", "duo", "collage"],
+  "trio-strip": ["single", "duo-side", "trio-strip"],
+};
+
+export function layoutForCount(from: PageLayoutId, count: number): PageLayoutId | null {
+  if (count <= 0) return null;
+  const ladder = LAYOUT_LADDER[from as Exclude<PageLayoutId, "title">] ?? LAYOUT_LADDER.single;
+  // Above three there is nothing to grow into; the caller is expected to
+  // have refused the drop before getting here, but clamping beats
+  // returning undefined and rendering an empty page.
+  return ladder[Math.min(count, 3) - 1];
+}
+
+/** The most photos any one page can hold, i.e. the top of the ladder. */
+export const MAX_SLOTS_PER_PAGE = 3;
 
 /** Repeating layout rhythm per density — tuned in the design prototype. */
 const DENSITY_PATTERNS: Record<DensityId, PageLayoutId[]> = {
@@ -284,19 +469,19 @@ export function prettyCaption(label: string): string {
  */
 export function generatePages(photos: BuilderPhoto[], density: DensityId): BookPage[] {
   const pattern = DENSITY_PATTERNS[density] ?? DENSITY_PATTERNS.balanced;
-  const pages: BookPage[] = [{ id: "pg-title", layout: "title", photoIds: [], caption: "" }];
+  const pages: BookPage[] = [{ id: "pg-title", layout: "title", slots: [], caption: "" }];
   let pi = 0;
   let step = 0;
   let n = 0;
   while (pi < photos.length) {
     const layout = pattern[step % pattern.length];
     const slots = Math.min(LAYOUT_SLOTS[layout], photos.length - pi);
-    const ids = photos.slice(pi, pi + slots).map((p) => p.id);
+    const placed = photos.slice(pi, pi + slots).map((p) => placement(p.id));
     const caption = layout === "single" ? prettyCaption(photos[pi].label) : "";
     pages.push({
       id: "pg" + n,
       layout: slots < LAYOUT_SLOTS[layout] ? (slots === 1 ? "single" : "duo") : layout,
-      photoIds: ids,
+      slots: placed,
       caption,
     });
     pi += slots;
@@ -304,7 +489,14 @@ export function generatePages(photos: BuilderPhoto[], density: DensityId): BookP
     n++;
   }
   if (pages.length % 2 === 1 && pages.length > 1) {
-    pages.push({ id: "pg-end", layout: "single", photoIds: [pages[1].photoIds[0]], caption: "until next time" });
+    // reprise the opening photo, but as its OWN placement — sharing the
+    // object would make reframing the first page silently reframe the last
+    pages.push({
+      id: "pg-end",
+      layout: "single",
+      slots: pages[1].slots[0] ? [{ ...pages[1].slots[0] }] : [],
+      caption: "until next time",
+    });
   }
   return pages;
 }

@@ -22,7 +22,7 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, ImagePlus, Plus, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { uploadPhotoFile } from "@/lib/uploads";
+import { readImageSize, uploadPhotoFile } from "@/lib/uploads";
 import { Ph } from "../book";
 import { generatePages, occasionById, type BookTheme, type BuilderPhoto, type CopyVoice } from "../data";
 import type { BuilderState } from "../state";
@@ -97,11 +97,18 @@ export function UploadScreen({
       const n = startIdx + i;
       let id = "p" + Date.now().toString(36) + "-" + n;
       let url: string | undefined;
+      // True pixel size of the uploaded bytes. Recorded on the photo so
+      // the editor can bound zoom and flag soft pages WITHOUT re-reading
+      // the file or waiting on the server's async sharp pass.
+      let w: number | undefined;
+      let h: number | undefined;
       if (projectId) {
         try {
           const uploaded = await uploadPhotoFile(file, projectId);
           id = uploaded.id;
           url = uploaded.url; // server URL — persists across reloads
+          w = uploaded.width ?? undefined;
+          h = uploaded.height ?? undefined;
         } catch {
           url = undefined; // fall through to the local-only path below
         }
@@ -109,6 +116,10 @@ export function UploadScreen({
       if (!url) {
         try {
           url = await readAsDataURL(file); // offline fallback, session-only
+          // the upload path never ran, so measure the original directly
+          const size = await readImageSize(file);
+          w = size?.w;
+          h = size?.h;
         } catch {
           url = undefined; // unreadable file → labelled placeholder tile
         }
@@ -119,6 +130,8 @@ export function UploadScreen({
         label: occ.photoLabels[n % occ.photoLabels.length] || cleanLabel(file.name),
         shade: n % 3,
         url,
+        w,
+        h,
       });
     }
     set({ photos: [...photos, ...next] });

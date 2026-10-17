@@ -64,6 +64,8 @@
 .bb-btn-ghost { color: var(--color-fg2); padding: 10px 14px; border-radius: var(--radius-pill); font-size: 14px; font-weight: var(--fw-medium); }
 .bb-btn-ghost:hover { background: rgba(60,60,59,0.05); color: var(--color-fg1); }
 .bb-btn-lg { padding: 18px 36px; font-size: 16px; }
+/* after -ghost/-lg so it wins on source order for the same specificity */
+.bb-btn-sm { padding: 7px 11px; font-size: 12.5px; gap: 5px; }
 .bb-btn[disabled] { opacity: 0.4; pointer-events: none; }
 
 /* ── Quiz ──────────────────────────────────────────── */
@@ -206,6 +208,16 @@
 /* real uploaded photo fills the same tile the placeholder uses */
 .bb-ph.has-img { background: #e9e6da; }
 .bb-ph.has-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* quarter-turn carrier: pre-sized to the transposed slot by turnBox() in
+   book.tsx and rotated about its centre, so a turned photo lands back on
+   the slot exactly. Only rendered when turn !== 0. */
+.bb-ph-turn { position: absolute; inset: 0; }
+/* Straighten carrier: sits OUTSIDE the turn carrier and is inset to the
+   slot exactly, so its aspect IS the slot's aspect — which is the number
+   tiltCover() was given. rotate() then scale() about the centre; the
+   scale is the smallest that keeps all four corners covered, so a
+   straightened photo can never expose the tile behind it. */
+.bb-ph-tilt { position: absolute; inset: 0; transform-origin: 50% 50%; }
 
 /* ── Generating ────────────────────────────────────── */
 .bb-generating { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; padding: 40px 20px; }
@@ -290,11 +302,37 @@
 .bb-page-single .bb-ph { flex: 1; }
 .bb-page-duo { gap: calc(var(--pw) * 0.05); }
 .bb-page-duo .bb-ph { flex: 1; min-height: 0; }
+/* two portraits, side by side. Grid rather than a flex row so the caption
+   can span both columns instead of turning into a third one. */
+.bb-page-duo-side {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: calc(var(--pw) * 0.05);
+}
+.bb-page-duo-side .bb-page-caption { grid-column: 1 / -1; }
+/* three in a row. The tiles carry a fixed 3:4 so the strip keeps its
+   proportions at every render scale — which is also why print.ts can
+   quote one exact slot size for it instead of a conservative bound.
+   align-content centres the strip in the page's height. */
+.bb-page-trio-strip {
+  display: grid; grid-template-columns: repeat(3, 1fr); align-content: center;
+  column-gap: calc(var(--pw) * 0.035);
+}
+.bb-page-trio-strip > .bb-ph, .bb-page-trio-strip > .bb-slot-wrap { aspect-ratio: 3 / 4; }
+.bb-page-trio-strip .bb-page-caption { grid-column: 1 / -1; }
 .bb-page-collage { display: block; }
 .bb-page-collage .bb-ph { position: absolute; box-shadow: 0 2px 8px rgba(60,60,59,0.18); }
 .bb-page-collage .c0 { left: 7%; top: 8%; width: 56%; height: 56%; transform: rotate(-2.5deg); }
 .bb-page-collage .c1 { right: 6%; top: 22%; width: 38%; height: 38%; transform: rotate(2deg); }
 .bb-page-collage .c2 { left: 22%; bottom: 7%; width: 48%; height: 34%; transform: rotate(1.2deg); }
+/* Mirrored collage: tiles move to the other side and lean the other way.
+   Deliberately NOT scaleX(-1) on the page — that would print every face,
+   sign and date reversed. Left/right and the tilt sign are the only
+   things carrying the asymmetry, so they are the only things that flip.
+   The same rules cover the plain .bb-ph tiles (preview) and the
+   .bb-slot-wrap tiles (customize), since both wear c0/c1/c2. */
+.bb-page-collage.bb-mirror .c0 { left: auto; right: 7%; transform: rotate(2.5deg); }
+.bb-page-collage.bb-mirror .c1 { right: auto; left: 6%; transform: rotate(-2deg); }
+.bb-page-collage.bb-mirror .c2 { left: auto; right: 22%; transform: rotate(-1.2deg); }
 .bb-page-title { align-items: center; justify-content: center; text-align: center; gap: calc(var(--pw) * 0.04); }
 .bb-page-title .t { font-family: var(--font-display); font-size: calc(var(--pw) * 0.085); font-weight: var(--fw-semibold); line-height: 1.15; letter-spacing: -0.01em; }
 .bb-page-title .rule { width: calc(var(--pw) * 0.14); height: 2px; }
@@ -351,15 +389,61 @@
 .bb-cust-page.sel { z-index: 2; box-shadow: 0 0 0 3px var(--tk-cobalt), var(--shadow-selected); }
 .bb-cust-page .bb-empty { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--color-fg3); background: var(--tk-cream-muted); }
 .bb-cust-spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 24px; transform: translateX(-50%); background: linear-gradient(to right, transparent, rgba(0,0,0,0.09) 50%, transparent); pointer-events: none; z-index: 3; }
-.bb-slot-hit { position: absolute; inset: 0; cursor: pointer; border-radius: inherit; transition: box-shadow var(--duration-fast); }
+/* Photo slot: a drag pans it, a tap opens the reframe bar. touch-action
+   is off so a drag on a phone moves the photo instead of scrolling. */
+.bb-slot-hit {
+  position: absolute; inset: 0; border-radius: inherit; touch-action: none;
+  cursor: grab; transition: box-shadow var(--duration-fast);
+}
+.bb-slot-hit:active { cursor: grabbing; }
 .bb-slot-hit:hover { box-shadow: inset 0 0 0 2.5px var(--tk-cobalt); }
-.bb-slot-hit .bb-swap-tag {
+.bb-slot-hit.on { box-shadow: inset 0 0 0 2.5px var(--tk-raspberry); }
+.bb-slot-hit .bb-slot-tag {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   display: flex; align-items: center; gap: 6px; background: rgba(29,70,160,0.92); color: #fff;
   font-size: 11px; font-weight: var(--fw-semibold); padding: 6px 12px; border-radius: 99px;
   opacity: 0; transition: opacity var(--duration-fast); pointer-events: none; white-space: nowrap;
 }
-.bb-slot-hit:hover .bb-swap-tag { opacity: 1; }
+.bb-slot-hit:hover .bb-slot-tag { opacity: 1; }
+/* while a slot is focused its own tag would sit under the controls */
+.bb-slot-hit.on .bb-slot-tag { opacity: 0; }
+
+/* ── Reframe bar ───────────────────────────────────── */
+.bb-reframe {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+  background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-pill);
+  padding: 7px 8px 7px 16px; box-shadow: var(--shadow-sm); max-width: 100%;
+}
+.bb-reframe-name {
+  font-size: 12px; font-weight: var(--fw-semibold); color: var(--color-fg2);
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bb-reframe-zoom { display: flex; align-items: center; gap: 8px; color: var(--color-fg2); }
+.bb-reframe-zoom input[type="range"] { width: 116px; accent-color: var(--tk-cobalt); cursor: pointer; }
+.bb-reframe-zoom b { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--color-fg3); min-width: 30px; }
+.bb-reframe-soft {
+  flex-basis: 100%; text-align: center; font-size: 11.5px; color: #7A5214;
+  background: #FDF6E3; border-radius: 8px; padding: 5px 10px;
+}
+/* Straighten. Same shape as the zoom control so they read as a pair,
+   but tinted only once it is off zero — a dial sitting at 0.0° is not
+   news and should not draw the eye. */
+.bb-reframe-tilt { display: flex; align-items: center; gap: 8px; color: var(--color-fg2); }
+.bb-reframe-tilt input[type="range"] { width: 96px; accent-color: var(--color-fg3); cursor: pointer; }
+.bb-reframe-tilt b {
+  font-size: 11px; font-variant-numeric: tabular-nums; color: var(--color-fg3);
+  min-width: 36px; cursor: pointer; user-select: none;
+}
+.bb-reframe-tilt.on input[type="range"] { accent-color: var(--tk-cobalt); }
+.bb-reframe-tilt.on b { color: var(--tk-cobalt); font-weight: var(--fw-semibold); }
+.bb-reframe-del:hover { color: var(--tk-raspberry); }
+.bb-reframe-note {
+  flex-basis: 100%; text-align: center; font-size: 11.5px; color: var(--color-fg3);
+}
+.bb-reframe-hint {
+  display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--color-fg3);
+}
+.bb-reframe-hint svg { color: var(--tk-raspberry); }
 
 .bb-panel { background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: 22px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 84px; }
 .bb-panel-sec { display: flex; flex-direction: column; gap: 12px; }
@@ -368,6 +452,34 @@
 .bb-seg button { flex: 1; padding: 9px 6px; border-radius: 9px; font-size: 12.5px; font-weight: var(--fw-medium); color: var(--color-fg2); transition: all var(--duration-fast); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .bb-seg button:hover { color: var(--color-fg1); }
 .bb-seg button.on { background: #fff; color: var(--tk-cobalt); box-shadow: var(--shadow-xs); font-weight: var(--fw-semibold); }
+
+/* ── Layout picker ─────────────────────────────────── */
+/* Grouped by how many photos the layout holds, because that is the
+   question the user is actually answering. The count is the group
+   header, so the option's own label only has to say which of the two
+   shapes it is. */
+.bb-layouts { display: flex; flex-direction: column; gap: 14px; }
+.bb-layouts-count { font-size: 11px; color: var(--color-fg3); margin-bottom: 7px; }
+.bb-layouts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bb-layout-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 8px 6px 7px;
+  border: 1.5px solid var(--color-border); border-radius: var(--radius-base); background: #fff;
+  font-size: 11.5px; font-weight: var(--fw-medium); color: var(--color-fg2);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast);
+}
+.bb-layout-opt:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.bb-layout-opt.on { border-color: var(--tk-cobalt); box-shadow: var(--shadow-selected); color: var(--tk-cobalt); font-weight: var(--fw-semibold); }
+/* The wireframe is a real page at thumbnail scale: same classes, same
+   geometry, tiles flattened to grey. --pw drives every internal gap and
+   inset, so shrinking it is the whole of the "make it a thumbnail" job. */
+/* The three colours are opaque mixes off the page colour, set inline by
+   LayoutWire — see the comment there. Translucent constants would go
+   invisible the moment the paper went dark. */
+.bb-wire { --pw: 52px; width: 52px; height: 52px; flex: none; border-radius: 3px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--wire-edge, rgba(60,60,59,0.1)); }
+.bb-wire .bb-ph { background: var(--wire-tile, rgba(60,60,59,0.24)); box-shadow: none; }
+.bb-layout-opt.on .bb-wire .bb-ph { background: var(--wire-accent, rgba(29,70,160,0.42)); }
+.bb-mirror-btn { align-self: flex-start; }
+
 .bb-caption-input { width: 100%; border: 1.5px solid var(--color-border); border-radius: var(--radius-base); padding: 11px 14px; font-size: 14px; transition: border-color var(--duration-base); background: #fff; }
 .bb-caption-input:focus { outline: none; border-color: var(--tk-cobalt); }
 .bb-theme-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -377,6 +489,26 @@
 .bb-theme-card .sw { height: 44px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 11px; }
 .bb-theme-card .nm { font-size: 11.5px; font-weight: var(--fw-medium); padding: 7px 4px; color: var(--color-fg2); }
 .bb-theme-card.on .nm { color: var(--tk-cobalt); }
+
+/* ── Page-colour swatches ──────────────────────────────
+   A wrapping grid, not a horizontal scroller: eleven chips fit in two
+   rows inside the panel, and a scroller would tuck the dark end of the
+   range behind an edge — precisely the swatches a user is least likely
+   to go looking for. The selected ring is drawn OUTSIDE the chip (a
+   box-shadow spread rather than a thicker border) so choosing a colour
+   doesn't shrink the patch of colour you're judging it by. */
+.bb-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.bb-swatch {
+  width: 30px; height: 30px; padding: 0; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(60,60,59,0.16); cursor: pointer;
+  transition: transform var(--duration-fast), box-shadow var(--duration-fast);
+}
+.bb-swatch:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.bb-swatch:focus-visible { outline: 2px solid var(--tk-cobalt); outline-offset: 2px; }
+.bb-swatch.on { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--tk-cobalt); }
+.bb-swatch svg { opacity: 0.75; }
+
 .bb-panel-note { font-size: 12px; color: var(--color-fg3); line-height: 1.5; display: flex; gap: 8px; align-items: flex-start; }
 .bb-panel-note svg { flex: none; margin-top: 1px; color: var(--tk-raspberry); }
 
@@ -385,6 +517,86 @@
 .bb-slot-wrap > .bb-ph { flex: 1; }
 .bb-page-collage .bb-slot-wrap { position: absolute; box-shadow: 0 2px 8px rgba(60,60,59,0.18); }
 .bb-page-collage .bb-slot-wrap .bb-ph { position: absolute; inset: 0; transform: none; box-shadow: none; width: 100%; height: 100%; }
+
+/* ── Moving photos around ──────────────────────────── */
+/* The grab handle. Deliberately small and corner-anchored: the slot's
+   own gesture is panning, so a big permanent grip would invite the
+   wrong one. It appears on hover, and stays put while a drag is in
+   flight so the source tile still reads as the thing being moved. */
+.bb-slot-grab {
+  position: absolute; top: 5px; left: 5px; z-index: 4;
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 7px;
+  background: rgba(255,255,255,0.92); color: var(--color-fg2);
+  box-shadow: 0 1px 4px rgba(60,60,59,0.28);
+  cursor: grab; opacity: 0; transition: opacity var(--duration-fast);
+}
+.bb-slot-grab:active { cursor: grabbing; }
+.bb-slot-wrap:hover .bb-slot-grab { opacity: 1; }
+/* While something is in flight every slot is a target, so every slot
+   says so — a faint inset while waiting, a solid one under the cursor,
+   because the photo underneath is the thing being aimed at.
+   The ring goes on the hit layer, not on the wrapper: the photo is a
+   positioned child and would paint straight over an outline drawn on
+   its parent. `.bb-slot-hit` already sits above the image, which is why
+   its own hover ring works, so the drop states borrow the same layer. */
+.bb-slot-wrap.dnd .bb-slot-grab { opacity: 1; }
+.bb-slot-wrap.dnd .bb-slot-hit { box-shadow: inset 0 0 0 2px rgba(29,70,160,0.38); }
+.bb-slot-wrap.dnd-over .bb-slot-hit {
+  box-shadow: inset 0 0 0 3px var(--tk-cobalt), inset 0 0 0 999px rgba(29,70,160,0.1);
+}
+.bb-slot-wrap.dnd-over { box-shadow: 0 0 0 3px rgba(29,70,160,0.16); }
+/* A page with room left rings its own margin — the part of the face
+   that is not a slot — because dropping there appends rather than
+   swaps. An overlay for the same paint-order reason as above, and
+   pointer-events: none so it cannot swallow the drop it advertises. */
+.bb-cust-page.droppable::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  border-radius: inherit; box-shadow: inset 0 0 0 2px rgba(29,70,160,0.32);
+}
+
+/* ── Photo tray ────────────────────────────────────── */
+/* Every photo in the book, used or not. Collapsible because on a full
+   book it is long, and open by default because the drag-to-place
+   gesture is invisible if the source of the drag is hidden. */
+.bb-strip-wrap { margin-top: 26px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+.bb-strip-head {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 2px;
+  font-size: 12px; font-weight: var(--fw-semibold); color: var(--color-fg2);
+  background: none; border: 0; cursor: pointer;
+}
+.bb-strip-head:hover { color: var(--color-fg1); }
+.bb-strip-count { font-weight: var(--fw-regular); color: var(--color-fg3); }
+.bb-strip-chev { margin-left: auto; color: var(--color-fg3); transition: transform var(--duration-fast); }
+.bb-strip-chev.open { transform: rotate(180deg); }
+.bb-strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 10px; scrollbar-width: thin; }
+.bb-strip::-webkit-scrollbar { height: 8px; }
+.bb-strip::-webkit-scrollbar-track { background: transparent; }
+.bb-strip::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 99px; }
+.bb-strip-item {
+  position: relative; flex: none; width: 56px; height: 56px; border-radius: 7px; overflow: hidden;
+  border: 1.5px solid var(--color-border); background: #fff; cursor: grab; user-select: none;
+  transition: transform var(--duration-fast), box-shadow var(--duration-fast), opacity var(--duration-fast);
+}
+.bb-strip-item:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.bb-strip-item:active { cursor: grabbing; }
+.bb-strip-item .bb-ph { width: 100%; height: 100%; box-shadow: none; border-radius: 0; }
+/* Already placed: dimmed, not hidden. It is still a legitimate drag
+   source (you may want the same face twice on different pages), the
+   dot just answers "did I use this one?" without a second glance. */
+.bb-strip-item.used { opacity: 0.5; }
+.bb-strip-item.used:hover { opacity: 1; }
+.bb-strip-dot {
+  position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--tk-cobalt); box-shadow: 0 0 0 1.5px #fff;
+}
+.bb-strip-item.missing { border-color: #E0C48A; }
+.bb-strip-missing {
+  position: absolute; inset: auto 0 0 0; display: flex; align-items: center; justify-content: center;
+  padding: 2px 0; background: rgba(253,246,227,0.94); color: #7A5214;
+}
+.bb-strip-empty { font-size: 12px; color: var(--color-fg3); padding: 12px 2px; }
+.bb-strip-hint { font-size: 11.5px; color: var(--color-fg3); padding: 0 2px 2px; }
 
 /* thumbnail rail */
 .bb-rail-wrap { margin-top: 28px; }
@@ -399,6 +611,11 @@
 .bb-thumb .bb-ph small { display: none; }
 .bb-thumb .bb-page, .bb-thumb .bb-cover { pointer-events: none; }
 .bb-thumb .pgnum { position: absolute; right: 3px; bottom: 3px; background: rgba(60,60,59,0.65); color: #fff; font-size: 9px; padding: 1px 5px; border-radius: 99px; font-weight: var(--fw-medium); }
+/* print-quality preflight: only ever rendered for a page that would
+   print soft, so its mere presence is the whole message. Amber rather
+   than red — this is "worth a look", not an error, and the book is
+   still perfectly orderable. */
+.bb-thumb-warn { position: absolute; left: 3px; top: 3px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 99px; background: #B7791F; color: #fff; box-shadow: 0 1px 3px rgba(60,60,59,0.35); pointer-events: none; }
 .bb-thumb-cover-mini { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 8.5px; text-align: center; padding: 4px; }
 .bb-rail-hint { font-size: 12px; color: var(--color-fg3); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 
@@ -427,6 +644,11 @@
 .bb-order-specs { display: flex; flex-direction: column; gap: 20px; }
 .bb-spec-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14.5px; gap: 12px; }
 .bb-spec-row b { font-weight: var(--fw-medium); color: var(--color-fg2); font-size: 13px; }
+/* preflight note in the order summary — informative, never alarming;
+   the order is still allowed to proceed */
+.bb-spec-row.bb-spec-warn { align-items: flex-start; font-size: 13px; line-height: 1.45; color: #7A5214; background: #FDF6E3; border: 1px solid #EBD9A8; border-radius: 8px; padding: 10px 12px; }
+.bb-spec-row.bb-spec-warn b { color: #7A5214; white-space: nowrap; }
+.bb-spec-row.bb-spec-warn span { text-align: right; }
 .bb-bindings { display: flex; gap: 8px; }
 .bb-binding { flex: 1; padding: 12px 8px; border: 1.5px solid var(--color-border); border-radius: var(--radius-base); text-align: center; transition: all var(--duration-fast); background: #fff; }
 .bb-binding.on { border-color: var(--tk-cobalt); box-shadow: var(--shadow-selected); background: var(--tk-cobalt-dim); }

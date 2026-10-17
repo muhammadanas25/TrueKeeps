@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useReducer } from "react";
-import type { BookPage, BuilderPhoto, CoverStyleId, DensityId } from "./data";
+import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
   | "quiz"
@@ -44,6 +44,14 @@ export interface BuilderState {
   photos: BuilderPhoto[];
   pages: BookPage[];
   themeId: string;
+  /**
+   * Page-colour override, whole book — a `PAGE_COLOURS` id from
+   * `palette.ts`, or `THEME_COLOUR` ("theme") to leave the theme's own
+   * page colour alone. Deliberately not folded into `themeId`: the
+   * theme owns the typography and the accent, the colour owns the
+   * paper, and multiplying them out would mean 44 themes to maintain.
+   */
+  pageColor: string;
   density: DensityId;
   coverStyle: CoverStyleId;
   voice: "warm" | "concise";
@@ -63,6 +71,7 @@ export const DEFAULT_STATE: BuilderState = {
   photos: [],
   pages: [],
   themeId: "ivory",
+  pageColor: "theme",
   density: "balanced",
   coverStyle: "full",
   voice: "warm",
@@ -103,18 +112,114 @@ function reducer(state: BuilderState, action: BuilderAction): BuilderState {
   }
 }
 
-const STORAGE_KEY = "tk_builder_v1";
+const STORAGE_KEY = "tk_builder_v2";
+/** Pre-Placement drafts: pages carried `photoIds: string[]`. */
+const STORAGE_KEY_V1 = "tk_builder_v1";
+
+/** The v1 page shape, kept only so the migration can be type-checked. */
+type LegacyPage = Omit<BookPage, "slots"> & { slots?: unknown; photoIds?: unknown };
+
+/**
+ * v1 → v2: `page.photoIds: string[]` becomes `page.slots: Placement[]`.
+ *
+ * This runs against a live deployment, so there are real half-finished
+ * books sitting in real browsers. Dropping them and starting the user
+ * over would be the easy implementation and the wrong one — a v1 draft
+ * migrates cleanly, because every v1 photo was implicitly centred and
+ * unzoomed, which is exactly DEFAULT_FRAMING.
+ *
+ * Written defensively (it parses untrusted localStorage that may have
+ * been hand-edited, truncated, or written by an older build): anything
+ * unrecognisable degrades to an empty slot list rather than throwing,
+ * because a page that renders blank is recoverable and a builder that
+ * crashes on boot is not.
+ */
+/**
+ * A layout id we can actually render.
+ *
+ * The set of layouts grows (Phase C added `duo-side` and `trio-strip`,
+ * per-occasion templates will add more), and localStorage is the one
+ * place a FUTURE id can arrive from — a user with two tabs open on two
+ * builds, or one who rolls back. An unknown id used to be trusted
+ * verbatim and would fall through every branch in PageFace to the
+ * `single` renderer while `slotAspect` looked up an undefined slot, so
+ * the failure was silent and slightly wrong rather than loud.
+ *
+ * Rewriting it to a real layout with the same slot count is the least
+ * destructive repair available: the photos and their framing all
+ * survive, only the arrangement is approximated.
+ */
+const KNOWN_LAYOUTS = Object.keys(LAYOUT_SLOTS) as PageLayoutId[];
+
+function safeLayout(raw: unknown, slotCount: number): PageLayoutId {
+  if (typeof raw === "string" && (KNOWN_LAYOUTS as string[]).includes(raw)) return raw as PageLayoutId;
+  if (slotCount >= 3) return "collage";
+  if (slotCount === 2) return "duo";
+  return "single";
+}
+
+/** Exported for tests: this is the one function that parses bytes the
+ *  user's browser could have written under any past or future build. */
+export function migratePages(input: unknown): BookPage[] {
+  if (!Array.isArray(input)) return [];
+  return input.flatMap((raw): BookPage[] => {
+    if (!raw || typeof raw !== "object") return [];
+    const page = raw as LegacyPage;
+
+    let slots: BookPage["slots"];
+    if (Array.isArray(page.slots)) {
+      // Already v2 — still normalise, in case of a partial write.
+      slots = page.slots.flatMap((s) => {
+        if (typeof s === "string") return [placement(s)]; // tolerate a mixed array
+        if (!s || typeof s !== "object") return [];
+        const p = s as Partial<BookPage["slots"][number]>;
+        return typeof p.photoId === "string" ? [placement(p.photoId, p)] : [];
+      });
+    } else if (Array.isArray(page.photoIds)) {
+      slots = page.photoIds.filter((id): id is string => typeof id === "string").map((id) => placement(id));
+    } else {
+      slots = [];
+    }
+
+    return [
+      {
+        id: typeof page.id === "string" ? page.id : "pg" + Math.random().toString(36).slice(2, 8),
+        layout: safeLayout(page.layout, slots.length),
+        slots,
+        caption: typeof page.caption === "string" ? page.caption : "",
+        // spread rather than assigned so the common case stays absent
+        // from the JSON instead of shipping `"mirror":false` per page
+        ...(page.mirror === true ? { mirror: true } : null),
+      },
+    ];
+  });
+}
 
 /** Restore a persisted draft; sanitizes transient screens (a reload
  *  mid-"generating" resumes at reveal/upload, never a stuck spinner). */
 function loadState(): BuilderState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // Prefer v2; fall back to a v1 draft and upgrade it in place.
+    const fromV2 = localStorage.getItem(STORAGE_KEY);
+    const raw = fromV2 ?? localStorage.getItem(STORAGE_KEY_V1);
     if (!raw) return null;
     const s = JSON.parse(raw) as Partial<BuilderState>;
     if (!s || typeof s !== "object") return null;
-    if (s.screen === "generating") s.screen = s.pages && s.pages.length ? "reveal" : "upload";
-    return { ...DEFAULT_STATE, ...s };
+
+    const pages = migratePages(s.pages);
+    if (s.screen === "generating") s.screen = pages.length ? "reveal" : "upload";
+
+    if (!fromV2) {
+      // One-way upgrade: the next persist writes v2, so retire the old
+      // key now rather than leaving a stale draft to be picked up by an
+      // older tab still running the previous build.
+      try {
+        localStorage.removeItem(STORAGE_KEY_V1);
+      } catch {
+        /* ignore */
+      }
+    }
+    return { ...DEFAULT_STATE, ...s, pages };
   } catch {
     return null;
   }
@@ -158,6 +263,7 @@ export function useBuilderState(initial?: Partial<BuilderState>) {
   const reset = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_V1);
     } catch {
       /* ignore */
     }

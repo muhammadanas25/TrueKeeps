@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BuilderDocument } from "@shared/document";
 import { apiRequest } from "@/lib/queryClient";
 import { getClaim, forgetClaim } from "@/lib/claims";
+import { THEME_COLOUR } from "./palette";
 import { useToast } from "@/hooks/use-toast";
 import type { BuilderState } from "./state";
 
@@ -78,10 +79,25 @@ export function toDocument(s: BuilderState): BuilderDocument {
     pages: s.pages.map((pg) => ({
       id: pg.id,
       layout: pg.layout,
-      slots: pg.slots.map((sl) => ({ photoId: sl.photoId, fx: sl.fx, fy: sl.fy, zoom: sl.zoom, turn: sl.turn })),
+      slots: pg.slots.map((sl) => ({
+        photoId: sl.photoId,
+        fx: sl.fx,
+        fy: sl.fy,
+        zoom: sl.zoom,
+        turn: sl.turn,
+        // `|| undefined` rather than the raw value: level is the case for
+        // all but a handful of placements in any book, and omitting it
+        // keeps a 200-page document from carrying 600 copies of `"tilt":0`.
+        tilt: sl.tilt || undefined,
+      })),
       caption: pg.caption,
+      // Named explicitly, like every other field: the document schema is
+      // non-strict, so anything not listed here is stripped in silence
+      // and the user's edit is gone after one server round-trip.
+      mirror: pg.mirror,
     })),
     themeId: s.themeId,
+    pageColor: s.pageColor,
     density: s.density,
     coverStyle: s.coverStyle,
     voice: s.voice,
@@ -96,8 +112,18 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
     vibe: d.vibe,
     title: d.title,
     photos: d.photos.map((p) => ({ id: p.id, label: p.label, shade: p.shade, url: p.url, w: p.w, h: p.h })),
-    pages: d.pages.map((pg) => ({ id: pg.id, layout: pg.layout, slots: pg.slots.map((s) => ({ ...s })), caption: pg.caption })),
+    pages: d.pages.map((pg) => ({
+      id: pg.id,
+      layout: pg.layout,
+      slots: pg.slots.map((s) => ({ ...s })),
+      caption: pg.caption,
+      mirror: pg.mirror,
+    })),
     themeId: d.themeId,
+    // A document written before page colours existed has no field here;
+    // `?? THEME_COLOUR` keeps it on the theme's own page rather than
+    // patching `undefined` over the state's default.
+    pageColor: d.pageColor ?? THEME_COLOUR,
     density: d.density,
     coverStyle: d.coverStyle,
     voice: d.voice,

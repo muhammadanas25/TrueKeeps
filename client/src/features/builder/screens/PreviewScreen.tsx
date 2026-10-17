@@ -11,7 +11,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, Hand, PenLine } from "lucide-react";
 import { Book3D, type Book3DApi } from "../book";
-import { BOOK_THEMES, occasionById, themeById, toSpreads, type CopyVoice } from "../data";
+import { BOOK_THEMES, occasionById, toSpreads, type CopyVoice } from "../data";
+import { bookTheme } from "../palette";
 import type { BuilderState } from "../state";
 
 export function PreviewScreen({
@@ -28,7 +29,7 @@ export function PreviewScreen({
   onCustomize: () => void;
 }) {
   const occ = occasionById(state.occasion);
-  const theme = themeById(state.themeId);
+  const theme = bookTheme(state.themeId, state.pageColor);
   const spreads = toSpreads(state.pages);
   const n = spreads.length;
   const api = useRef<Book3DApi | null>(null);

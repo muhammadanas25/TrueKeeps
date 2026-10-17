@@ -41,13 +41,33 @@ const placementSchema = z.object({
   fy: z.number().min(0).max(1),
   zoom: z.number().min(0.1).max(10),
   turn: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+  /**
+   * Straightening angle in degrees; absent means level.
+   *
+   * Bounded here as well as on the client because this schema is the
+   * last thing standing between a hand-rolled request and the print
+   * pipeline, and a tilt is scaled up to cover its own corners before it
+   * is drawn — 45° would ask the renderer for 1.41× the pixels and crop
+   * half the frame away. ±15 leaves the client's ±10 room to grow
+   * without needing a document migration.
+   */
+  tilt: z.number().min(-15).max(15).optional(),
 });
 
+/**
+ * Keep this enum in step with `PageLayoutId` in
+ * client/src/features/builder/data.ts. It is not merely descriptive:
+ * every autosave is validated against it, so a layout the client can
+ * produce but this list omits makes the whole document 400 and the
+ * user's draft stop saving.
+ */
 const pageSchema = z.object({
   id: z.string().min(1).max(64),
-  layout: z.enum(["title", "full", "single", "duo", "collage"]),
+  layout: z.enum(["title", "full", "single", "duo", "duo-side", "collage", "trio-strip"]),
   slots: z.array(placementSchema).max(6),
   caption: z.string().max(280),
+  /** collage only: flips the tile positions left-to-right */
+  mirror: z.boolean().optional(),
 });
 
 export const builderDocumentSchema = z.object({
@@ -59,6 +79,15 @@ export const builderDocumentSchema = z.object({
   photos: z.array(photoSchema).max(400),
   pages: z.array(pageSchema).max(200),
   themeId: z.string().max(40),
+  /**
+   * Page-colour override (a PAGE_COLOURS id, or "theme"). Optional so
+   * every document written before this field existed still validates —
+   * an absent value reads back as the theme default, which is exactly
+   * what those books were rendering. Not an enum: the swatch list will
+   * grow, and a server that 400s on a colour it hasn't heard of would
+   * lock users out of saving during a deploy.
+   */
+  pageColor: z.string().max(24).optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
   coverStyle: z.enum(["full", "framed", "minimal", "split"]),
   voice: z.enum(["warm", "concise"]),

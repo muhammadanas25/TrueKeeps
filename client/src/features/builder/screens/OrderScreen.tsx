@@ -11,7 +11,9 @@
 
 import { ArrowRight, BookOpen, Check, Minus, Plus, Truck } from "lucide-react";
 import { MiniBook } from "../book";
-import { BINDINGS, occasionById, themeById, type CopyVoice } from "../data";
+import { BINDINGS, occasionById, type CopyVoice } from "../data";
+import { bookTheme } from "../palette";
+import { lowQualityPageCount } from "../print";
 import type { BuilderState } from "../state";
 
 export function OrderScreen({
@@ -28,11 +30,15 @@ export function OrderScreen({
   onBack: () => void;
 }) {
   const occ = occasionById(state.occasion);
-  const theme = themeById(state.themeId);
+  const theme = bookTheme(state.themeId, state.pageColor);
   const binding = BINDINGS.find((b) => b.id === state.binding) ?? BINDINGS[1];
   const subtotal = binding.price * state.qty;
   const freeShip = subtotal >= 50;
   const shipping = freeShip ? 0 : 4.99;
+  // Last honest chance to mention print quality before money changes
+  // hands. Silent at zero — nobody needs a green tick telling them
+  // nothing is wrong.
+  const softPages = lowQualityPageCount(state.pages, state.photos);
 
   return (
     <div className="bb-screen bb-order">
@@ -60,6 +66,15 @@ export function OrderScreen({
               <b>Details</b>
               <span>8×8 in · {state.pages.length} pages · matte paper · {theme.name}</span>
             </div>
+            {softPages > 0 ? (
+              <div className="bb-spec-row bb-spec-warn">
+                <b>Heads up</b>
+                <span>
+                  {softPages === 1 ? "1 page uses a photo" : `${softPages} pages use photos`} that may look soft in
+                  print. You can still order — or go back and zoom out a little.
+                </span>
+              </div>
+            ) : null}
             <div>
               <div className="bb-panel-label" style={{ marginBottom: 8 }}>
                 Binding

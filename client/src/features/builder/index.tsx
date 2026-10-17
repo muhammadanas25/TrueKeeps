@@ -28,7 +28,8 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw } from "lucide-react";
 import "./builder.css";
-import { COPY, OCCASIONS, generatePages, occasionById, themeById } from "./data";
+import { COPY, OCCASIONS, generatePages, occasionById } from "./data";
+import { bookTheme } from "./palette";
 import { BACK_MAP, SCREEN_CONTEXT, useBuilderState, type BuilderState } from "./state";
 import { useBuilderSync, type SyncStatus } from "./sync";
 import { useSession } from "@/features/auth/useSession";
@@ -154,7 +155,7 @@ export default function BookBuilder() {
       <main className="bb-main">
         {state.screen === "quiz" ? <QuizScreen key="quiz" state={state} set={set} copy={copy} onDone={() => set({ screen: "upload" })} /> : null}
         {state.screen === "upload" ? (
-          <UploadScreen key="upload" state={state} set={set} copy={copy} theme={themeById(state.themeId)} onContinue={() => set({ screen: "generating" })} />
+          <UploadScreen key="upload" state={state} set={set} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "generating" })} />
         ) : null}
         {state.screen === "generating" ? <GeneratingScreen key="gen" copy={copy} onDone={onGenerated} /> : null}
         {state.screen === "reveal" ? <RevealScreen key="reveal" state={state} set={set} copy={copy} onOpen={() => set({ screen: "preview", pos: 0 })} /> : null}
