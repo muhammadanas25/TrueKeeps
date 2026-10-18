@@ -181,12 +181,32 @@ export class S3MediaStore implements MediaStore {
 
 /* ── Factory ────────────────────────────────────────────────── */
 
+/**
+ * S3_ENDPOINT must be the bare account endpoint. Cloudflare's dashboard
+ * shows the bucket URL (`https://<acct>.r2.cloudflarestorage.com/<bucket>`),
+ * and pasting that makes the SDK prefix EVERY key with the bucket name:
+ * objects land at `<bucket>/projects/…` while public URLs point at
+ * `projects/…`, so every photo 404s. Keep only scheme + host.
+ */
+export function normaliseS3Endpoint(endpoint: string | undefined): string | undefined {
+  if (!endpoint) return endpoint;
+  try {
+    const u = new URL(endpoint);
+    if (u.pathname && u.pathname !== "/") {
+      console.warn(`[media] S3_ENDPOINT has a path ("${u.pathname}") — ignoring it; use ${u.origin}`);
+    }
+    return u.origin;
+  } catch {
+    return endpoint;
+  }
+}
+
 function createMediaStore(): MediaStore {
   const s3 = config.s3;
   if (s3.bucket && s3.accessKeyId && s3.secretAccessKey && s3.publicBaseUrl) {
     console.log(`[media] using S3-compatible store (bucket=${s3.bucket})`);
     return new S3MediaStore({
-      endpoint: s3.endpoint,
+      endpoint: normaliseS3Endpoint(s3.endpoint),
       region: s3.region || "auto", // "auto" is what R2 expects
       bucket: s3.bucket,
       accessKeyId: s3.accessKeyId,
