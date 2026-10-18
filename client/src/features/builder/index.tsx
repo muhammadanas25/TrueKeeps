@@ -24,9 +24,9 @@
  *    required before checkout (SignInSheet, intent "order")
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw } from "lucide-react";
+import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
 import { COPY, OCCASIONS, generatePages, occasionById } from "./data";
 import { bookTheme } from "./palette";
@@ -42,6 +42,9 @@ import { RevealScreen } from "./screens/RevealScreen";
 import { PreviewScreen } from "./screens/PreviewScreen";
 import { CustomizeScreen } from "./screens/CustomizeScreen";
 import { ConfirmScreen, OrderScreen } from "./screens/OrderScreen";
+import { EditorV2 } from "./editor-v2/EditorV2";
+import { useEditorVersion } from "./editor-v2/pref";
+import { PageLookContext, type PageLook } from "./looks";
 import { TKMark } from "@/features/landing/primitives";
 
 /** Seed builder state from URL params (?occasion=wedding from landing). */
@@ -82,6 +85,15 @@ export default function BookBuilder() {
   const copy = COPY[state.voice] ?? COPY.warm;
   const { status: syncStatus } = useBuilderSync(state, set);
   const { loading: sessionLoading, isMember } = useSession();
+  const [editorVersion, setEditorVersion] = useEditorVersion();
+
+  // Typeface, edges, subtitle and caption visibility reach every page
+  // renderer (preview, order, both editors) through this context.
+  const look = useMemo<PageLook>(
+    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden }),
+    [state.fontId, state.edge, state.subtitle, state.captionsHidden],
+  );
+  const v2Customize = state.screen === "customize" && editorVersion === "v2";
 
   // Soft prompt: once per browser, the first time a guest reaches a
   // finished book. Dismissible — the book keeps working without it.
@@ -124,7 +136,29 @@ export default function BookBuilder() {
   const onGenerated = () =>
     set({ pages: generatePages(state.photos, state.density), screen: "reveal", pos: 0 });
 
+  // The v2 editor is a full-screen app of its own (own top bar, no page
+  // scroll), so it replaces the shell rather than living inside it.
+  if (v2Customize) {
+    return (
+      <PageLookContext.Provider value={look}>
+        <div className="bb-shell">
+          <EditorV2
+            state={state}
+            set={set}
+            copy={copy}
+            saveStatus={syncStatus}
+            onBack={() => set({ screen: "preview", pos: 0 })}
+            onPreview={() => set({ screen: "preview", pos: 0 })}
+            onOrder={() => set({ screen: "order" })}
+            onSwitchClassic={() => setEditorVersion("classic")}
+          />
+        </div>
+      </PageLookContext.Provider>
+    );
+  }
+
   return (
+    <PageLookContext.Provider value={look}>
     <div className="bb-shell">
       <header className="bb-nav">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -163,7 +197,12 @@ export default function BookBuilder() {
           <PreviewScreen key="preview" state={state} set={set} copy={copy} onOrder={() => set({ screen: "order" })} onCustomize={() => set({ screen: "customize" })} />
         ) : null}
         {state.screen === "customize" ? (
-          <CustomizeScreen key="customize" state={state} set={set} copy={copy} onDone={() => set({ screen: "preview", pos: 0 })} />
+          <>
+            <CustomizeScreen key="customize" state={state} set={set} copy={copy} onDone={() => set({ screen: "preview", pos: 0 })} />
+            <button className="bb-try-v2" onClick={() => setEditorVersion("v2")}>
+              <Sparkles size={15} /> Try the new editor
+            </button>
+          </>
         ) : null}
         {state.screen === "order" ? (
           <OrderScreen key="order" state={state} set={set} copy={copy} onBack={() => set({ screen: "preview", pos: 0 })} />
@@ -174,5 +213,6 @@ export default function BookBuilder() {
       {savePrompt && !orderGate ? <SignInSheet intent="save" onClose={dismissSavePrompt} /> : null}
       {orderGate ? <SignInSheet intent="order" onClose={() => set({ screen: "preview", pos: 0 })} /> : null}
     </div>
+    </PageLookContext.Provider>
   );
 }

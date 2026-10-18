@@ -119,6 +119,22 @@ export const THEME_COLOUR = "theme";
 export const pageColourById = (id: string | null | undefined): PageColour | null =>
   PAGE_COLOURS.find((c) => c.id === id) ?? null;
 
+/**
+ * A page colour as stored: a palette id ("ivory"), a literal "#RRGGBB"
+ * (editor v2's full grid and "your own" field), or THEME_COLOUR/null.
+ * Returns the hex to paint, or null for "use the theme's own page".
+ * Any hex is accepted: legibility is guaranteed by deriveTheme choosing
+ * the ink by contrast, whichever colour the user lands on.
+ */
+export function resolvePageHex(colour: string | null | undefined): string | null {
+  if (!colour || colour === THEME_COLOUR) return null;
+  if (colour.startsWith("#")) {
+    const c = parseHex(colour);
+    return c ? toHex(c).toUpperCase() : null;
+  }
+  return pageColourById(colour)?.hex ?? null;
+}
+
 /* ── Derivation ─────────────────────────────────────────────── */
 
 /** The two candidate inks. Near-black rather than pure black so light
@@ -150,11 +166,9 @@ const INK_LIGHT = "#FFFFFF";
  * instead of a blank page.
  */
 export function deriveTheme(theme: BookTheme, colourId: string | null | undefined): BookTheme {
-  if (!colourId || colourId === THEME_COLOUR) return theme;
-  const colour = pageColourById(colourId);
-  if (!colour) return theme;
+  const page = resolvePageHex(colourId);
+  if (!page) return theme;
 
-  const page = colour.hex;
   const ink = contrastRatio(page, INK_DARK) >= contrastRatio(page, INK_LIGHT) ? INK_DARK : INK_LIGHT;
   const dark = ink === INK_LIGHT;
   const accent = contrastRatio(theme.accent, page) >= 2 ? theme.accent : mix(page, ink, 0.72);

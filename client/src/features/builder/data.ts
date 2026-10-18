@@ -53,6 +53,13 @@ export const BOOK_THEMES: BookTheme[] = [
   { id: "cobalt", name: "Bold Cobalt", page: "#1D46A0", ink: "#FFFFFF", accent: "#F5D547", soft: "#2a5cc0", stripeA: "#2A57B4", stripeB: "#3160BD", scrim: "rgba(20,52,120,0.82)", dark: true },
   { id: "blush", name: "Soft Blush", page: "#F9EEEF", ink: "#3C3C3B", accent: "#DB3069", soft: "#F2DEE0", stripeA: "#F4E2E4", stripeB: "#EBD3D6", scrim: "rgba(249,238,239,0.88)", dark: false },
   { id: "gallery", name: "Gallery White", page: "#FFFFFF", ink: "#3C3C3B", accent: "#3C3C3B", soft: "#F1F1EE", stripeA: "#F1F1EE", stripeB: "#E5E5E0", scrim: "rgba(255,255,255,0.88)", dark: false },
+  // Editor v2 looks (2026-10-18). Derived the same way palette.ts derives
+  // a page colour: soft/stripes are the page nudged 9/6/12% toward the ink.
+  // Each ships with a default typeface + photo edge in looks.ts.
+  { id: "sage", name: "Sage Garden", page: "#E4E8DC", ink: "#33332F", accent: "#5E7350", soft: "#D4D8CC", stripeA: "#D9DDD2", stripeB: "#CFD2C7", scrim: "rgba(228,232,220,0.88)", dark: false },
+  { id: "midnight", name: "Midnight", page: "#23262B", ink: "#F7F4EC", accent: "#F5D547", soft: "#36393C", stripeA: "#303237", stripeB: "#3C3F42", scrim: "rgba(35,38,43,0.88)", dark: true },
+  { id: "golden", name: "Golden Hour", page: "#F6E7C8", ink: "#33332F", accent: "#B07428", soft: "#E4D7BA", stripeA: "#EADCBF", stripeB: "#DFD1B6", scrim: "rgba(246,231,200,0.88)", dark: false },
+  { id: "kraft", name: "Kraft Journal", page: "#D9C3A0", ink: "#33332F", accent: "#6E4A26", soft: "#CAB696", stripeA: "#CFBA99", stripeB: "#C5B292", scrim: "rgba(217,195,160,0.88)", dark: false },
 ];
 
 export const themeById = (id: string | null | undefined): BookTheme =>
@@ -364,6 +371,13 @@ export interface BookPage {
    * scaleX(-1) on the page would print every face reversed.
    */
   mirror?: boolean;
+  /**
+   * Page-colour override for THIS page only (a palette id or "#RRGGBB"),
+   * set by the editor's "This spread" colour scope. Absent = the book's
+   * colour. Resolved through palette.ts like the book colour, so the ink
+   * still flips by contrast on a dark page.
+   */
+  bg?: string | null;
 }
 
 /** Read-only view for the many call sites that only care about identity. */

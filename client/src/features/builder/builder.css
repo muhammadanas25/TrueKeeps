@@ -716,3 +716,28 @@
 @media (min-width: 761px) {
   .bb-order-card > div:first-child { align-self: start; position: sticky; top: 96px; }
 }
+
+/* ── Book looks: typeface + photo edges (looks.ts, editor v2) ──
+   Applied by class on every .bb-page / .bb-cover, so the editor, the
+   filmstrip, the 3-D preview and the order mini-book all agree. The
+   defaults (classic + clean) add nothing, which is the pre-v2 look. */
+.bb-font-editorial .t, .bb-font-editorial .bb-cover-title { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: 0; }
+.bb-font-editorial .bb-page-caption { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: calc(var(--pw) * 0.048); }
+.bb-font-modern .t, .bb-font-modern .bb-cover-title { font-family: 'Archivo', var(--font-body), sans-serif; font-weight: 500; letter-spacing: -0.015em; }
+.bb-font-modern .bb-page-caption { font-family: 'Archivo', var(--font-body), sans-serif; font-weight: 400; }
+.bb-font-script .t, .bb-font-script .bb-cover-title { font-family: 'Caveat', 'Segoe Script', cursive; font-weight: 600; letter-spacing: 0; font-size: calc(var(--pw) * 0.11); }
+.bb-font-script .bb-cover-title { font-size: calc(var(--pw) * 0.1); }
+.bb-font-script .bb-page-caption { font-family: 'Caveat', 'Segoe Script', cursive; font-weight: 600; font-size: calc(var(--pw) * 0.06); }
+.bb-edge-soft:not(.bb-page-full) .bb-ph { border-radius: calc(var(--pw) * 0.022); }
+.bb-edge-border:not(.bb-page-full) .bb-ph { border-radius: 0; box-shadow: 0 0 0 calc(var(--pw) * 0.011) #fff, 0 calc(var(--pw) * 0.01) calc(var(--pw) * 0.03) rgba(0,0,0,0.18); }
+
+/* inline-editable page text (editor v2) */
+.bb-editable { outline: none; border-radius: 3px; cursor: text; display: inline-block; min-width: 2ch; transition: box-shadow 0.15s; -webkit-user-select: text; user-select: text; }
+.bb-editable:hover { box-shadow: 0 0 0 1px rgba(128,128,128,0.45); }
+.bb-editable:focus { box-shadow: 0 0 0 1.5px var(--tk-cobalt); background: rgba(29,70,160,0.05); }
+.bb-editable:empty::before { content: attr(data-ph); opacity: 0.45; }
+.bb-page-caption.is-empty { opacity: 0.85; }
+
+/* classic editor → "Try the new editor" (editor-v2/pref.ts) */
+.bb-try-v2 { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 999px; background: var(--tk-gunmetal, #3C3C3B) !important; color: #fff !important; font-weight: 600; font-size: 13.5px; box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
+.bb-try-v2:hover { filter: brightness(1.15); }

@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useReducer, useRef } from "react";
+import type { EdgeId, FontId } from "./looks";
 import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
@@ -59,6 +60,16 @@ export interface BuilderState {
   pos: number;
   qty: number;
   binding: string;
+  /* ── editor v2 style (looks.ts) ── */
+  /** typeface for titles/captions; defaults reproduce the pre-v2 look */
+  fontId: FontId;
+  /** photo edge treatment on non-bleed slots */
+  edge: EdgeId;
+  /** line under the title on the title page; null = occasion default */
+  subtitle: string | null;
+  captionsHidden: boolean;
+  /** last page colours picked in the editor's colour grid (device-local) */
+  recentColors: string[];
 }
 
 export const DEFAULT_STATE: BuilderState = {
@@ -78,6 +89,11 @@ export const DEFAULT_STATE: BuilderState = {
   pos: 0,
   qty: 1,
   binding: "hardcover",
+  fontId: "classic",
+  edge: "clean",
+  subtitle: null,
+  captionsHidden: false,
+  recentColors: [],
 };
 
 /** Where "back" goes from each screen (quiz handles its own sub-steps). */

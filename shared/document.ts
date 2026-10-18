@@ -68,6 +68,8 @@ const pageSchema = z.object({
   caption: z.string().max(280),
   /** collage only: flips the tile positions left-to-right */
   mirror: z.boolean().optional(),
+  /** per-page colour override (palette id or #RRGGBB); absent = book colour */
+  bg: z.string().max(24).nullable().optional(),
 });
 
 export const builderDocumentSchema = z.object({
@@ -88,6 +90,11 @@ export const builderDocumentSchema = z.object({
    * lock users out of saving during a deploy.
    */
   pageColor: z.string().max(24).optional(),
+  /* editor v2 style — all optional so older documents still validate */
+  fontId: z.enum(["classic", "editorial", "modern", "script"]).optional(),
+  edge: z.enum(["clean", "soft", "border"]).optional(),
+  subtitle: z.string().max(120).nullable().optional(),
+  captionsHidden: z.boolean().optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
   coverStyle: z.enum(["full", "framed", "minimal", "split"]),
   voice: z.enum(["warm", "concise"]),

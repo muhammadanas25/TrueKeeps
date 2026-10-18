@@ -95,9 +95,14 @@ export function toDocument(s: BuilderState): BuilderDocument {
       // non-strict, so anything not listed here is stripped in silence
       // and the user's edit is gone after one server round-trip.
       mirror: pg.mirror,
+      bg: pg.bg ?? undefined,
     })),
     themeId: s.themeId,
     pageColor: s.pageColor,
+    fontId: s.fontId,
+    edge: s.edge,
+    subtitle: s.subtitle,
+    captionsHidden: s.captionsHidden,
     density: s.density,
     coverStyle: s.coverStyle,
     voice: s.voice,
@@ -118,12 +123,18 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
       slots: pg.slots.map((s) => ({ ...s })),
       caption: pg.caption,
       mirror: pg.mirror,
+      bg: pg.bg ?? null,
     })),
     themeId: d.themeId,
     // A document written before page colours existed has no field here;
     // `?? THEME_COLOUR` keeps it on the theme's own page rather than
     // patching `undefined` over the state's default.
     pageColor: d.pageColor ?? THEME_COLOUR,
+    // pre-v2 documents have none of these; defaults = the pre-v2 look
+    fontId: d.fontId ?? "classic",
+    edge: d.edge ?? "clean",
+    subtitle: d.subtitle ?? null,
+    captionsHidden: d.captionsHidden ?? false,
     density: d.density,
     coverStyle: d.coverStyle,
     voice: d.voice,

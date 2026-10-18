@@ -16,7 +16,7 @@
  * timer fallbacks so a missed transitionend can never wedge the book.
  */
 
-import { memo, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
 import { GripVertical, ImageOff } from "lucide-react";
 import {
   DEFAULT_FRAMING,
@@ -33,7 +33,8 @@ import {
   type Spread,
 } from "./data";
 import { clampTilt, slotAspect, tiltCover } from "./print";
-import { mix } from "./palette";
+import { deriveTheme, mix } from "./palette";
+import { lookClasses, usePageLook } from "./looks";
 import { SlotHit } from "./reframe";
 
 /* ── Photo tile ─────────────────────────────────────────────── */
@@ -260,6 +261,61 @@ function Stripes({
 /* ── Inner page ─────────────────────────────────────────────── */
 
 /**
+ * Inline-editable text printed on a page (editor v2 only).
+ *
+ * Uncontrolled contentEditable: the DOM owns the text while focused and
+ * we commit once, on blur (Enter blurs, Escape cancels). Writing the
+ * value back on every keystroke would move the caret to the start.
+ * Pointer events stop here so tapping text never selects the photo
+ * underneath or starts a page swipe.
+ */
+function Editable({
+  value,
+  placeholder,
+  onCommit,
+  maxLength = 120,
+}: {
+  value: string;
+  placeholder: string;
+  onCommit: (v: string) => void;
+  maxLength?: number;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el && document.activeElement !== el) el.textContent = value;
+  }, [value]);
+  return (
+    <span
+      ref={ref}
+      className="bb-editable"
+      contentEditable
+      suppressContentEditableWarning
+      role="textbox"
+      aria-label={placeholder}
+      data-ph={placeholder}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+        if (e.key === "Escape") {
+          e.currentTarget.textContent = value;
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={(e) => {
+        const v = (e.currentTarget.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+        if (v !== value) onCommit(v);
+      }}
+    />
+  );
+}
+
+/**
  * Memoised, because a drag commits a new framing on every pointer move
  * and the customize screen re-renders the whole thumbnail rail each
  * time. Every prop here is either a primitive or a stable reference —
@@ -278,6 +334,7 @@ function PageFaceImpl({
   onSlotFrame,
   focusSlot,
   dnd,
+  renderSlotOverlay,
 }: {
   page: BookPage | null | undefined;
   photos: BuilderPhoto[];
@@ -310,8 +367,20 @@ function PageFaceImpl({
     over: number | null;
     onDragOverSlot: (slotIdx: number | null) => void;
   };
+  /**
+   * Editor v2: draw an interaction layer over each photo (selection,
+   * crop gestures, drop target). Replaces the classic SlotHit drag-to-pan,
+   * which the v2 editor deliberately does NOT want — there a one-finger
+   * drag on a photo has to stay free for swiping to the next page.
+   */
+  renderSlotOverlay?: (slotIdx: number, photo: BuilderPhoto, placement: Placement, aspect: number) => ReactNode;
 }) {
-  if (!page) return <div className="bb-page" style={{ background: theme.page }}></div>;
+  // Hooks first: the early return below must not change the hook count.
+  const look = usePageLook();
+  if (!page) return <div className={"bb-page" + lookClasses(look)} style={{ background: theme.page }}></div>;
+  // "This spread" colour scope: a page may carry its own paper colour.
+  if (page.bg) theme = deriveTheme(theme, page.bg);
+  const lc = lookClasses(look);
   const at = (i: number) => page.slots[i] ?? null;
   const ph = (i: number) => {
     const s = at(i);
@@ -329,6 +398,17 @@ function PageFaceImpl({
   const slot = (i: number, cls?: string) => {
     const photo = ph(i);
     if (!photo) return null;
+    if (renderSlotOverlay)
+      return (
+        <div
+          key={i}
+          className={"bb-slot-wrap bb-slot-v2 " + (cls || "")}
+          style={{ position: cls ? "absolute" : "relative", flex: cls ? undefined : 1, minHeight: 0, display: "flex" }}
+        >
+          <Ph photo={photo} theme={theme} placement={at(i)} slotAspect={aspect(i)} />
+          {renderSlotOverlay(i, photo, at(i) ?? placement(photo.id), aspect(i))}
+        </div>
+      );
     if (!onSlotClick)
       return <Ph key={i} photo={photo} theme={theme} className={cls || ""} placement={at(i)} slotAspect={aspect(i)} />;
     return (
@@ -389,52 +469,74 @@ function PageFaceImpl({
   };
 
   const base: CSSProperties = { background: theme.page, color: theme.ink };
-  if (page.layout === "title") {
+  const editing = Boolean(look.onEditCaption);
+  /**
+   * The caption element. Hidden entirely when captions are switched off
+   * (not merely emptied — an empty caption still takes height and would
+   * change the slot size print.ts quotes). In the editor an empty
+   * caption shows a placeholder so it can be typed into in place.
+   */
+  const caption = (wrapScrim = false) => {
+    if (look.captionsHidden) return null;
+    if (!page.caption && !editing) return null;
+    const text = editing ? (
+      <Editable value={page.caption} placeholder="Add a caption" onCommit={(v) => look.onEditCaption!(page.id, v)} />
+    ) : (
+      page.caption
+    );
     return (
-      <div className="bb-page bb-page-title" style={base}>
-        <div className="t">{title}</div>
+      <div className={"bb-page-caption" + (!page.caption ? " is-empty" : "")} style={wrapScrim ? { color: theme.ink } : undefined}>
+        {wrapScrim ? <span style={{ "--scrim": theme.scrim } as CSSProperties}>{text}</span> : text}
+      </div>
+    );
+  };
+  if (page.layout === "title") {
+    const sub = look.subtitle ?? occasion.subtitle;
+    return (
+      <div className={"bb-page bb-page-title" + lc} style={base}>
+        <div className="t">
+          {look.onEditTitle ? <Editable value={title} placeholder="Book title" maxLength={48} onCommit={(v) => v && look.onEditTitle!(v)} /> : title}
+        </div>
         <div className="rule" style={{ background: theme.accent }}></div>
-        <div className="s">{occasion.subtitle}</div>
+        <div className="s">
+          {look.onEditSubtitle ? <Editable value={sub} placeholder="Add a date or a line" maxLength={60} onCommit={(v) => look.onEditSubtitle!(v)} /> : sub}
+        </div>
       </div>
     );
   }
   if (page.layout === "full") {
     return (
-      <div className="bb-page bb-page-full" style={base}>
-        {onSlotClick ? slot(0) : <Ph photo={ph(0)} theme={theme} placement={at(0)} slotAspect={aspect(0)} />}
-        {page.caption ? (
-          <div className="bb-page-caption" style={{ color: theme.ink }}>
-            <span style={{ "--scrim": theme.scrim } as CSSProperties}>{page.caption}</span>
-          </div>
-        ) : null}
+      <div className={"bb-page bb-page-full" + lc} style={base}>
+        {onSlotClick || renderSlotOverlay ? slot(0) : <Ph photo={ph(0)} theme={theme} placement={at(0)} slotAspect={aspect(0)} />}
+        {caption(true)}
       </div>
     );
   }
   if (page.layout === "duo") {
     return (
-      <div className="bb-page bb-page-duo" style={base}>
+      <div className={"bb-page bb-page-duo" + lc} style={base}>
         {slot(0)}
         {slot(1)}
-        {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
+        {caption()}
       </div>
     );
   }
   if (page.layout === "duo-side") {
     return (
-      <div className="bb-page bb-page-duo-side" style={base}>
+      <div className={"bb-page bb-page-duo-side" + lc} style={base}>
         {slot(0)}
         {slot(1)}
-        {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
+        {caption()}
       </div>
     );
   }
   if (page.layout === "trio-strip") {
     return (
-      <div className="bb-page bb-page-trio-strip" style={base}>
+      <div className={"bb-page bb-page-trio-strip" + lc} style={base}>
         {slot(0)}
         {slot(1)}
         {slot(2)}
-        {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
+        {caption()}
       </div>
     );
   }
@@ -443,7 +545,7 @@ function PageFaceImpl({
     // .bb-mirror). Flipping the page with scaleX would reverse every
     // face and every sign in the photos themselves.
     return (
-      <div className={"bb-page bb-page-collage" + (page.mirror ? " bb-mirror" : "")} style={base}>
+      <div className={"bb-page bb-page-collage" + (page.mirror ? " bb-mirror" : "") + lc} style={base}>
         {slot(0, "c0")}
         {slot(1, "c1")}
         {slot(2, "c2")}
@@ -452,7 +554,7 @@ function PageFaceImpl({
   }
   // single (framed)
   return (
-    <div className="bb-page bb-page-single" style={base}>
+    <div className={"bb-page bb-page-single" + lc} style={base}>
       {slot(0)}
       {page.caption ? <div className="bb-page-caption">{page.caption}</div> : null}
     </div>
@@ -547,12 +649,14 @@ export function CoverFace({
   ) : (
     <div className="bb-cover-title">{title}</div>
   );
-  const sub = <div className="bb-cover-sub">{occasion.subtitle}</div>;
+  const look = usePageLook();
+  const lc = lookClasses(look);
+  const sub = <div className="bb-cover-sub">{look.subtitle ?? occasion.subtitle}</div>;
   const base: CSSProperties = { background: theme.page, color: theme.ink };
 
   if (coverStyle === "minimal") {
     return (
-      <div className="bb-cover bb-cover-minimal" style={base}>
+      <div className={"bb-cover bb-cover-minimal" + lc} style={base}>
         <div>
           {titleEl}
           {sub}
@@ -563,7 +667,7 @@ export function CoverFace({
   }
   if (coverStyle === "framed") {
     return (
-      <div className="bb-cover bb-cover-framed" style={base}>
+      <div className={"bb-cover bb-cover-framed" + lc} style={base}>
         <Ph photo={photo} theme={theme} />
         <div className="bb-cover-text">
           {titleEl}
@@ -574,7 +678,7 @@ export function CoverFace({
   }
   if (coverStyle === "split") {
     return (
-      <div className="bb-cover bb-cover-split" style={base}>
+      <div className={"bb-cover bb-cover-split" + lc} style={base}>
         <Ph photo={photo} theme={theme} />
         <div className="bb-cover-text">
           {titleEl}
@@ -585,7 +689,7 @@ export function CoverFace({
   }
   // full-bleed photo + scrim text panel
   return (
-    <div className="bb-cover bb-cover-full" style={{ color: theme.ink }}>
+    <div className={"bb-cover bb-cover-full" + lc} style={{ color: theme.ink }}>
       <Ph photo={photo} theme={theme} />
       <div className="bb-cover-text" style={{ background: theme.scrim }}>
         {titleEl}
