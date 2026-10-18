@@ -8,7 +8,8 @@
  *   /api/auth/*  (better-auth)      → BEFORE express.json: it parses
  *                                     its own bodies
  *   express.json (1 MB)             → bytes never come through here
- *                                     (uploads use presigned PUTs)
+ *                                     (uploads use presigned PUTs);
+ *                                     skipped for signed webhooks
  *   origin check (CSRF)             → mutating /api calls only
  *   domain routes                   → all owner-checked
  *   error handler                   → JSON, never re-throws
@@ -25,6 +26,7 @@ import { applySecurity } from "./middleware/security";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { corsConfig } from "./cors";
+import { startOrderJobs } from "./orders/service";
 
 const app = express();
 
@@ -45,8 +47,12 @@ app.all("/api/auth/*", (req, _res, next) => {
   next();
 }, toNodeHandler(auth));
 
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+// Webhooks are authenticated by an HMAC over their exact bytes, so their
+// body must reach the route unparsed (it uses express.raw itself).
+const jsonParser = express.json({ limit: "1mb" });
+const formParser = express.urlencoded({ extended: false, limit: "1mb" });
+app.use((req, res, next) => (req.path.startsWith("/api/payments/webhook/") ? next() : jsonParser(req, res, next)));
+app.use((req, res, next) => (req.path.startsWith("/api/payments/webhook/") ? next() : formParser(req, res, next)));
 
 (async () => {
   const server = await registerRoutes(app);
@@ -68,6 +74,9 @@ app.use(express.urlencoded({ extended: false, limit: "1mb" }));
   }
 
   // Railway injects PORT; serves API + client on the one open port.
+  // payment reconciliation + expiry sweep (see server/orders/service.ts)
+  startOrderJobs();
+
   server.listen({ port: config.port, host: "0.0.0.0", reusePort: true }, () => {
     log.info({ port: config.port, env: config.nodeEnv, appUrl: config.appUrl }, "serving");
   });

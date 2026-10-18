@@ -15,6 +15,13 @@
       "when": 1789300987913,
       "tag": "0001_phase2a_auth_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792342321015,
+      "tag": "0002_phase2b_orders_payments",
+      "breakpoints": true
     }
   ]
 }

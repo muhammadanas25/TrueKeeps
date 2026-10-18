@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { MiniBook, Ph, Stars, TKLogo, tintFor, type BookTone } from "./primitives";
 import { AccountMenu } from "@/features/auth/AccountMenu";
+import { formatPKR, PRICE_LIST } from "@shared/pricing";
 
 /** Route the marketing CTAs land on — the quiz-first book builder. */
 const BUILDER_PATH = "/wizard";
@@ -159,7 +160,7 @@ export function Hero() {
 
 export function TrustStrip() {
   const items = [
-    { icon: Truck, text: <span><b>Free shipping</b> over $50</span> },
+    { icon: Truck, text: <span><b>Free shipping</b> from {formatPKR(PRICE_LIST.freeShippingFromMinor)}</span> },
     { icon: Leaf, text: <span><b>Archival</b>, FSC-certified paper</span> },
     { icon: ShieldCheck, text: <span><b>Love-it</b> guarantee</span> },
     { icon: Star, text: <span><b>4.9/5</b> from 12,000 reviews</span> },

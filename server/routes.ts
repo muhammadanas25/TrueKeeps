@@ -20,6 +20,7 @@ import { themesRouter } from "./routes/themes";
 import { projectsRouter } from "./routes/projects";
 import { pagesRouter } from "./routes/pages";
 import { uploadsRouter } from "./routes/uploads";
+import { ordersRouter } from "./routes/orders";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Liveness probe — used by the hosting platform (Railway healthcheck)
@@ -34,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(projectsRouter);
   app.use(pagesRouter);
   app.use(uploadsRouter);
+  app.use(ordersRouter);
 
   // unknown /api paths must never fall through to the SPA index.html
   app.use("/api", (_req, res) => {

@@ -8,6 +8,8 @@
  * #EBEBD3). No emoji (brand rule).
  */
 
+import { formatPKR } from "@shared/pricing";
+
 const BRAND = {
   cobalt: "#1D46A0",
   gunmetal: "#3C3C3B",
@@ -47,4 +49,39 @@ export function magicLinkEmail(params: { url: string; expiresMinutes: number }) 
     ),
     text: `Sign in to TrueKeep\n\nOpen this link to sign in (expires in ${expiresMinutes} minutes):\n${url}\n\nIf you didn't request this, ignore this email.`,
   };
+}
+
+export function orderConfirmedEmail(params: {
+  orderNumber: string;
+  title: string;
+  totalMinor: number;
+  qty: number;
+  binding: string;
+  orderUrl: string;
+  /** sandbox payment — say so plainly so nobody expects a book */
+  testMode: boolean;
+}) {
+  const { orderNumber, title, totalMinor, qty, binding, orderUrl, testMode } = params;
+  const total = formatPKR(totalMinor);
+  const bindingName = binding.charAt(0).toUpperCase() + binding.slice(1);
+  const testNote = testMode
+    ? para(`<b style="color:#DB3069">Test order.</b> This was paid in Safepay's sandbox, so no money moved and nothing will be printed.`)
+    : "";
+  return {
+    subject: `${testMode ? "[TEST] " : ""}Order ${orderNumber} confirmed — ${title}`,
+    html: shell(
+      "Thank you — your order is confirmed",
+      testNote +
+        para(`We've received your payment of <b>${total}</b> for <b>${escapeHtml(title)}</b> (${qty} × ${bindingName}).`) +
+        para(`Your order number is <b>${orderNumber}</b>. We'll email you again when your book ships.`) +
+        button(orderUrl, "View your order"),
+    ),
+    text:
+      (testMode ? "TEST ORDER — paid in Safepay's sandbox; nothing will be printed.\n\n" : "") +
+      `Thank you — your order is confirmed.\n\nOrder ${orderNumber}\n${title} — ${qty} × ${bindingName}\nPaid: ${total}\n\nWe'll email you when it ships.\nView your order: ${orderUrl}`,
+  };
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

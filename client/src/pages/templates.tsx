@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import type { Theme } from "@shared/schema";
 import { Loader2, Star, BookOpen } from "lucide-react";
+import { formatPKR, STARTING_PRICE_MINOR } from "@shared/pricing";
 
 const themeCategories = ["All", "Travel", "Simple", "Family", "Wedding", "Baby"];
 
@@ -140,7 +141,7 @@ export default function Templates() {
                         {theme.pageCount} pages included
                       </span>
                       <span className="font-semibold text-primary" data-testid={`text-price-${theme.id}`}>
-                        Starting at ${theme.price}
+                        From {formatPKR(STARTING_PRICE_MINOR)}
                       </span>
                     </div>
                   </CardContent>

@@ -12,7 +12,7 @@
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { BookOpen, LogOut, Settings } from "lucide-react";
+import { BookOpen, ClipboardList, LogOut, Package, Settings } from "lucide-react";
 import { useSession } from "./useSession";
 import "./auth.css";
 
@@ -84,6 +84,14 @@ export function AccountMenu({ signInClassName = "bb-btn bb-btn-ghost" }: { signI
           <Link href="/books" onClick={() => setOpen(false)} role="menuitem">
             <BookOpen size={16} /> My books
           </Link>
+          <Link href="/orders" onClick={() => setOpen(false)} role="menuitem">
+            <Package size={16} /> My orders
+          </Link>
+          {(user as { role?: string }).role === "admin" ? (
+            <Link href="/admin/orders" onClick={() => setOpen(false)} role="menuitem">
+              <ClipboardList size={16} /> Manage orders
+            </Link>
+          ) : null}
           <Link href="/account" onClick={() => setOpen(false)} role="menuitem">
             <Settings size={16} /> Account
           </Link>

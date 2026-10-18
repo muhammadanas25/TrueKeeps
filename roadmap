@@ -31,7 +31,9 @@ Local Postgres for dev: `createdb truekeep_dev`, then in `.env`:
 
 **Decisions locked 2026-09-13 (see ~/.claude/plans/we-have-implemented-and-glistening-feather.md):** Pakistan-only, PKR (integer paisa); Safepay hosted checkout behind a `PaymentProvider` interface (no Stripe in PK; PayFast rejected on MDR/DX); prepaid only, no COD; registered business → start Safepay onboarding now.
 
-**Next up:** Phase 2B — orders + Safepay + transactional email (pg-boss queue, order state machine, address form in PKR, `/orders/:id` status page, admin order list), then Phase 2C — draft reminders, partitioned `events` table, lifecycle nudges.
+**Phase 2B (commerce) implemented 2026-10-18** (docs/adr/005): PKR price list in `shared/pricing.ts`; `orders` / `order_events` / `payments` tables (migration 0002); Safepay **v3** hosted checkout behind `server/payments/` with server-side verification via the reporter API (redirects are unsigned — verified in sandbox); signed webhooks; 5-minute reconcile + 24 h expiry sweep; order confirmation email; `/orders`, `/orders/:id`, `/admin/orders`; sandbox orders flagged TEST end to end. Verified end-to-end against the real Safepay sandbox (build → sign in → address → hosted payment → confirmed order). Prices are placeholders pending owner confirmation.
+
+**Next up:** shipped/delivered emails + courier tracking links, then Phase 2C — draft reminders, partitioned `events` table, lifecycle nudges.
 
 Note: `npm run dev` currently fails on this machine with `ENOSPC` (inotify watcher limit). Fix once with:
 `sudo sysctl fs.inotify.max_user_watches=524288` (persist in /etc/sysctl.conf). `npm run build && PORT=5001 npm start` works meanwhile.

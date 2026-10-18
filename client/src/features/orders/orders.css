@@ -1,0 +1,68 @@
+/*
+ * Order pages (/orders, /orders/:id, /admin/orders) — prefix `or-` / `ad-`.
+ * Built on the account-page primitives in features/auth/auth.css and the
+ * design tokens in client/src/index.css.
+ */
+
+.or-page { max-width: 920px; }
+.or-test { margin-bottom: 18px; padding: 10px 14px; border-radius: 10px; background: var(--tk-raspberry-dim); color: #8f1d44; border: 1px solid rgba(219,48,105,0.25); font-size: 13.5px; }
+
+.or-hero { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 22px; }
+.or-hero h1 { margin: 4px 0 6px !important; font-size: clamp(26px, 3.6vw, 34px) !important; }
+.or-hero-ic { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; }
+.or-hero.ok .or-hero-ic { background: rgba(31,138,76,0.1); color: #1f8a4c; }
+.or-hero.wait .or-hero-ic { background: var(--tk-gold-dim); color: var(--tk-gold-deep); }
+.or-hero.off .or-hero-ic { background: rgba(60,60,59,0.07); color: var(--color-fg2); }
+
+.or-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 22px 74px; }
+.or-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+
+.or-line { display: flex; justify-content: space-between; gap: 14px; font-size: 14.5px; align-items: baseline; }
+.or-line > span:first-child { color: var(--color-fg2); }
+.or-line.muted { font-size: 13px; color: var(--color-fg3); }
+.or-line.total { font-family: var(--font-display); font-size: 20px; font-weight: var(--fw-semibold); }
+.or-line.total > span:first-child { color: var(--color-fg1); }
+.or-line code { font-size: 12px; word-break: break-all; }
+.or-sum { border-top: 1px solid var(--color-border); padding-top: 12px; display: flex; flex-direction: column; gap: 7px; }
+
+.or-addr { font-style: normal; display: flex; flex-direction: column; gap: 2px; font-size: 14.5px; line-height: 1.45; }
+
+.or-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.or-timeline li { display: flex; gap: 12px; align-items: flex-start; }
+.or-timeline .dot { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--tk-cobalt-dim); color: var(--tk-cobalt); display: grid; place-items: center; margin-top: 1px; }
+.or-timeline li > div { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.or-timeline li span { color: var(--color-fg2); font-size: 13px; }
+.or-timeline time { color: var(--color-fg3); font-size: 12px; }
+
+.or-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.or-row {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 16px; text-align: left;
+  background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px 16px;
+  color: inherit; text-decoration: none; font: inherit; cursor: pointer;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+.or-row:hover, .or-row.sel { border-color: var(--tk-cobalt); box-shadow: var(--shadow-sm); }
+.or-row > div:first-child { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.or-row > div:first-child b { font-size: 15px; }
+.or-row > div:first-child span { font-size: 12.5px; color: var(--color-fg3); }
+.or-row-end { display: flex; align-items: center; gap: 12px; flex: none; }
+.or-status { font-size: 12px; font-weight: var(--fw-semibold); padding: 4px 10px; border-radius: 99px; background: rgba(60,60,59,0.07); color: var(--color-fg2); white-space: nowrap; }
+.or-status.s-pending_payment { background: var(--tk-gold-dim); color: var(--tk-gold-deep); }
+.or-status.s-paid, .or-status.s-in_production { background: var(--tk-cobalt-dim); color: var(--tk-cobalt); }
+.or-status.s-shipped, .or-status.s-delivered { background: rgba(31,138,76,0.1); color: #1f8a4c; }
+.or-tag { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; padding: 3px 7px; border-radius: 6px; background: var(--tk-raspberry-dim); color: #8f1d44; }
+
+.ad-filter { font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--color-border); background: #fff; }
+.ad-split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; }
+.ad-detail { position: sticky; top: 84px; }
+.ad-fields { display: flex; flex-direction: column; gap: 8px; }
+.ad-fields input { font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--color-border); }
+.ad-moves { display: flex; flex-wrap: wrap; gap: 8px; }
+.ad-moves .bb-btn { padding: 10px 16px; font-size: 13.5px; }
+
+@media (max-width: 760px) {
+  .or-grid, .ad-split { grid-template-columns: 1fr; }
+  .or-actions { margin-left: 0; }
+  .or-row { flex-direction: column; align-items: flex-start; }
+  .ad-detail { position: static; }
+}

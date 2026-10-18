@@ -56,6 +56,8 @@ the process 24/7, reads `railway.json` for build/start/healthcheck, and injects
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud → APIs & Services → Credentials (OAuth client, type "Web application"). Authorised redirect URI: `https://thetruekeeps.com/api/auth/callback/google`. Omit both to hide the Google button. |
    | `ADMIN_EMAILS` | comma-separated; these get `role=admin` on first sign-in |
    | `RESEND_API_KEY` / `EMAIL_FROM` | transactional email (magic links). Without a key, emails are only logged — sign-in by email will NOT work in prod. |
+   | `API_KEY_SAFE_PAY` / `SAFE_PAY_SECRET_KEY` / `SAFE_PAY_WEBHOOK_SECRET` | Safepay public key, secret key, and the endpoint's shared secret (Developer → Endpoints → View shared secret). All three or checkout is disabled. |
+   | `SAFE_PAY_API_URL` | `https://sandbox.api.getsafepay.com` while testing (orders are marked TEST and can't be sent to print); `https://api.getsafepay.com` when live. |
 
    Don't set `PORT` — Railway injects it.
 
@@ -88,6 +90,21 @@ the process 24/7, reads `railway.json` for build/start/healthcheck, and injects
   local-disk WARNING, the `S3_*` vars are missing/incomplete.
 - Run the wizard end-to-end: quiz → upload a photo → generate → preview.
   The photo URL should point at `S3_PUBLIC_BASE_URL`, not `/media/…`.
+
+## Payments (Safepay) checklist
+
+1. Safepay dashboard → Developer → Endpoints → add
+   `https://thetruekeeps.com/api/payments/webhook/safepay`, subscribe to
+   `payment.succeeded` and `payment.failed`, copy the shared secret into
+   `SAFE_PAY_WEBHOOK_SECRET`.
+2. Sandbox test: order a book on the site, pay with test card
+   `4456 5300 0000 1005` (any future expiry, CVC 111); the order page should
+   turn "confirmed" within seconds and `/admin/orders` shows it tagged TEST.
+3. Going live: swap the three keys for live ones, set
+   `SAFE_PAY_API_URL=https://api.getsafepay.com`, place one real low-value
+   order and refund it from the Safepay dashboard. If the live hosted page
+   404s, set `SAFE_PAY_CHECKOUT_URL` to the URL Safepay gives you
+   (docs/adr/005).
 
 ## Notes / future
 

@@ -166,7 +166,7 @@ export default function BookBuilder() {
           <CustomizeScreen key="customize" state={state} set={set} copy={copy} onDone={() => set({ screen: "preview", pos: 0 })} />
         ) : null}
         {state.screen === "order" ? (
-          <OrderScreen key="order" state={state} set={set} copy={copy} onPlace={() => set({ screen: "confirm" })} onBack={() => set({ screen: "preview", pos: 0 })} />
+          <OrderScreen key="order" state={state} set={set} copy={copy} onBack={() => set({ screen: "preview", pos: 0 })} />
         ) : null}
         {state.screen === "confirm" ? <ConfirmScreen key="confirm" copy={copy} onRestart={reset} onBack={() => set({ screen: "preview", pos: 0 })} /> : null}
       </main>

@@ -8,9 +8,12 @@
  *     │   ──< accounts            (OAuth links: google, …)
  *     │       verifications       (magic-link tokens)
  *     │
- *     └──< projects ──< project_pages ──< page_photos   (canvas editor)
- *            │
- *            └──< uploaded_photos                       (media metadata)
+ *     ├──< projects ──< project_pages ──< page_photos   (canvas editor)
+ *     │      │
+ *     │      └──< uploaded_photos                       (media metadata)
+ *     │
+ *     └──< orders ──< order_events                      (Phase 2B commerce)
+ *                 └──< payments
  *
  * Conventions
  *  - ids are varchar UUIDs generated in Postgres (`gen_random_uuid()`)
@@ -282,6 +285,122 @@ export const uploadedPhotos = pgTable(
   (t) => [index("uploaded_photos_project_idx").on(t.projectId), index("uploaded_photos_user_idx").on(t.userId)],
 );
 
+/* ── Commerce (Phase 2B, docs/adr/005) ──────────────────────────── */
+
+/**
+ * One row per checkout. Money is integer paisa; prices are re-quoted on
+ * the server (shared/pricing.ts) and frozen here with the price-list
+ * version, so a later price change never alters a placed order.
+ * `document_snapshot` is the exact book the customer paid for — the
+ * print pipeline renders from it even if the project is edited or
+ * deleted afterwards (hence ON DELETE RESTRICT on project).
+ */
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuidPk(),
+    /** human-facing reference, e.g. TK-7F3K9Q — also sent to Safepay */
+    orderNumber: text("order_number").notNull(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    projectId: varchar("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    /** see shared/orders.ts ORDER_STATUSES */
+    status: text("status").notNull().default("pending_payment"),
+    currency: text("currency").notNull().default("PKR"),
+    unitMinor: integer("unit_minor").notNull(),
+    subtotalMinor: integer("subtotal_minor").notNull(),
+    shippingMinor: integer("shipping_minor").notNull(),
+    totalMinor: integer("total_minor").notNull(),
+    priceListVersion: text("price_list_version").notNull(),
+    binding: text("binding").notNull(),
+    qty: integer("qty").notNull(),
+    pageCount: integer("page_count").notNull(),
+    /** denormalised for analytics / lifecycle campaigns */
+    title: text("title").notNull(),
+    occasion: text("occasion"),
+    themeKey: text("theme_key"),
+    documentSnapshot: jsonb("document_snapshot").notNull(),
+    shippingAddress: jsonb("shipping_address").notNull(),
+    contactEmail: text("contact_email").notNull(),
+    contactPhone: text("contact_phone").notNull(),
+    /** `safepay` | `fake` (dev) */
+    paymentProvider: text("payment_provider").notNull(),
+    /** provider's payment session id (Safepay tracker token) */
+    providerRef: text("provider_ref"),
+    /** false = sandbox / test payment — never fulfil these */
+    livemode: boolean("livemode").notNull().default(false),
+    idempotencyKey: text("idempotency_key").notNull(),
+    courier: text("courier"),
+    trackingNumber: text("tracking_number"),
+    paidAt: ts("paid_at"),
+    expiresAt: ts("expires_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("orders_number_unique").on(t.orderNumber),
+    uniqueIndex("orders_user_idem_unique").on(t.userId, t.idempotencyKey),
+    uniqueIndex("orders_provider_ref_unique").on(t.providerRef),
+    index("orders_user_created_idx").on(t.userId, t.createdAt),
+    index("orders_status_created_idx").on(t.status, t.createdAt),
+    index("orders_project_idx").on(t.projectId),
+  ],
+);
+
+/** Append-only status timeline — what the customer sees on /orders/:id. */
+export const orderEvents = pgTable(
+  "order_events",
+  {
+    id: uuidPk(),
+    orderId: varchar("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    /** status after this event (or null for notes like payment_failed) */
+    toStatus: text("to_status"),
+    fromStatus: text("from_status"),
+    /** `created` | `status` | `payment_failed` | `amount_mismatch` | `note` */
+    kind: text("kind").notNull(),
+    /** `user` | `webhook` | `redirect` | `poll` | `reconcile` | `admin` | `system` */
+    actor: text("actor").notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("order_events_order_idx").on(t.orderId, t.createdAt)],
+);
+
+/**
+ * Every confirmed money movement we learn about, for audit and
+ * idempotency. `provider_event_id` (the webhook's own id) is unique, so a
+ * re-delivered webhook can't record twice.
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuidPk(),
+    orderId: varchar("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    provider: text("provider").notNull(),
+    providerRef: text("provider_ref").notNull(),
+    providerEventId: text("provider_event_id"),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: text("currency").notNull(),
+    /** `succeeded` | `failed` | `refunded` */
+    status: text("status").notNull(),
+    /** how we learned of it: `webhook` | `redirect` | `poll` | `reconcile` */
+    source: text("source").notNull(),
+    raw: jsonb("raw"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("payments_order_idx").on(t.orderId),
+    uniqueIndex("payments_event_unique").on(t.providerEventId),
+  ],
+);
+
 /* ── Zod insert schemas (API validation) ────────────────────────── */
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -362,3 +481,9 @@ export type InsertPagePhoto = z.infer<typeof insertPagePhotoSchema>;
 export type PagePhoto = typeof pagePhotos.$inferSelect;
 export type InsertUploadedPhoto = z.infer<typeof insertUploadedPhotoSchema>;
 export type UploadedPhoto = typeof uploadedPhotos.$inferSelect;
+export type Order = typeof orders.$inferSelect;
+export type NewOrder = typeof orders.$inferInsert;
+export type OrderEvent = typeof orderEvents.$inferSelect;
+export type NewOrderEvent = typeof orderEvents.$inferInsert;
+export type Payment = typeof payments.$inferSelect;
+export type NewPayment = typeof payments.$inferInsert;

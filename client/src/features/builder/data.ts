@@ -16,6 +16,8 @@
  *    change is safe and cheap.
  */
 
+import { PRICE_LIST } from "@shared/pricing";
+
 /* ── Book themes ────────────────────────────────────────────── */
 
 export interface BookTheme {
@@ -130,13 +132,12 @@ export const DENSITIES: Array<{ id: DensityId; name: string; blurb: string }> = 
 export interface Binding {
   id: string;
   name: string;
-  price: number;
+  /** price per copy in PAISA — from the shared PKR price list */
+  priceMinor: number;
 }
-export const BINDINGS: Binding[] = [
-  { id: "softcover", name: "Softcover", price: 24 },
-  { id: "hardcover", name: "Hardcover", price: 34 },
-  { id: "layflat", name: "Layflat", price: 46 },
-];
+/** Bindings + prices come from shared/pricing.ts so the server's quote
+ *  and what the customer sees can never drift. */
+export const BINDINGS: Binding[] = PRICE_LIST.bindings.map((b) => ({ id: b.id, name: b.name, priceMinor: b.unitMinor }));
 
 /* ── Copy voices ────────────────────────────────────────────── */
 /* Every user-facing headline/CTA lives here so tone is switchable
@@ -194,7 +195,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     customizeSub: "Tap any page to change it. Nothing can go wrong.",
     orderTitle: "Almost there",
     orderSub: "Check the details — then we print, bind, and ship it.",
-    placeOrder: "Place my order",
+    placeOrder: "Continue to secure payment",
     confirmTitle: "It's on its way to print",
     confirmSub: "We'll email you the moment it ships. Your book is saved here — come back anytime.",
   },
@@ -221,7 +222,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     customizeSub: "Select a page to edit it.",
     orderTitle: "Order summary",
     orderSub: "Review and confirm.",
-    placeOrder: "Place order",
+    placeOrder: "Pay securely",
     confirmTitle: "Order placed",
     confirmSub: "We'll email you when it ships.",
   },

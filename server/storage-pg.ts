@@ -18,7 +18,7 @@
  * exactly like a fresh dev server.
  */
 
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import {
   themes,
   projects,
@@ -26,6 +26,14 @@ import {
   pagePhotos,
   uploadedPhotos,
   users,
+  orders,
+  orderEvents,
+  payments,
+  type Order,
+  type NewOrder,
+  type OrderEvent,
+  type NewOrderEvent,
+  type NewPayment,
   type User,
   type Theme,
   type InsertTheme,
@@ -40,6 +48,7 @@ import {
   type InsertUploadedPhoto,
 } from "@shared/schema";
 import type { BuilderDocument } from "@shared/document";
+import type { OrderStatus } from "@shared/orders";
 import { getDb } from "./db";
 import { SEED_THEMES, denormalise, type IStorage, type ProjectFull, type ProjectSummary, type SaveDocumentResult } from "./storage";
 
@@ -318,6 +327,104 @@ export class DrizzleStorage implements IStorage {
       .delete(uploadedPhotos)
       .where(eq(uploadedPhotos.id, id))
       .returning({ id: uploadedPhotos.id });
+    return rows.length > 0;
+  }
+
+  /* ── orders ───────────────────────────────────────── */
+
+  async createOrder(order: NewOrder, event: Omit<NewOrderEvent, "orderId">): Promise<Order> {
+    return this.db.transaction(async (tx) => {
+      const rows = await tx.insert(orders).values(order).returning();
+      await tx.insert(orderEvents).values({ ...event, orderId: rows[0].id });
+      return rows[0];
+    });
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const rows = await this.db.select().from(orders).where(eq(orders.id, id));
+    return rows[0];
+  }
+
+  async getOrderByIdempotencyKey(userId: string, key: string): Promise<Order | undefined> {
+    const rows = await this.db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.userId, userId), eq(orders.idempotencyKey, key)));
+    return rows[0];
+  }
+
+  async getOrderByProviderRef(ref: string): Promise<Order | undefined> {
+    const rows = await this.db.select().from(orders).where(eq(orders.providerRef, ref));
+    return rows[0];
+  }
+
+  async listOrdersForUser(userId: string): Promise<Order[]> {
+    return this.db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+  }
+
+  async listOrdersAdmin({ status, limit }: { status?: OrderStatus; limit: number }): Promise<Order[]> {
+    const q = this.db.select().from(orders);
+    return (status ? q.where(eq(orders.status, status)) : q).orderBy(desc(orders.createdAt)).limit(limit);
+  }
+
+  async listPendingOrders(before: Date, limit: number): Promise<Order[]> {
+    return this.db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.status, "pending_payment"), isNotNull(orders.providerRef), lt(orders.createdAt, before)))
+      .orderBy(asc(orders.createdAt))
+      .limit(limit);
+  }
+
+  async updateOrder(
+    id: string,
+    patch: Partial<Pick<Order, "providerRef" | "courier" | "trackingNumber">>,
+  ): Promise<Order | undefined> {
+    const rows = await this.db.update(orders).set({ ...patch, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
+    return rows[0];
+  }
+
+  /**
+   * The status column is only ever changed here. The WHERE clause carries
+   * the allowed source states, so concurrent confirmers (webhook +
+   * redirect + reconcile) race safely: exactly one gets a row back and
+   * writes the event; the others see undefined and do nothing.
+   */
+  async transitionOrder(
+    id: string,
+    from: OrderStatus[],
+    to: OrderStatus,
+    event: Omit<NewOrderEvent, "orderId" | "fromStatus" | "toStatus">,
+    patch: Partial<Pick<Order, "paidAt" | "courier" | "trackingNumber">> = {},
+  ): Promise<Order | undefined> {
+    return this.db.transaction(async (tx) => {
+      const before = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, id)).for("update");
+      const rows = await tx
+        .update(orders)
+        .set({ ...patch, status: to, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), inArray(orders.status, from)))
+        .returning();
+      if (!rows[0]) return undefined;
+      await tx.insert(orderEvents).values({ ...event, orderId: id, fromStatus: before[0]?.status ?? null, toStatus: to });
+      return rows[0];
+    });
+  }
+
+  async addOrderEvent(event: NewOrderEvent): Promise<OrderEvent> {
+    const rows = await this.db.insert(orderEvents).values(event).returning();
+    return rows[0];
+  }
+
+  async listOrderEvents(orderId: string): Promise<OrderEvent[]> {
+    return this.db.select().from(orderEvents).where(eq(orderEvents.orderId, orderId)).orderBy(asc(orderEvents.createdAt));
+  }
+
+  async recordPayment(payment: NewPayment): Promise<boolean> {
+    const rows = await this.db
+      .insert(payments)
+      .values(payment)
+      .onConflictDoNothing({ target: payments.providerEventId })
+      .returning({ id: payments.id });
     return rows.length > 0;
   }
 }

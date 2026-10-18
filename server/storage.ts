@@ -26,7 +26,14 @@ import {
   type InsertPagePhoto,
   type UploadedPhoto,
   type InsertUploadedPhoto,
+  type Order,
+  type NewOrder,
+  type OrderEvent,
+  type NewOrderEvent,
+  type Payment,
+  type NewPayment,
 } from "@shared/schema";
+import type { OrderStatus } from "@shared/orders";
 import type { BuilderDocument } from "@shared/document";
 import { randomUUID } from "crypto";
 import { DrizzleStorage } from "./storage-pg";
@@ -126,6 +133,35 @@ export interface IStorage {
   /** Used by the image pipeline to attach derivative URLs/dimensions after processing. */
   updateUploadedPhoto(id: string, photo: Partial<InsertUploadedPhoto>): Promise<UploadedPhoto | undefined>;
   deleteUploadedPhoto(id: string): Promise<boolean>;
+
+  /* ── orders (Phase 2B) ── */
+  /** Insert an order and its `created` event together. */
+  createOrder(order: NewOrder, event: Omit<NewOrderEvent, "orderId">): Promise<Order>;
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrderByIdempotencyKey(userId: string, key: string): Promise<Order | undefined>;
+  getOrderByProviderRef(ref: string): Promise<Order | undefined>;
+  listOrdersForUser(userId: string): Promise<Order[]>;
+  listOrdersAdmin(filter: { status?: OrderStatus; limit: number }): Promise<Order[]>;
+  /** pending_payment orders with a provider session, created before `before` */
+  listPendingOrders(before: Date, limit: number): Promise<Order[]>;
+  /** Plain field update (provider ref, courier/tracking) — not for status. */
+  updateOrder(id: string, patch: Partial<Pick<Order, "providerRef" | "courier" | "trackingNumber">>): Promise<Order | undefined>;
+  /**
+   * Compare-and-set status change: applies only if the current status is
+   * in `from`, writes the event in the same transaction, and returns the
+   * updated order — or undefined if someone else got there first.
+   */
+  transitionOrder(
+    id: string,
+    from: OrderStatus[],
+    to: OrderStatus,
+    event: Omit<NewOrderEvent, "orderId" | "fromStatus" | "toStatus">,
+    patch?: Partial<Pick<Order, "paidAt" | "courier" | "trackingNumber">>,
+  ): Promise<Order | undefined>;
+  addOrderEvent(event: NewOrderEvent): Promise<OrderEvent>;
+  listOrderEvents(orderId: string): Promise<OrderEvent[]>;
+  /** Returns false when `providerEventId` was already recorded (duplicate webhook). */
+  recordPayment(payment: NewPayment): Promise<boolean>;
 }
 
 /**
@@ -145,6 +181,9 @@ export function denormalise(doc: BuilderDocument): Pick<Project, "name" | "occas
 }
 
 export class MemStorage implements IStorage {
+  private orders = new Map<string, Order>();
+  private orderEvents: OrderEvent[] = [];
+  private payments: Payment[] = [];
   private themes: Map<string, Theme>;
   private projects: Map<string, Project>;
   private projectPages: Map<string, ProjectPage>;
@@ -459,6 +498,112 @@ export class MemStorage implements IStorage {
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {
     return this.uploadedPhotos.delete(id);
+  }
+  /* ── orders ─────────────────────────────────────────── */
+
+  async createOrder(input: NewOrder, event: Omit<NewOrderEvent, "orderId">): Promise<Order> {
+    const now = new Date();
+    for (const o of Array.from(this.orders.values())) {
+      if (o.orderNumber === input.orderNumber) throw Object.assign(new Error("duplicate order number"), { code: "23505" });
+      if (o.userId === input.userId && o.idempotencyKey === input.idempotencyKey)
+        throw Object.assign(new Error("duplicate idempotency key"), { code: "23505" });
+    }
+    const order: Order = {
+      id: randomUUID(),
+      status: "pending_payment",
+      currency: "PKR",
+      occasion: null,
+      themeKey: null,
+      providerRef: null,
+      livemode: false,
+      courier: null,
+      trackingNumber: null,
+      paidAt: null,
+      expiresAt: null,
+      createdAt: now,
+      updatedAt: now,
+      ...input,
+    } as Order;
+    this.orders.set(order.id, order);
+    await this.addOrderEvent({ ...event, orderId: order.id });
+    return order;
+  }
+
+  async getOrder(id: string) {
+    return this.orders.get(id);
+  }
+
+  async getOrderByIdempotencyKey(userId: string, key: string) {
+    return Array.from(this.orders.values()).find((o) => o.userId === userId && o.idempotencyKey === key);
+  }
+
+  async getOrderByProviderRef(ref: string) {
+    return Array.from(this.orders.values()).find((o) => o.providerRef === ref);
+  }
+
+  async listOrdersForUser(userId: string) {
+    return Array.from(this.orders.values())
+      .filter((o) => o.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async listOrdersAdmin({ status, limit }: { status?: OrderStatus; limit: number }) {
+    return Array.from(this.orders.values())
+      .filter((o) => !status || o.status === status)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
+  }
+
+  async listPendingOrders(before: Date, limit: number) {
+    return Array.from(this.orders.values())
+      .filter((o) => o.status === "pending_payment" && o.providerRef && o.createdAt < before)
+      .slice(0, limit);
+  }
+
+  async updateOrder(id: string, patch: Partial<Pick<Order, "providerRef" | "courier" | "trackingNumber">>) {
+    const o = this.orders.get(id);
+    if (!o) return undefined;
+    const next = { ...o, ...patch, updatedAt: new Date() };
+    this.orders.set(id, next);
+    return next;
+  }
+
+  async transitionOrder(
+    id: string,
+    from: OrderStatus[],
+    to: OrderStatus,
+    event: Omit<NewOrderEvent, "orderId" | "fromStatus" | "toStatus">,
+    patch: Partial<Pick<Order, "paidAt" | "courier" | "trackingNumber">> = {},
+  ) {
+    const o = this.orders.get(id);
+    if (!o || !from.includes(o.status as OrderStatus)) return undefined;
+    const next = { ...o, ...patch, status: to, updatedAt: new Date() };
+    this.orders.set(id, next);
+    await this.addOrderEvent({ ...event, orderId: id, fromStatus: o.status, toStatus: to });
+    return next;
+  }
+
+  async addOrderEvent(event: NewOrderEvent): Promise<OrderEvent> {
+    const row: OrderEvent = {
+      id: randomUUID(),
+      toStatus: null,
+      fromStatus: null,
+      note: null,
+      createdAt: new Date(),
+      ...event,
+    } as OrderEvent;
+    this.orderEvents.push(row);
+    return row;
+  }
+
+  async listOrderEvents(orderId: string) {
+    return this.orderEvents.filter((e) => e.orderId === orderId);
+  }
+
+  async recordPayment(payment: NewPayment): Promise<boolean> {
+    if (payment.providerEventId && this.payments.some((p) => p.providerEventId === payment.providerEventId)) return false;
+    this.payments.push({ id: randomUUID(), providerEventId: null, raw: null, createdAt: new Date(), ...payment } as Payment);
+    return true;
   }
 }
 

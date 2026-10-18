@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,9 +15,11 @@ import Home from "@/pages/home";
 const Templates = lazy(() => import("@/pages/templates"));
 const Create = lazy(() => import("@/pages/create"));
 const BookBuilder = lazy(() => import("@/features/builder"));
-const WizardClassic = lazy(() => import("@/pages/wizard"));
 const Books = lazy(() => import("@/pages/books"));
 const Account = lazy(() => import("@/pages/account"));
+const Orders = lazy(() => import("@/pages/orders"));
+const Order = lazy(() => import("@/pages/order"));
+const AdminOrders = lazy(() => import("@/pages/admin-orders"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 /** Minimal, brand-neutral fallback while a route chunk loads. */
@@ -34,11 +36,19 @@ function Router() {
         <Route path="/create" component={Create} />
         {/* quiz-first builder — the primary "autopilot" path */}
         <Route path="/wizard" component={BookBuilder} />
-        {/* previous 6-step wizard, kept reachable for comparison */}
-        <Route path="/wizard-classic" component={WizardClassic} />
+        {/* The previous 6-step wizard had USD prices and a fake "Order placed"
+            button; with real checkout live it would mislead customers, so the
+            URL now goes to the real builder. Code kept in pages/wizard.tsx. */}
+        <Route path="/wizard-classic">
+          <Redirect to="/wizard" />
+        </Route>
         {/* account area (Phase 2A) */}
         <Route path="/books" component={Books} />
         <Route path="/account" component={Account} />
+        {/* commerce (Phase 2B) */}
+        <Route path="/orders" component={Orders} />
+        <Route path="/orders/:id" component={Order} />
+        <Route path="/admin/orders" component={AdminOrders} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

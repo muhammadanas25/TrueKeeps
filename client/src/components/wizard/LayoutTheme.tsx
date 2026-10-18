@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import type { WizardState, LayoutStyle } from "@/lib/wizard-types";
 import type { Theme } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { formatPKR, STARTING_PRICE_MINOR } from "@shared/pricing";
 
 interface Props {
   state: WizardState;
@@ -132,7 +133,7 @@ export function LayoutTheme({ state, onChange }: Props) {
                     <p className="text-sm font-semibold leading-tight" style={{ color: selected ? "#1D4BA6" : "#3C3C3B" }}>
                       {theme.name}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#9b9b97" }}>from ${theme.price}</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#9b9b97" }}>from {formatPKR(STARTING_PRICE_MINOR)}</p>
                   </div>
                   {selected && (
                     <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: "#1D4BA6" }}>

@@ -53,6 +53,9 @@ const envSchema = z.object({
   SAFE_PAY_WEBHOOK_SECRET: z.string().optional(),
   /** https://sandbox.api.getsafepay.com (sandbox) or https://api.getsafepay.com (live) */
   SAFE_PAY_API_URL: z.string().url().default("https://sandbox.api.getsafepay.com"),
+  /** Hosted checkout base. Default: <API>/embedded/ in sandbox,
+   *  https://getsafepay.com/embedded/ live — override if Safepay says otherwise. */
+  SAFE_PAY_CHECKOUT_URL: z.string().url().optional(),
 
   /** Email delivery (Resend when a key is set; console otherwise) */
   RESEND_API_KEY: z.string().optional(),
@@ -121,6 +124,12 @@ export const config = {
           baseUrl: env.SAFE_PAY_API_URL.replace(/\/$/, ""),
           // the SDK wants an environment name, not a URL
           environment: /sandbox/.test(env.SAFE_PAY_API_URL) ? ("sandbox" as const) : ("production" as const),
+          checkoutBase: (
+            env.SAFE_PAY_CHECKOUT_URL ??
+            (/sandbox/.test(env.SAFE_PAY_API_URL)
+              ? env.SAFE_PAY_API_URL.replace(/\/$/, "") + "/embedded/"
+              : "https://getsafepay.com/embedded/")
+          ),
         }
       : null,
   email: {
