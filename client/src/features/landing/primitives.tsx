@@ -8,73 +8,102 @@
  * component so Vite can tree-shake) instead of the prototype's runtime
  * `window.lucide` lookup.
  *
- * Why placeholder tiles instead of stock photos: the design system
- * deliberately uses labelled, brand-tinted tiles so the marketing page
- * ships zero image bytes and reads as "your photos go here".
+ * The logo is now the supplied raster artwork (see TKLogo). The marketing
+ * sections themselves use real product photography (./assets); the
+ * labelled, brand-tinted Ph tiles remain for in-app "your photos go here"
+ * placeholders.
  */
 
 import type { CSSProperties, ReactNode } from "react";
+import logoIndigo40 from "./assets/logo-indigo-40.png";
+import logoIndigo80 from "./assets/logo-indigo-80.png";
+import logoIndigo120 from "./assets/logo-indigo-120.png";
+import logoPink40 from "./assets/logo-pink-40.png";
+import logoPink80 from "./assets/logo-pink-80.png";
+import logoPink120 from "./assets/logo-pink-120.png";
+import markIndigo32 from "./assets/mark-indigo-32.png";
+import markIndigo64 from "./assets/mark-indigo-64.png";
+import markIndigo96 from "./assets/mark-indigo-96.png";
+import markPink32 from "./assets/mark-pink-32.png";
+import markPink64 from "./assets/mark-pink-64.png";
+import markPink96 from "./assets/mark-pink-96.png";
 
 /* ── Brand logo ─────────────────────────────────────────────── */
 
-/**
- * TKMark — the geometric "kept moment" mark: a cobalt photo-book cover
- * with a gold keepsake bookmark and a framed horizon line.
+/*
+ * Brand artwork — raster exports of the supplied "truekeeps" logo
+ * (Website Images/Website Logo - 200px), trimmed and exported at three
+ * heights (40/80/120px) plus a square "tk" mark (32/64/96px).
+ *
+ * Sizing strategy, so every device downloads only what it needs:
+ *  - `srcSet` with width descriptors + an exact `sizes` lets the browser
+ *    pick the export matching rendered size × device pixel ratio (a 1×
+ *    laptop pulls the 7 KB file, a 3× phone the 23 KB one).
+ *  - Rendered height is a CSS custom property (--tk-logo-h), so surfaces
+ *    can shrink it per breakpoint in CSS without new props.
+ *  - Below 360px wide the lockup collapses to the mark via <picture>,
+ *    keeping narrow phone navs from overflowing.
+ * Indigo is the light-surface variant; pink is for dark surfaces.
  */
-export function TKMark({ size = 36 }: { size?: number }) {
-  const cover = "#1D46A0";
-  const gold = "#F5D547";
-  const paper = "#FAFAF7";
+
+const LOGOS = {
+  light: { full: [logoIndigo40, logoIndigo80, logoIndigo120], mark: [markIndigo32, markIndigo64, markIndigo96] },
+  dark: { full: [logoPink40, logoPink80, logoPink120], mark: [markPink32, markPink64, markPink96] },
+};
+
+/** Width ÷ height of the trimmed wordmark export (610×120). */
+const LOGO_ASPECT = 610 / 120;
+
+/** TKMark — the square "tk" monogram on its own, `size` px square. */
+export function TKMark({ size = 36, theme = "light" }: { size?: number; theme?: "light" | "dark" }) {
+  const px = Math.round(size * 0.86);
+  const [m1, m2, m3] = LOGOS[theme].mark;
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true" style={{ display: "block" }}>
-      {/* book cover */}
-      <rect x="6" y="4" width="32" height="40" rx="6" fill={cover} />
-      {/* spine highlight */}
-      <rect x="6" y="4" width="5" height="40" rx="2.5" fill="#000" opacity="0.16" />
-      {/* framed photo: sky + horizon + sun */}
-      <rect x="13" y="11" width="19" height="20" rx="2.5" fill={paper} />
-      <circle cx="19" cy="18" r="3" fill={gold} />
-      <path
-        d="M13 27.5 L18.5 23 L23 26 L28 21 L32 25 V28.5 a2.5 2.5 0 0 1 -2.5 2.5 H15.5 A2.5 2.5 0 0 1 13 28.5 Z"
-        fill={cover}
-        opacity="0.85"
-      />
-      {/* gold keepsake bookmark */}
-      <path d="M27 4 H33 V15 L30 12.4 L27 15 Z" fill={gold} />
-    </svg>
+    <img
+      src={m1}
+      srcSet={`${m1} 32w, ${m2} 64w, ${m3} 96w`}
+      sizes={`${px}px`}
+      width={px}
+      height={px}
+      alt=""
+      aria-hidden="true"
+      style={{ display: "block", borderRadius: 2 }}
+    />
   );
 }
 
-/** TKLogo — mark + Clash Display wordmark. `theme="dark"` for dark surfaces. */
+/**
+ * TKLogo — the full "tk truekeeps" lockup. `size` keeps its old meaning
+ * (roughly the wordmark cap size) so existing call sites stay balanced;
+ * the image is rendered ~1.5× that tall. `theme="dark"` swaps to pink.
+ * Override the height per breakpoint with `--tk-logo-h` in CSS.
+ */
 export function TKLogo({
   size = 26,
   theme = "light",
-  mark = true,
   style,
 }: {
   size?: number;
   theme?: "light" | "dark";
-  mark?: boolean;
   style?: CSSProperties;
 }) {
-  const ink = theme === "dark" ? "#FFFFFF" : "var(--tk-gunmetal)";
+  const h = Math.round(size * 1.5);
+  const w = Math.round(h * LOGO_ASPECT);
+  const [f1, f2, f3] = LOGOS[theme].full;
+  const [m1, m2, m3] = LOGOS[theme].mark;
   return (
-    <div className="tk-logo" style={{ display: "inline-flex", alignItems: "center", gap: size * 0.34, ...style }}>
-      {mark ? <TKMark size={size * 1.46} /> : null}
-      <span
-        style={{
-          fontFamily: "var(--font-display)",
-          fontWeight: 600,
-          fontSize: size,
-          letterSpacing: "-0.02em",
-          color: ink,
-          lineHeight: 1,
-          whiteSpace: "nowrap",
-        }}
-      >
-        True<span style={{ color: theme === "dark" ? "#F5D547" : "var(--tk-cobalt)" }}>Keep</span>
-      </span>
-    </div>
+    <picture className="tk-logo" style={{ display: "block", ["--tk-logo-h" as string]: `${h}px`, ...style }}>
+      <source media="(max-width: 359px)" srcSet={`${m1} 32w, ${m2} 64w, ${m3} 96w`} sizes={`${h}px`} />
+      <img
+        src={f1}
+        srcSet={`${f1} 203w, ${f2} 406w, ${f3} 610w`}
+        sizes={`${w}px`}
+        alt="truekeeps"
+        width={w}
+        height={h}
+        style={{ display: "block", height: "var(--tk-logo-h)", width: "auto" }}
+      />
+    </picture>
   );
 }
 

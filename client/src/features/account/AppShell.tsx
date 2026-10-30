@@ -8,7 +8,7 @@
 
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { TKMark } from "@/features/landing/primitives";
+import { TKLogo } from "@/features/landing/primitives";
 import { AccountMenu } from "@/features/auth/AccountMenu";
 import "@/features/builder/builder.css";
 import "@/features/auth/auth.css";
@@ -17,11 +17,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="bb-shell">
       <header className="bb-nav">
-        <Link href="/" className="bb-wordmark" aria-label="TrueKeep home">
-          <TKMark size={26} />
-          <span>
-            True<em>Keep</em>
-          </span>
+        <Link href="/" className="bb-wordmark" aria-label="truekeeps home">
+          <TKLogo size={18} />
         </Link>
         <div className="bb-nav-right">
           <Link href="/wizard" className="bb-btn bb-btn-ghost">

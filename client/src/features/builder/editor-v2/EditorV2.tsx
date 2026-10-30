@@ -63,7 +63,7 @@ import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
 import type { BuilderState } from "../state";
 import type { SyncStatus } from "../sync";
-import { TKMark } from "@/features/landing/primitives";
+import { TKLogo } from "@/features/landing/primitives";
 import { apiRequest } from "@/lib/queryClient";
 import { readImageSize, uploadPhotoFile } from "@/lib/uploads";
 import { formatPKR, quote } from "@shared/pricing";
@@ -651,10 +651,7 @@ export function EditorV2({
             {!isMobile ? (
               <>
                 <span className="tke-logo">
-                  <TKMark size={22} />
-                  <span>
-                    True<em>Keep</em>
-                  </span>
+                  <TKLogo size={15} />
                 </span>
                 <span className="tke-top-div" />
               </>

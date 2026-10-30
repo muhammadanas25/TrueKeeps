@@ -45,7 +45,7 @@ import { ConfirmScreen, OrderScreen } from "./screens/OrderScreen";
 import { EditorV2 } from "./editor-v2/EditorV2";
 import { useEditorVersion } from "./editor-v2/pref";
 import { PageLookContext, type PageLook } from "./looks";
-import { TKMark } from "@/features/landing/primitives";
+import { TKLogo } from "@/features/landing/primitives";
 
 /** Seed builder state from URL params (?occasion=wedding from landing). */
 function seedFromUrl(): Partial<BuilderState> {
@@ -167,11 +167,8 @@ export default function BookBuilder() {
               <ChevronLeft size={18} />
             </button>
           ) : null}
-          <Link href="/" className="bb-wordmark" aria-label="TrueKeep home">
-            <TKMark size={26} />
-            <span>
-              True<em>Keep</em>
-            </span>
+          <Link href="/" className="bb-wordmark" aria-label="truekeeps home">
+            <TKLogo size={18} />
           </Link>
         </div>
         <div className="bb-nav-right">

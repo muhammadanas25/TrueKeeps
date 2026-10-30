@@ -9,28 +9,39 @@
  *  - prototype `<a href="../book_builder/...">` CTAs → wouter <Link>
  *    into the in-app builder at /wizard (occasion cards deep-link with
  *    ?occasion=<id> so the quiz pre-selects the moment)
- *  - copy is verbatim from the prototype (design-system voice rules)
+ *  - Hero + Showcase copy comes from "Website Copywriting.docx"
+ *    (Oct 2026); the rest is still the prototype copy
+ *  - imagery is real product photography from "Website Images/" and
+ *    "Website Assets/", pre-sized to WebP in ./assets (srcset picks
+ *    1280w vs 2400w; phones get the designer's square crops, 800w/1200w)
  */
 
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import {
-  ArrowRight,
-  Award,
-  Baby,
-  BookOpen,
-  Cake,
-  Check,
-  Heart,
-  Leaf,
-  Plane,
-  PlayCircle,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Truck,
-} from "lucide-react";
-import { MiniBook, Ph, Stars, TKLogo, tintFor, type BookTone } from "./primitives";
+import { ArrowRight, Leaf, ShieldCheck, Star, Truck } from "lucide-react";
+import { TKLogo, tintFor } from "./primitives";
+import heroSm from "./assets/hero-1280.webp";
+import heroLg from "./assets/hero-2400.webp";
+import heroM800 from "./assets/hero-mobile-800.webp";
+import heroM1200 from "./assets/hero-mobile-1200.webp";
+import keepSm from "./assets/keepsake-1280.webp";
+import keepLg from "./assets/keepsake-2400.webp";
+import keepM800 from "./assets/keepsake-mobile-800.webp";
+import keepM1200 from "./assets/keepsake-mobile-1200.webp";
+import ctaSm from "./assets/cta-1280.webp";
+import ctaLg from "./assets/cta-2400.webp";
+import ctaM800 from "./assets/cta-mobile-800.webp";
+import ctaM1200 from "./assets/cta-mobile-1200.webp";
+import how1 from "./assets/how-1.webp";
+import how2 from "./assets/how-2.webp";
+import how3 from "./assets/how-3.webp";
+import bookWedding from "./assets/book-wedding.webp";
+import bookBaby from "./assets/book-baby.webp";
+import bookBirthday from "./assets/book-birthday.webp";
+import bookSchool from "./assets/book-school.webp";
+import bookUmrah from "./assets/book-umrah.webp";
+import bookTravel from "./assets/book-travel.webp";
+import bookAnniversary from "./assets/book-anniversary.webp";
 import { AccountMenu } from "@/features/auth/AccountMenu";
 import { formatPKR, PRICE_LIST } from "@shared/pricing";
 
@@ -67,88 +78,55 @@ export function Nav() {
   );
 }
 
-/* ── Hero — camera-roll loss aversion ───────────────────────── */
+/* ── Full-bleed banner photo ────────────────────────────────── */
 
-/** Floating photo tiles "spilling" out of the phone in the hero art. */
-const HERO_TILES = [
-  { l: "IMG_4471", i: 0, x: 158, y: 16, r: -7, s: 134 },
-  { l: "IMG_5096", i: 1, x: 286, y: 6, r: 6, s: 120 },
-  { l: "IMG_2210", i: 2, x: 206, y: 132, r: -3, s: 142 },
-  { l: "IMG_6633", i: 5, x: 330, y: 120, r: 9, s: 124 },
-  { l: "IMG_1188", i: 4, x: 150, y: 168, r: 5, s: 112 },
-];
+/** One banner's exports: wide desktop shot + the square phone crop. */
+type BannerSet = { sm: string; lg: string; m800: string; m1200: string };
+
+const HERO_PHOTO: BannerSet = { sm: heroSm, lg: heroLg, m800: heroM800, m1200: heroM1200 };
+const KEEP_PHOTO: BannerSet = { sm: keepSm, lg: keepLg, m800: keepM800, m1200: keepM1200 };
+const CTA_PHOTO: BannerSet = { sm: ctaSm, lg: ctaLg, m800: ctaM800, m1200: ctaM1200 };
+
+/**
+ * BannerPhoto — responsive full-bleed photo behind a banner section.
+ * Desktop gets the wide shot (srcset 1280w/2400w); ≤720px gets the
+ * designer-supplied square phone crop (800w/1200w, picked by DPR).
+ * `eager` for the hero (LCP); everything else lazy-loads.
+ */
+function BannerPhoto({ set, eager, className }: { set: BannerSet; eager?: boolean; className?: string }) {
+  return (
+    <picture className={"lp-banner-photo" + (className ? " " + className : "")}>
+      <source media="(max-width: 720px)" srcSet={`${set.m800} 800w, ${set.m1200} 1200w`} sizes="100vw" />
+      <img
+        src={set.sm}
+        srcSet={`${set.sm} 1280w, ${set.lg} 2400w`}
+        sizes="100vw"
+        alt=""
+        loading={eager ? "eager" : "lazy"}
+        // React 18 only accepts the lowercase DOM attribute
+        {...(eager ? { fetchpriority: "high" } : {})}
+        decoding="async"
+      />
+    </picture>
+  );
+}
+
+/* ── Hero — banner photo with copy over the open tabletop ────── */
 
 export function Hero() {
   return (
     <header className="lp-hero">
+      <BannerPhoto set={HERO_PHOTO} eager />
       <div className="lp-wrap">
         <div className="lp-hero-copy">
-          <div className="lp-eyebrow" style={{ color: "var(--tk-raspberry)" }}>
-            Don't let them disappear
-          </div>
-          <h1>
-            Your best moments are <span className="lp-gold">stuck</span> in your phone.
-          </h1>
+          <h1>Your best moments deserve more than a phone.</h1>
           <p className="sub">
-            The average camera roll holds 8,000 photos no one ever sees again. Pick a moment and we'll turn the best of
-            them into a book you can actually hold — designed for you, automatically.
+            Design it yourself in minutes, or let us create it for you. Then hold it, share it, and keep it forever.
           </p>
           <div className="lp-hero-actions">
             <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent lp-btn-lg">
-              Free my memories
+              Make my book <ArrowRight size={18} />
             </Link>
-            <a href="#how" className="lp-btn lp-btn-ghost">
-              <PlayCircle size={20} /> See how it works
-            </a>
-          </div>
-          <div className="lp-hero-proof">
-            <div className="avatars">
-              {[0, 2, 4, 6].map((i) => (
-                <span key={i} style={{ background: tintFor(i) }} />
-              ))}
-            </div>
-            <Stars />{" "}
-            <span>
-              Loved by <b style={{ color: "var(--tk-gunmetal)" }}>40,000+</b> families
-            </span>
-          </div>
-        </div>
-
-        <div className="lp-hero-stage">
-          <div className="lp-hero-art floaty">
-            <div className="lp-phone">
-              <div className="lp-phone-screen">
-                {[10, 11, 12, 13, 14, 15].map((i) => (
-                  <Ph key={i} i={i} style={{ borderRadius: 5 }} />
-                ))}
-              </div>
-              <div className="lp-phone-notch"></div>
-            </div>
-            {HERO_TILES.map((t, k) => (
-              <div
-                key={k}
-                className="lp-tile drift"
-                style={{
-                  left: t.x,
-                  top: t.y,
-                  width: t.s,
-                  height: t.s * 0.82,
-                  transform: `rotate(${t.r}deg)`,
-                  animationDelay: 0.25 + k * 0.13 + "s",
-                }}
-              >
-                <Ph i={t.i} label={t.l} style={{ width: "100%", height: "100%", borderRadius: 5 }} />
-              </div>
-            ))}
-            <div className="lp-hero-book drift" style={{ animationDelay: "1s" }}>
-              <MiniBook tone="ivory" title={"Our\nSummer"} sub="2025, in photos" coverLabel="golden hour" coverIdx={4} style={{ width: "100%", height: "100%" }} />
-            </div>
-            <span className="lp-spark" style={{ right: 96, top: 8 }}>
-              <Sparkles size={26} />
-            </span>
-            <span className="lp-spark" style={{ right: 40, bottom: 30 }}>
-              <Sparkles size={20} />
-            </span>
           </div>
         </div>
       </div>
@@ -202,27 +180,8 @@ export function HowItWorks() {
         <div className="lp-steps">
           <div className="lp-step lp-reveal">
             <div className="lp-step-num">1</div>
-            <div className="lp-step-vis lp-step-pick">
-              <div className="lp-pick-grid">
-                {[
-                  { n: "Wedding", Ic: Heart, on: true },
-                  { n: "New baby", Ic: Baby, on: false },
-                  { n: "Travel", Ic: Plane, on: false },
-                  { n: "Birthday", Ic: Cake, on: false },
-                ].map((o, k) => (
-                  <div className={"lp-pick" + (o.on ? " on" : "")} key={k}>
-                    <span className="lp-pick-ic">
-                      <o.Ic size={16} strokeWidth={1.9} />
-                    </span>
-                    <span className="lp-pick-label">{o.n}</span>
-                    {o.on ? (
-                      <span className="lp-pick-check">
-                        <Check size={11} strokeWidth={3} />
-                      </span>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+            <div className="lp-step-vis">
+              <img src={how1} alt="Choosing Wedding from a grid of occasions" width={521} height={255} loading="lazy" />
             </div>
             <h3>Pick the moment</h3>
             <p>Wedding, a new baby, the trip of a lifetime — tell us what you're celebrating and we set the tone.</p>
@@ -230,21 +189,15 @@ export function HowItWorks() {
           <div className="lp-step lp-reveal">
             <div className="lp-step-num">2</div>
             <div className="lp-step-vis">
-              <div className="lp-step-photos">
-                {[0, 1, 2, 5, 4, 3].map((i) => (
-                  <Ph key={i} i={i} style={{ borderRadius: 6 }} />
-                ))}
-              </div>
+              <img src={how2} alt="Selecting photos to add" width={521} height={255} loading="lazy" />
             </div>
             <h3>Add your photos</h3>
             <p>Drop in a handful or a thousand. We sift out the blurry duplicates and keep the ones that matter.</p>
           </div>
           <div className="lp-step lp-reveal">
             <div className="lp-step-num">3</div>
-            <div className="lp-step-vis" style={{ background: "var(--tk-cobalt-dim)" }}>
-              <div className="lp-step-wand">
-                <MiniBook tone="cobalt" title={"The Good\nDays"} sub="Made for you" coverIdx={3} full={false} style={{ width: 96, height: 116 }} />
-              </div>
+            <div className="lp-step-vis">
+              <img src={how3} alt="A finished hardcover photo book" width={521} height={255} loading="lazy" />
             </div>
             <h3>We design it</h3>
             <p>A complete book appears — cover, layouts, and captions. Hold it in 3-D, tweak anything, then order.</p>
@@ -262,42 +215,85 @@ export function HowItWorks() {
 
 /* ── Showcase: what you'll hold ─────────────────────────────── */
 
+/*
+ * Feature art — small bespoke duotone drawings (raspberry + gold on
+ * white) instead of stock line icons, each one depicting the actual
+ * product detail: a square hardcover with its 12" dimension rule, a
+ * glossy sheet over a matte one, and an open spread with a check.
+ */
+
+const ART_PINK = "var(--tk-raspberry)";
+const ART_GOLD = "var(--tk-gold)";
+
+function ArtHardcover() {
+  return (
+    <svg viewBox="0 0 56 56" aria-hidden="true">
+      <rect x="12" y="7" width="34" height="34" rx="3" fill={ART_PINK} />
+      <rect x="12" y="7" width="6" height="34" rx="2" fill="#000" opacity="0.18" />
+      <rect x="22" y="13" width="18" height="16" rx="1.5" fill="#fff" />
+      <path d="M22 29 l5-5 4 3 4-4 5 6 z" fill={ART_GOLD} />
+      <circle cx="35.5" cy="17.5" r="2" fill={ART_GOLD} />
+      <path d="M12 48.5 H46 M12 46 v5 M46 46 v5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.75" />
+    </svg>
+  );
+}
+
+function ArtFinish() {
+  return (
+    <svg viewBox="0 0 56 56" aria-hidden="true">
+      <defs>
+        <linearGradient id="lp-art-sheen" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.85" />
+          <stop offset="0.45" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect x="7" y="7" width="28" height="28" rx="3" fill="#fff" opacity="0.3" />
+      <rect x="21" y="21" width="28" height="28" rx="3" fill={ART_GOLD} />
+      <rect x="21" y="21" width="28" height="28" rx="3" fill="url(#lp-art-sheen)" />
+      <path d="M27 27 L35 27 L27 35 Z" fill="#fff" opacity="0.6" />
+    </svg>
+  );
+}
+
+function ArtPreview() {
+  return (
+    <svg viewBox="0 0 56 56" aria-hidden="true">
+      <path d="M5 14 Q16 10 28 14 V44 Q16 40 5 44 Z" fill="#fff" />
+      <path d="M51 14 Q40 10 28 14 V44 Q40 40 51 44 Z" fill="#fff" opacity="0.82" />
+      <rect x="9" y="18" width="15" height="11" rx="1.5" fill={ART_PINK} />
+      <rect x="32" y="18" width="15" height="6" rx="1.5" fill={ART_GOLD} />
+      <rect x="32" y="27" width="15" height="6" rx="1.5" fill={ART_PINK} opacity="0.55" />
+      <circle cx="44" cy="44" r="8" fill={ART_PINK} stroke="#1c181a" strokeOpacity="0.25" />
+      <path d="M40.3 44.2 l2.6 2.6 l5-5.2" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function Showcase() {
-  const quality = [
-    { Icon: BookOpen, h: "True lay-flat binding", p: "Pages open completely flat, so a panorama spreads across the spine without losing a thing." },
-    { Icon: Leaf, h: "Archival, museum-grade paper", p: "Thick, lightly textured pages that resist fading for 100+ years. Made to be handled." },
-    { Icon: Sparkles, h: "Hand-checked before it ships", p: "A real person reviews every book for color and binding. If it isn't right, we reprint it free." },
+  const features = [
+    { Art: ArtHardcover, h: "Big 12×12 hardcover", p: "Large square pages that give your photos the space they deserve." },
+    { Art: ArtFinish, h: "Glossy or matte, your choice", p: "Pick the finish that feels right for your memories." },
+    { Art: ArtPreview, h: "What you see is what you get", p: "Preview every page before you order. No surprises, just your book." },
   ];
   return (
-    <section className="lp-showcase lp-section" id="book">
+    <section className="lp-showcase" id="book">
+      <BannerPhoto set={KEEP_PHOTO} />
       <div className="lp-wrap">
-        <div className="lp-showcase-book">
-          <div className="lp-show-big floaty">
-            <MiniBook tone="ivory" title={"The Day We\nSaid Yes"} sub="June 2026" coverLabel="the first kiss" coverIdx={2} style={{ width: "100%", height: "100%" }} />
-          </div>
-          <div className="lp-show-badge lp-reveal">
-            <Award size={22} strokeWidth={1.8} />
-            <div>
-              <b>Premium</b>
-              <span>8×8" hardcover</span>
-            </div>
-          </div>
-        </div>
-        <div>
+        <div className="lp-showcase-copy">
           <div className="lp-eyebrow">What you'll hold</div>
           <h2 className="lp-h2">
             Not a print-out.
-            <br />A real keepsake.
+            <br />A <span className="lp-mark">real keepsake.</span>
           </h2>
           <p className="lp-lede">
-            Beautiful quality, for beautiful moments. Every TrueKeep book is printed and bound to last a lifetime — the
-            kind of thing that gets passed down, not deleted.
+            A big, beautiful hardcover book you can hold in your hands, share with family, and keep for years. Not lost
+            in a phone.
           </p>
           <div className="lp-quality">
-            {quality.map((q, k) => (
-              <div className="lp-qrow lp-reveal" key={k}>
-                <div className="lp-qicon">
-                  <q.Icon size={22} strokeWidth={1.8} />
+            {features.map((q) => (
+              <div className="lp-qrow lp-reveal" key={q.h}>
+                <div className="lp-qart">
+                  <q.Art />
                 </div>
                 <div>
                   <h4>{q.h}</h4>
@@ -314,22 +310,19 @@ export function Showcase() {
 
 /* ── Occasions ──────────────────────────────────────────────── */
 
-/** Card → builder deep link: ?occasion pre-selects the quiz answer. */
-const OCC_CARDS: Array<{
-  tone: BookTone;
-  title: string;
-  sub: string;
-  label: string;
-  idx: number;
-  name: string;
-  blurb: string;
-  occasion: string;
-}> = [
-  { tone: "blush", title: "Our\nWedding", sub: "The vows", label: "first look", idx: 2, name: "Weddings", blurb: "The day, start to last dance", occasion: "wedding" },
-  { tone: "ivory", title: "Hello,\nBaby", sub: "Year one", label: "tiny toes", idx: 6, name: "New baby", blurb: "First smiles to first steps", occasion: "baby" },
-  { tone: "cobalt", title: "The Long\nWay", sub: "On the road", label: "sunset point", idx: 5, name: "Travel", blurb: "Every place you wandered", occasion: "travel" },
-  { tone: "blush", title: "What a\nDay", sub: "Celebrate", label: "make a wish", idx: 1, name: "Birthdays", blurb: "Parties, grads & big days", occasion: "birthday" },
-  { tone: "ivory", title: "The Good\nDays", sub: "A bit of everything", label: "sunday", idx: 4, name: "Everything", blurb: "A year of ordinary magic", occasion: "mix" },
+/**
+ * Card → builder deep link: ?occasion pre-selects the quiz answer. The
+ * builder knows five occasions (wedding/baby/travel/birthday/mix), so the
+ * newer book types map onto the nearest one until they get their own.
+ */
+const OCC_CARDS: Array<{ img: string; alt: string; name: string; blurb: string; occasion: string }> = [
+  { img: bookWedding, alt: "Wedding photo book for Mubeen & Farah", name: "Weddings", blurb: "The day, start to last dance", occasion: "wedding" },
+  { img: bookBaby, alt: "Baby photo book titled Little Feet, First Journey", name: "New baby", blurb: "First smiles to first steps", occasion: "baby" },
+  { img: bookBirthday, alt: "First birthday photo book open to a cake spread", name: "Birthdays", blurb: "Parties, cakes & big days", occasion: "birthday" },
+  { img: bookSchool, alt: "First day of school photo book", name: "School days", blurb: "First days and proud milestones", occasion: "mix" },
+  { img: bookUmrah, alt: "Umrah photo book with a family at the Kaaba", name: "Umrah & Hajj", blurb: "A journey of a lifetime", occasion: "travel" },
+  { img: bookTravel, alt: "Travel photo book titled No Signal, Just Kumrat", name: "Travel", blurb: "Every place you wandered", occasion: "travel" },
+  { img: bookAnniversary, alt: "Pink anniversary book titled You & Me, our love story", name: "Anniversaries", blurb: "Your story, year after year", occasion: "wedding" },
 ];
 
 export function Occasions() {
@@ -345,9 +338,11 @@ export function Occasions() {
       </div>
       <div className="lp-wrap">
         <div className="lp-occ-grid">
-          {OCC_CARDS.map((o, k) => (
-            <Link href={`${BUILDER_PATH}?occasion=${o.occasion}`} className="lp-occ-card lp-reveal" key={k}>
-              <MiniBook tone={o.tone} title={o.title} sub={o.sub} coverLabel={o.label} coverIdx={o.idx} className="lp-occ-book" />
+          {OCC_CARDS.map((o) => (
+            <Link href={`${BUILDER_PATH}?occasion=${o.occasion}`} className="lp-occ-card lp-reveal" key={o.name}>
+              <div className="lp-occ-img">
+                <img src={o.img} alt={o.alt} width={720} height={720} loading="lazy" decoding="async" />
+              </div>
               <h4>{o.name}</h4>
               <p>{o.blurb}</p>
             </Link>
@@ -410,6 +405,8 @@ export function Proof() {
 export function FinalCTA() {
   return (
     <section className="lp-cta">
+      {/* Banner 03 as a barely-there texture under the glows */}
+      <BannerPhoto set={CTA_PHOTO} className="lp-cta-photo" />
       <div className="lp-cta-glow"></div>
       <div className="lp-cta-glow gold"></div>
       <div className="lp-wrap">
@@ -417,12 +414,8 @@ export function FinalCTA() {
           <div className="lp-eyebrow center" style={{ color: "var(--tk-gold)", justifyContent: "center" }}>
             Your story is already written
           </div>
-          <h2>
-            Let's get it off your phone
-            <br />
-            and into your hands.
-          </h2>
-          <p>Start free — design your whole book in minutes and only pay when you love it.</p>
+          <h2>Don’t let your best photos get lost.</h2>
+          <p>Start for free. We design your whole book, you make it yours, and you only pay when you love it.</p>
           <div className="lp-cta-actions">
             <Link href={BUILDER_PATH} className="lp-btn lp-btn-gold lp-btn-lg">
               Free my memories <ArrowRight size={18} />
@@ -431,7 +424,7 @@ export function FinalCTA() {
               See a sample book
             </Link>
           </div>
-          <div className="lp-cta-sub">No credit card · Designed in ~1 minute · Ships in 3–5 days</div>
+          <div className="lp-cta-sub">Free to start · No design skills needed · See every page before you pay</div>
         </div>
       </div>
     </section>
