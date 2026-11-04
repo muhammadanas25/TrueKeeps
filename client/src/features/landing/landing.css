@@ -133,26 +133,6 @@
 .lp-occ-card h4 { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 0 0 4px; }
 .lp-occ-card p { font-size: 13px; color: var(--tk-gunmetal-light); margin: 0; padding: 0 6px; }
 
-/* ── proof / testimonials ───────────────────── */
-.lp-proof { background: var(--tk-cobalt); color: #fff; position: relative; overflow: hidden; }
-.lp-proof::before { content: ''; position: absolute; top: -30%; right: -10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(245,213,71,0.18), transparent 65%); }
-.lp-proof-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; position: relative; }
-.lp-proof-head .lp-eyebrow { color: rgba(255,255,255,0.85); }
-.lp-proof-head .lp-eyebrow::before { background: var(--tk-gold); }
-.lp-proof-head h2 { color: #fff; }
-.lp-proof-rating { text-align: right; }
-.lp-proof-rating .big { font-family: var(--font-display); font-weight: 600; font-size: 40px; line-height: 1; }
-.lp-proof-rating .stars { color: var(--tk-gold); font-size: 18px; letter-spacing: 2px; }
-.lp-proof-rating span { display: block; font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 4px; }
-.lp-tcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 50px; position: relative; }
-.lp-tcard { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; padding: 28px 26px; backdrop-filter: blur(4px); }
-.lp-tcard .stars { color: var(--tk-gold); font-size: 15px; letter-spacing: 2px; }
-.lp-tcard blockquote { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.4; letter-spacing: -0.01em; margin: 14px 0 22px; color: #fff; }
-.lp-tcard-who { display: flex; align-items: center; gap: 12px; }
-.lp-tcard-av { width: 40px; height: 40px; border-radius: 50%; flex: none; }
-.lp-tcard-who b { display: block; font-size: 14px; font-weight: 600; }
-.lp-tcard-who span { display: block; font-size: 12.5px; color: rgba(255,255,255,0.72); }
-
 /* ── final CTA ──────────────────────────────── */
 .lp-cta { background: var(--tk-gunmetal); color: #fff; position: relative; overflow: hidden; }
 /* Banner 03 at ~7% under the glows: a texture, not a picture */
@@ -174,6 +154,12 @@
 .lp-fcol a { display: block; font-size: 14px; color: rgba(255,255,255,0.72); text-decoration: none; margin-bottom: 11px; transition: color .15s; }
 .lp-fcol a:hover { color: var(--tk-gold); }
 .lp-footer-bar { border-top: 1px solid rgba(255,255,255,0.1); margin-top: 48px; padding-top: 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.45); }
+
+/* ── swipe rails + sticky CTA (activated on phones below) ─ */
+.lp-rail-dots { display: flex; justify-content: center; gap: 7px; margin-top: 6px; }
+.lp-rail-dots span { width: 6px; height: 6px; border-radius: 50%; background: rgba(60,60,59,0.22); transition: background .2s, transform .2s; }
+.lp-rail-dots span.on { background: var(--tk-cobalt); transform: scale(1.3); }
+.lp-sticky-cta { display: none; }
 
 /* ── reveal-on-scroll ───────────────────────── */
 .lp-reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s cubic-bezier(0,0,0.2,1), transform .7s cubic-bezier(0,0,0.2,1); }
@@ -215,10 +201,52 @@
 /* ── responsive ─────────────────────────────── */
 @media (max-width: 940px) {
   .lp-steps { grid-template-columns: 1fr; }
-  .lp-tcards { grid-template-columns: 1fr; }
   .lp-occ-card { flex-basis: calc((100% - 20px) / 2); }
   .lp-footer .lp-wrap { grid-template-columns: 1fr 1fr; }
   .lp-nav-links { display: none; }
+}
+/* Phones: shorter page and thumb-sized targets. Steps and occasions become
+   native scroll-snap rails; the next card peeks in to signal there is more.
+   Negative margins let a rail bleed to the screen edges past the 16px gutter. */
+@media (max-width: 720px) {
+  .lp-wrap { width: calc(100% - 32px); }
+  .lp-nav { height: 60px; }
+  .lp-nav-signin { min-height: 44px; padding: 0 4px; }
+  /* grow the tap area, not the pill */
+  .lp-nav-cta .lp-btn-sm { position: relative; }
+  .lp-nav-cta .lp-btn-sm::after { content: ''; position: absolute; inset: -5px 0; }
+  .lp-desk-only { display: none; }
+  .lp-h2 { text-wrap: balance; }
+
+  .lp-trust .lp-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; padding: 18px 0; }
+  .lp-trust-item { align-items: flex-start; font-size: 13px; line-height: 1.35; gap: 8px; }
+  .lp-trust-item svg { flex: none; }
+  .lp-trust-rule { display: none; }
+
+  .lp-rail { display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 12px; margin: 34px -16px 0; padding: 4px 16px 14px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
+  .lp-rail::-webkit-scrollbar { display: none; }
+  .lp-rail:focus-visible { outline: 2px solid var(--tk-cobalt); outline-offset: -2px; }
+  .lp-rail > * { scroll-snap-align: start; }
+  /* lifting on hover would clip inside the scroller and sticks on touch */
+  .lp-step:hover, .lp-occ-card:hover { transform: none; box-shadow: none; }
+  .lp-step { flex: 0 0 84%; padding: 16px 16px 20px; }
+  .lp-step-num { top: 8px; right: 8px; }
+  .lp-step-vis { margin-bottom: 16px; }
+  /* the sticky bar is already showing here; two identical buttons would stack */
+  .lp-steps-cta { display: none; }
+  .lp-occ-card { flex: 0 0 62%; padding: 8px 8px 16px; }
+
+  .lp-fcol a { margin-bottom: 0; padding: 12px 0; }
+  .lp-footer-bar { grid-column: 1 / -1; margin-top: 24px; }
+  .lp-footer-bar a { display: inline-block; padding: 13px 0; }
+
+  /* slides up once the hero button has scrolled away (StickyCTA) */
+  .lp-sticky-cta { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(250,250,247,0.88); backdrop-filter: blur(14px); border-top: 1px solid rgba(216,213,197,0.7); transform: translateY(100%); visibility: hidden; transition: transform .25s cubic-bezier(0,0,0.2,1), visibility .25s; }
+  .lp-sticky-cta.on { transform: none; visibility: visible; }
+  .lp-sticky-cta .lp-btn { width: 100%; box-shadow: none; }
+}
+@media (max-width: 720px) and (prefers-reduced-motion: reduce) {
+  .lp-sticky-cta { transition: none; }
 }
 /* Phones: banners stack — portrait photo on top, copy below on a ground
    sampled from the photo so the seam disappears under a short fade. */
@@ -237,12 +265,4 @@
   .lp-hero .lp-wrap, .lp-showcase .lp-wrap { width: calc(100% - 32px); padding: 8px 0 56px; }
   .lp-hero-actions .lp-btn { width: 100%; }
   .lp-quality { padding: 4px 18px; }
-}
-@media (max-width: 520px) {
-  .lp-wrap { width: calc(100% - 32px); }
-  .lp-occ-grid { gap: 12px; }
-  .lp-occ-card { flex-basis: calc((100% - 12px) / 2); padding: 8px 8px 14px; }
-  .lp-occ-card h4 { font-size: 15px; }
-  .lp-trust .lp-wrap { justify-content: center; }
-  .lp-trust-rule { display: none; }
 }

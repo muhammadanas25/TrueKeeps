@@ -3,7 +3,7 @@
  *
  * Composition ported verbatim from the updated prototype shell
  * (`~/Downloads/landing.jsx`): Nav → Hero → TrustStrip → HowItWorks →
- * Showcase → Occasions → Proof → FinalCTA → Footer, with
+ * Showcase → Occasions → FinalCTA → Footer (plus the phone-only StickyCTA), with
  * reveal-on-scroll handled by useScrollReveal (see that hook for the
  * motion-gating rationale).
  *
@@ -13,7 +13,7 @@
 
 import "./landing.css";
 import { useScrollReveal } from "./use-scroll-reveal";
-import { FinalCTA, Footer, Hero, HowItWorks, Nav, Occasions, Proof, Showcase, TrustStrip } from "./sections";
+import { FinalCTA, Footer, Hero, HowItWorks, Nav, Occasions, Showcase, StickyCTA, TrustStrip } from "./sections";
 
 export default function LandingPage() {
   useScrollReveal();
@@ -25,9 +25,9 @@ export default function LandingPage() {
       <HowItWorks />
       <Showcase />
       <Occasions />
-      <Proof />
       <FinalCTA />
       <Footer />
+      <StickyCTA />
     </div>
   );
 }

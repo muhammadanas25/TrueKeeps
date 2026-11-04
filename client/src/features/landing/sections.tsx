@@ -1,6 +1,6 @@
 /**
  * Landing sections — Nav, Hero, TrustStrip, HowItWorks, Showcase,
- * Occasions, Proof (testimonials), FinalCTA, Footer.
+ * Occasions, FinalCTA, Footer, plus the phone-only StickyCTA.
  *
  * Ported from the updated design-system prototypes
  * (`~/Downloads/landing.jsx` composition + `landing_page/hero.jsx` /
@@ -14,12 +14,16 @@
  *  - imagery is real product photography from "Website Images/" and
  *    "Website Assets/", pre-sized to WebP in ./assets (srcset picks
  *    1280w vs 2400w; phones get the designer's square crops, 800w/1200w)
+ *  - no reviews, ratings or testimonials until real ones exist (PRODUCT.md,
+ *    "Evidence on Hand"); the prototype's placeholder Proof section is gone
+ *  - phones (≤720px): How it works and Occasions become swipe rails
+ *    (SwipeRail) to keep the page short; desktop layout is untouched
  */
 
-import { useEffect, useState } from "react";
+import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { ArrowRight, Leaf, ShieldCheck, Star, Truck } from "lucide-react";
-import { TKLogo, tintFor } from "./primitives";
+import { ArrowRight, Eye, Leaf, ShieldCheck, Truck } from "lucide-react";
+import { TKLogo } from "./primitives";
 import heroSm from "./assets/hero-1280.webp";
 import heroLg from "./assets/hero-2400.webp";
 import heroM800 from "./assets/hero-mobile-800.webp";
@@ -65,7 +69,6 @@ export function Nav() {
           <a href="#how">How it works</a>
           <a href="#book">The book</a>
           <a href="#occasions">Occasions</a>
-          <a href="#reviews">Reviews</a>
         </div>
         <div className="lp-nav-cta">
           <AccountMenu signInClassName="lp-nav-signin" />
@@ -141,7 +144,7 @@ export function TrustStrip() {
     { icon: Truck, text: <span><b>Free shipping</b> from {formatPKR(PRICE_LIST.freeShippingFromMinor)}</span> },
     { icon: Leaf, text: <span><b>Archival</b>, FSC-certified paper</span> },
     { icon: ShieldCheck, text: <span><b>Love-it</b> guarantee</span> },
-    { icon: Star, text: <span><b>4.9/5</b> from 12,000 reviews</span> },
+    { icon: Eye, text: <span><b>See every page</b> before you pay</span> },
   ];
   return (
     <div className="lp-trust">
@@ -159,6 +162,69 @@ export function TrustStrip() {
   );
 }
 
+/* ── Swipe rail ─────────────────────────────────────────────── */
+
+/**
+ * SwipeRail — a row that CSS turns into a native scroll-snap rail on phones
+ * (`.lp-rail` in landing.css) and leaves as the normal grid on desktop.
+ *
+ * Scrolling and snapping stay entirely native, so this only adds the things
+ * CSS can't do:
+ *  1. Detect real overflow (ResizeObserver), so dots and the keyboard tab stop
+ *     exist only while the row actually scrolls, never on desktop.
+ *  2. Map scroll progress onto a dot: round(scrollLeft / maxScroll × last).
+ *     Progress rather than nearest-card, because on a rail showing more than
+ *     one card the last few cards can never reach the left edge.
+ *
+ * The dots are a decorative position cue (aria-hidden, not controls); people
+ * move the rail by swiping or by keyboard scroll.
+ */
+function SwipeRail({ className, label, children }: { className: string; label: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  const [active, setActive] = useState(0);
+  const count = Children.count(children);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setOverflowing(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max > 0) setActive(Math.round((el.scrollLeft / max) * (count - 1)));
+  };
+
+  return (
+    <>
+      <div
+        ref={ref}
+        className={"lp-rail " + className}
+        role="group"
+        aria-label={label}
+        tabIndex={overflowing ? 0 : undefined}
+        onScroll={onScroll}
+      >
+        {children}
+      </div>
+      {overflowing ? (
+        <div className="lp-rail-dots" aria-hidden="true">
+          {Array.from({ length: count }, (_, k) => (
+            <span key={k} className={k === active ? "on" : undefined} />
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /* ── How it works ───────────────────────────────────────────── */
 
 export function HowItWorks() {
@@ -168,8 +234,7 @@ export function HowItWorks() {
         <div className="lp-eyebrow center">How it works</div>
         <h2 className="lp-h2">
           From camera roll to keepsake
-          <br />
-          in about a minute.
+          <br className="lp-desk-only" /> in about a minute.
         </h2>
         <p className="lp-lede">
           No blank canvas, no design skills. Answer one question, add your photos, and we lay out the whole book for
@@ -177,7 +242,7 @@ export function HowItWorks() {
         </p>
       </div>
       <div className="lp-wrap">
-        <div className="lp-steps">
+        <SwipeRail className="lp-steps" label="How it works, three steps">
           <div className="lp-step lp-reveal">
             <div className="lp-step-num">1</div>
             <div className="lp-step-vis">
@@ -202,7 +267,7 @@ export function HowItWorks() {
             <h3>We design it</h3>
             <p>A complete book appears — cover, layouts, and captions. Hold it in 3-D, tweak anything, then order.</p>
           </div>
-        </div>
+        </SwipeRail>
         <div className="lp-steps-cta">
           <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent lp-btn-lg">
             Make my book <ArrowRight size={18} />
@@ -337,7 +402,7 @@ export function Occasions() {
         </h2>
       </div>
       <div className="lp-wrap">
-        <div className="lp-occ-grid">
+        <SwipeRail className="lp-occ-grid" label="Book types">
           {OCC_CARDS.map((o) => (
             <Link href={`${BUILDER_PATH}?occasion=${o.occasion}`} className="lp-occ-card lp-reveal" key={o.name}>
               <div className="lp-occ-img">
@@ -347,54 +412,7 @@ export function Occasions() {
               <p>{o.blurb}</p>
             </Link>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── Proof / testimonials ───────────────────────────────────── */
-
-const REVIEWS = [
-  { n: 5, q: "I cried opening it. It felt like holding the whole year in my hands.", who: "Maya & Sam", role: "Wedding album", av: 0 },
-  { n: 5, q: "I dreaded designing it. Turns out I didn't have to — it was just done, and gorgeous.", who: "Priya R.", role: "Baby's first year", av: 2 },
-  { n: 5, q: "The paper, the binding — it looks like something from a bookstore. Worth every penny.", who: "James O.", role: "Iceland trip", av: 6 },
-];
-
-export function Proof() {
-  return (
-    <section className="lp-proof lp-section" id="reviews">
-      <div className="lp-wrap">
-        <div className="lp-proof-head">
-          <div>
-            <div className="lp-eyebrow">Loved by families</div>
-            <h2 className="lp-h2">
-              The part that surprises
-              <br />
-              people most: it's easy.
-            </h2>
-          </div>
-          <div className="lp-proof-rating">
-            <div className="big">4.9</div>
-            <div className="stars">★★★★★</div>
-            <span>12,000+ verified reviews</span>
-          </div>
-        </div>
-        <div className="lp-tcards">
-          {REVIEWS.map((r, k) => (
-            <div className="lp-tcard lp-reveal" key={k}>
-              <div className="stars">{"★★★★★".slice(0, r.n)}</div>
-              <blockquote>“{r.q}”</blockquote>
-              <div className="lp-tcard-who">
-                <div className="lp-tcard-av" style={{ background: tintFor(r.av) }}></div>
-                <div>
-                  <b>{r.who}</b>
-                  <span>{r.role}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        </SwipeRail>
       </div>
     </section>
   );
@@ -431,12 +449,54 @@ export function FinalCTA() {
   );
 }
 
+/* ── Sticky CTA (phones) ────────────────────────────────────── */
+
+/**
+ * StickyCTA — keeps "Make my book" in thumb reach on phones (landing.css hides
+ * it above 720px). Shown only between the hero button leaving the screen and
+ * the final CTA arriving, so it never duplicates a button already in view and
+ * never sits on top of the footer.
+ *
+ * Both checks treat "scrolled past" as well as "visible" so the state stays
+ * right after a reload partway down the page. The hidden state uses
+ * `visibility`, which also takes the link out of the tab order.
+ */
+export function StickyCTA() {
+  const [pastHero, setPastHero] = useState(false);
+  const [atEnd, setAtEnd] = useState(false);
+
+  useEffect(() => {
+    const hero = document.querySelector(".lp-hero-actions");
+    const end = document.querySelector(".lp-cta");
+    if (!hero || !end || !("IntersectionObserver" in window)) return;
+    const heroIO = new IntersectionObserver(
+      ([e]) => setPastHero(!e.isIntersecting && e.boundingClientRect.top < 0),
+      { rootMargin: "-60px 0px 0px 0px" }, // the sticky nav covers the top 60px
+    );
+    const endIO = new IntersectionObserver(([e]) => setAtEnd(e.isIntersecting || e.boundingClientRect.top < 0));
+    heroIO.observe(hero);
+    endIO.observe(end);
+    return () => {
+      heroIO.disconnect();
+      endIO.disconnect();
+    };
+  }, []);
+
+  return (
+    <div className={"lp-sticky-cta" + (pastHero && !atEnd ? " on" : "")}>
+      <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent">
+        Make my book <ArrowRight size={18} />
+      </Link>
+    </div>
+  );
+}
+
 /* ── Footer ─────────────────────────────────────────────────── */
 
 export function Footer() {
   const cols = [
     { h: "Product", links: ["Photo books", "Wedding albums", "Baby books", "Travel books", "Gift cards"] },
-    { h: "Company", links: ["Our story", "Quality promise", "Reviews", "Careers"] },
+    { h: "Company", links: ["Our story", "Quality promise", "Careers"] },
     { h: "Support", links: ["Help center", "Shipping", "Track order", "Contact us"] },
   ];
   return (
