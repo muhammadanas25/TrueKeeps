@@ -61,9 +61,24 @@ export function originCheck(req: Request, res: Response, next: NextFunction) {
   return hasCookie ? res.status(403).json({ error: "Missing origin" }) : next();
 }
 
+/**
+ * Send www visitors to the main address with a permanent redirect.
+ *
+ * Railway serves www and the bare domain as two separate sites and has no
+ * redirect setting. Without this, www would be a duplicate of every page for
+ * search engines, and sign-in cookies set on one address would not apply on
+ * the other. The target is always our own APP_URL, so a forged Host header
+ * cannot turn this into a redirect to someone else's site.
+ */
+export function wwwRedirect(req: Request, res: Response, next: NextFunction) {
+  if (req.hostname !== `www.${new URL(config.appUrl).hostname}`) return next();
+  res.redirect(301, config.appUrl + req.originalUrl);
+}
+
 export function applySecurity(app: Express) {
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
+  app.use(wwwRedirect);
 
   const mediaOrigin = config.s3.publicBaseUrl ? new URL(config.s3.publicBaseUrl).origin : null;
 
@@ -84,7 +99,7 @@ export function applySecurity(app: Express) {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"],
-        // Archivo via Google Fonts, Clash Display via Fontshare (index.css)
+        // Figtree/Archivo via Google Fonts, Clash Display via Fontshare (index.html)
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://api.fontshare.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.fontshare.com", "data:"],
         imgSrc: ["'self'", "data:", "blob:", "https:", ...(mediaOrigin ? [mediaOrigin] : [])],

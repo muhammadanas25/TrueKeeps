@@ -1,21 +1,31 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+/**
+ * NotFound — shown for any unknown URL. The server sends a real 404 status with
+ * this page (server/vite.ts), so search engines drop the URL while a person who
+ * followed a bad link still gets a way forward.
+ */
+
+import { Link } from "wouter";
+import { BUILDER_PATH, Footer, Nav } from "@/features/landing/sections";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
+    <div className="lp lp-page">
+      <Nav />
+      <main className="lp-wrap" style={{ minHeight: "50vh" }}>
+        <div className="lp-page-head">
+          <h1>We couldn't find that page</h1>
+          <p className="lp-lede">The link may be old or mistyped. Your books and photos are safe.</p>
+          <div className="lp-hero-actions">
+            <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent">
+              Make my book
+            </Link>
+            <Link href="/photo-books" className="lp-btn lp-btn-ghost">
+              See photo books
+            </Link>
           </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }

@@ -7,8 +7,8 @@
  * `landing_page/sections.jsx`), converted to typed TSX:
  *  - `window.lucide` icon lookups → static lucide-react imports
  *  - prototype `<a href="../book_builder/...">` CTAs → wouter <Link>
- *    into the in-app builder at /wizard (occasion cards deep-link with
- *    ?occasion=<id> so the quiz pre-selects the moment)
+ *    into the in-app builder at /wizard; occasion cards go to their
+ *    /photo-books/<slug> page, which is what search engines can index
  *  - Hero + Showcase copy comes from "Website Copywriting.docx"
  *    (Oct 2026); the rest is still the prototype copy
  *  - imagery is real product photography from "Website Images/" and
@@ -16,6 +16,8 @@
  *    1280w vs 2400w; phones get the designer's square crops, 800w/1200w)
  *  - no reviews, ratings or testimonials until real ones exist (PRODUCT.md,
  *    "Evidence on Hand"); the prototype's placeholder Proof section is gone
+ *  - prerendered at build time (scripts/prerender.mjs): anything touching the
+ *    browser must stay inside an effect
  *  - phones (≤720px): How it works and Occasions become swipe rails
  *    (SwipeRail) to keep the page short; desktop layout is untouched
  */
@@ -24,6 +26,7 @@ import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Eye, Leaf, ShieldCheck, Truck } from "lucide-react";
 import { TKLogo } from "./primitives";
+import { BOOK_IMAGES } from "./book-images";
 import heroSm from "./assets/hero-1280.webp";
 import heroLg from "./assets/hero-2400.webp";
 import heroM800 from "./assets/hero-mobile-800.webp";
@@ -39,18 +42,12 @@ import ctaM1200 from "./assets/cta-mobile-1200.webp";
 import how1 from "./assets/how-1.webp";
 import how2 from "./assets/how-2.webp";
 import how3 from "./assets/how-3.webp";
-import bookWedding from "./assets/book-wedding.webp";
-import bookBaby from "./assets/book-baby.webp";
-import bookBirthday from "./assets/book-birthday.webp";
-import bookSchool from "./assets/book-school.webp";
-import bookUmrah from "./assets/book-umrah.webp";
-import bookTravel from "./assets/book-travel.webp";
-import bookAnniversary from "./assets/book-anniversary.webp";
 import { AccountMenu } from "@/features/auth/AccountMenu";
 import { formatPKR, PRICE_LIST } from "@shared/pricing";
+import { BOOK_TYPES, PRICE_SUMMARY, SITE } from "@shared/site";
 
 /** Route the marketing CTAs land on — the quiz-first book builder. */
-const BUILDER_PATH = "/wizard";
+export const BUILDER_PATH = "/wizard";
 
 /* ── Nav ────────────────────────────────────────────────────── */
 
@@ -64,11 +61,15 @@ export function Nav() {
   return (
     <nav className={"lp-nav" + (scrolled ? " scrolled" : "")}>
       <div className="lp-wrap">
-        <TKLogo size={23} />
+        <Link href="/" aria-label={`${SITE.name} home`}>
+          <TKLogo size={23} />
+        </Link>
         <div className="lp-nav-links">
-          <a href="#how">How it works</a>
-          <a href="#book">The book</a>
-          <a href="#occasions">Occasions</a>
+          {/* full paths: the nav also appears on /photo-books pages */}
+          <a href="/#how">How it works</a>
+          <a href="/#book">The book</a>
+          <a href="/#occasions">Occasions</a>
+          <Link href="/photo-books">Prices</Link>
         </div>
         <div className="lp-nav-cta">
           <AccountMenu signInClassName="lp-nav-signin" />
@@ -96,7 +97,7 @@ const CTA_PHOTO: BannerSet = { sm: ctaSm, lg: ctaLg, m800: ctaM800, m1200: ctaM1
  * designer-supplied square phone crop (800w/1200w, picked by DPR).
  * `eager` for the hero (LCP); everything else lazy-loads.
  */
-function BannerPhoto({ set, eager, className }: { set: BannerSet; eager?: boolean; className?: string }) {
+function BannerPhoto({ set, eager, className, alt = "" }: { set: BannerSet; eager?: boolean; className?: string; alt?: string }) {
   return (
     <picture className={"lp-banner-photo" + (className ? " " + className : "")}>
       <source media="(max-width: 720px)" srcSet={`${set.m800} 800w, ${set.m1200} 1200w`} sizes="100vw" />
@@ -104,7 +105,7 @@ function BannerPhoto({ set, eager, className }: { set: BannerSet; eager?: boolea
         src={set.sm}
         srcSet={`${set.sm} 1280w, ${set.lg} 2400w`}
         sizes="100vw"
-        alt=""
+        alt={alt}
         loading={eager ? "eager" : "lazy"}
         // React 18 only accepts the lowercase DOM attribute
         {...(eager ? { fetchpriority: "high" } : {})}
@@ -119,7 +120,7 @@ function BannerPhoto({ set, eager, className }: { set: BannerSet; eager?: boolea
 export function Hero() {
   return (
     <header className="lp-hero">
-      <BannerPhoto set={HERO_PHOTO} eager />
+      <BannerPhoto set={HERO_PHOTO} eager alt="Printed photo book on a table, with a family photo on the cover" />
       <div className="lp-wrap">
         <div className="lp-hero-copy">
           <h1>Your best moments deserve more than a phone.</h1>
@@ -342,7 +343,7 @@ export function Showcase() {
   ];
   return (
     <section className="lp-showcase" id="book">
-      <BannerPhoto set={KEEP_PHOTO} />
+      <BannerPhoto set={KEEP_PHOTO} alt="A mother and child looking through a printed hardcover photo book of a newborn" />
       <div className="lp-wrap">
         <div className="lp-showcase-copy">
           <div className="lp-eyebrow">What you'll hold</div>
@@ -375,21 +376,6 @@ export function Showcase() {
 
 /* ── Occasions ──────────────────────────────────────────────── */
 
-/**
- * Card → builder deep link: ?occasion pre-selects the quiz answer. The
- * builder knows five occasions (wedding/baby/travel/birthday/mix), so the
- * newer book types map onto the nearest one until they get their own.
- */
-const OCC_CARDS: Array<{ img: string; alt: string; name: string; blurb: string; occasion: string }> = [
-  { img: bookWedding, alt: "Wedding photo book for Mubeen & Farah", name: "Weddings", blurb: "The day, start to last dance", occasion: "wedding" },
-  { img: bookBaby, alt: "Baby photo book titled Little Feet, First Journey", name: "New baby", blurb: "First smiles to first steps", occasion: "baby" },
-  { img: bookBirthday, alt: "First birthday photo book open to a cake spread", name: "Birthdays", blurb: "Parties, cakes & big days", occasion: "birthday" },
-  { img: bookSchool, alt: "First day of school photo book", name: "School days", blurb: "First days and proud milestones", occasion: "mix" },
-  { img: bookUmrah, alt: "Umrah photo book with a family at the Kaaba", name: "Umrah & Hajj", blurb: "A journey of a lifetime", occasion: "travel" },
-  { img: bookTravel, alt: "Travel photo book titled No Signal, Just Kumrat", name: "Travel", blurb: "Every place you wandered", occasion: "travel" },
-  { img: bookAnniversary, alt: "Pink anniversary book titled You & Me, our love story", name: "Anniversaries", blurb: "Your story, year after year", occasion: "wedding" },
-];
-
 export function Occasions() {
   return (
     <section className="lp-section" id="occasions">
@@ -403,16 +389,40 @@ export function Occasions() {
       </div>
       <div className="lp-wrap">
         <SwipeRail className="lp-occ-grid" label="Book types">
-          {OCC_CARDS.map((o) => (
-            <Link href={`${BUILDER_PATH}?occasion=${o.occasion}`} className="lp-occ-card lp-reveal" key={o.name}>
+          {/* crawlable links to each book page; the page's button opens the builder */}
+          {BOOK_TYPES.map((b) => (
+            <Link href={`/photo-books/${b.slug}`} className="lp-occ-card lp-reveal" key={b.slug}>
               <div className="lp-occ-img">
-                <img src={o.img} alt={o.alt} width={720} height={720} loading="lazy" decoding="async" />
+                <img src={BOOK_IMAGES[b.slug]} alt={b.imageAlt} width={720} height={720} loading="lazy" decoding="async" />
               </div>
-              <h4>{o.name}</h4>
-              <p>{o.blurb}</p>
+              <h4>{b.label}</h4>
+              <p>{b.blurb}</p>
             </Link>
           ))}
         </SwipeRail>
+      </div>
+    </section>
+  );
+}
+
+/* ── What, where, how much ───────────────────────────────────── */
+
+/**
+ * The plain answer search engines and AI assistants look for, and that a
+ * first-time visitor wants too: what this is, where it delivers, what it costs.
+ */
+export function PlainFacts() {
+  return (
+    <section className="lp-facts">
+      <div className="lp-wrap lp-center">
+        <h2 className="lp-h2">Photo books, delivered across Pakistan.</h2>
+        <p className="lp-lede">
+          {SITE.name} turns the photos on your phone into a printed 12×12 inch photo book. {PRICE_SUMMARY}, with flat{" "}
+          {formatPKR(PRICE_LIST.shippingMinor)} delivery nationwide, free from {formatPKR(PRICE_LIST.freeShippingFromMinor)}.
+        </p>
+        <Link href="/photo-books" className="lp-facts-link">
+          See prices and questions <ArrowRight size={16} />
+        </Link>
       </div>
     </section>
   );
@@ -494,40 +504,48 @@ export function StickyCTA() {
 /* ── Footer ─────────────────────────────────────────────────── */
 
 export function Footer() {
+  // Only links that lead somewhere real. Add Privacy, Terms and Contact here
+  // once those pages exist.
   const cols = [
-    { h: "Product", links: ["Photo books", "Wedding albums", "Baby books", "Travel books", "Gift cards"] },
-    { h: "Company", links: ["Our story", "Quality promise", "Careers"] },
-    { h: "Support", links: ["Help center", "Shipping", "Track order", "Contact us"] },
+    { h: "Photo books", links: BOOK_TYPES.slice(0, 4).map((b) => ({ label: b.label, href: `/photo-books/${b.slug}` })) },
+    {
+      h: "More",
+      links: [
+        ...BOOK_TYPES.slice(4).map((b) => ({ label: b.label, href: `/photo-books/${b.slug}` })),
+        { label: "Prices", href: "/photo-books" },
+      ],
+    },
+    {
+      h: "Your account",
+      links: [
+        { label: "My books", href: "/books" },
+        { label: "My orders", href: "/orders" },
+        { label: "Account", href: "/account" },
+      ],
+    },
   ];
   return (
     <footer className="lp-footer">
       <div className="lp-wrap">
         <div className="lp-footer-brand">
           <TKLogo size={24} theme="dark" />
-          <p>Beautiful quality, for beautiful moments. Turning the photos on your phone into keepsakes worth holding.</p>
+          <p>{SITE.tagline} Turning the photos on your phone into keepsakes worth holding, delivered across Pakistan.</p>
         </div>
         {cols.map((c, k) => (
           <div className="lp-fcol" key={k}>
             <h5>{c.h}</h5>
             {c.links.map((l) => (
-              <a href="#" key={l}>
-                {l}
-              </a>
+              <Link href={l.href} key={l.href}>
+                {l.label}
+              </Link>
             ))}
           </div>
         ))}
       </div>
       <div className="lp-wrap">
         <div className="lp-footer-bar">
-          <span>© 2026 TrueKeep. All rights reserved.</span>
-          <span style={{ display: "flex", gap: 20 }}>
-            <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
-              Privacy
-            </a>
-            <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
-              Terms
-            </a>
-          </span>
+          {/* the prerendered year can lag a rebuild across New Year */}
+          <span suppressHydrationWarning>© {new Date().getFullYear()} {SITE.name}. All rights reserved.</span>
         </div>
       </div>
     </footer>

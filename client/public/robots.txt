@@ -1,0 +1,8 @@
+# Everyone is welcome, including AI assistants. Private pages are kept out of
+# results by a noindex header, which crawlers can only see if they may fetch
+# the page, so those pages are deliberately not listed as Disallow here.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://thetruekeeps.com/sitemap.xml
