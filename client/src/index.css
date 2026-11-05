@@ -14,52 +14,144 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── v1 (legacy) variables ─────────────────────────────── */
 :root {
-  --background: hsl(0, 0%, 98%);
-  --foreground: hsl(0, 0%, 23%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(0, 0%, 23%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(0, 0%, 23%);
-  --primary: hsl(238, 91%, 26%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(332, 58%, 56%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(0, 0%, 96%);
-  --muted-foreground: hsl(0, 0%, 45%);
-  --accent: hsl(193, 75%, 63%);
-  --accent-foreground: hsl(0, 0%, 23%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(0, 0%, 91%);
-  --input: hsl(0, 0%, 91%);
-  --ring: hsl(238, 91%, 26%);
-  --chart-1: hsl(238, 91%, 26%);
-  --chart-2: hsl(332, 58%, 56%);
-  --chart-3: hsl(193, 75%, 63%);
-  --chart-4: hsl(0, 0%, 23%);
-  --chart-5: hsl(332, 58%, 56%);
-  --sidebar: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(0, 0%, 23%);
-  --sidebar-primary: hsl(238, 91%, 26%);
-  --sidebar-primary-foreground: hsl(0, 0%, 98%);
-  --sidebar-accent: hsl(0, 0%, 96%);
-  --sidebar-accent-foreground: hsl(238, 91%, 26%);
-  --sidebar-border: hsl(0, 0%, 91%);
-  --sidebar-ring: hsl(238, 91%, 26%);
-  --font-sans: 'Figtree', 'Outfit', system-ui, sans-serif;
+  /* ─── Brand kit tokens (v1, Nov 2026) ─────────────────────────────
+     Copied unchanged from Truekeeps-Brand-Kit/colours/tokens.css, which
+     stays the source of truth. Use the role tokens below in components
+     rather than these directly, so a colour's job is stated where it's
+     used. */
+  --tk-brand:#2A1E5C;
+  --tk-accent:#EE4266;
+  --tk-button:#CA3A58;
+  --tk-button-hover:#A5324A;
+  --tk-background:#FBF6F0;
+  --tk-surface:#FFFFFF;
+  --tk-success:#3CBBB1;
+  --tk-border:#C4CBCA;
+  --tk-text:#0A0F0D;
+  --tk-heading:#2A1E5C;
+  --tk-paper:#FBF6F0;
+  --tk-rose-50:#FEF0F3;
+  --tk-rose-100:#FCDDE3;
+  --tk-rose-200:#F9BBC8;
+  --tk-rose-300:#F595A9;
+  --tk-rose-400:#F26C88;
+  --tk-rose-500:#EE4266;
+  --tk-rose-600:#CA3A58;
+  --tk-rose-700:#A5324A;
+  --tk-rose-800:#812A3B;
+  --tk-rose-900:#5C212D;
+  --tk-indigo-50:#EEEDF2;
+  --tk-indigo-100:#D9D6E2;
+  --tk-indigo-200:#B2AEC4;
+  --tk-indigo-300:#8881A4;
+  --tk-indigo-400:#595080;
+  --tk-indigo-500:#2A1E5C;
+  --tk-indigo-600:#251C4F;
+  --tk-indigo-700:#201943;
+  --tk-indigo-800:#1B1736;
+  --tk-indigo-900:#161429;
+  --tk-teal-50:#EFFAF9;
+  --tk-teal-100:#DCF3F1;
+  --tk-teal-200:#B9E7E3;
+  --tk-teal-300:#92D9D3;
+  --tk-teal-400:#67CAC2;
+  --tk-teal-500:#3CBBB1;
+  --tk-teal-600:#349F97;
+  --tk-teal-700:#2C847D;
+  --tk-teal-800:#246862;
+  --tk-teal-900:#1C4D48;
+  --tk-mist-50:#FAFBFB;
+  --tk-mist-100:#F4F6F5;
+  --tk-mist-200:#EAECEC;
+  --tk-mist-300:#DEE2E1;
+  --tk-mist-400:#D1D6D6;
+  --tk-mist-500:#C4CBCA;
+  --tk-mist-600:#A6ADAC;
+  --tk-mist-700:#888F8E;
+  --tk-mist-800:#6B716F;
+  --tk-mist-900:#4D5351;
+  --tk-ink-50:#EBECEC;
+  --tk-ink-100:#D3D4D3;
+  --tk-ink-200:#A7A9A8;
+  --tk-ink-300:#767977;
+  --tk-ink-400:#404442;
+  --tk-ink-500:#0A0F0D;
+  --tk-font-body:'Figtree',system-ui,sans-serif;
+  --tk-radius-button:999px;
+  --tk-radius-card:14px;
+
+  /* ─── Roles ───────────────────────────────────────────────────────
+     Each colour has one job (brand kit, section 3). Contrast figures are
+     against Paper unless stated; 4.5 is the minimum for small text. */
+  --action:            var(--tk-rose-600);   /* the one main button; white text 4.93 */
+  --action-hover:      var(--tk-rose-700);
+  --action-fg:         #FFFFFF;
+  --selected:          var(--tk-indigo-500); /* selected items, step numbers; never a separate blue */
+  --selected-bg:       var(--tk-indigo-50);
+  --selected-tint:     rgba(42, 30, 92, 0.12);
+  --focus:             var(--tk-indigo-500); /* keyboard focus outline; white on dark surfaces */
+  --heading:           var(--tk-indigo-500); /* 13.58 */
+  --highlight:         var(--tk-rose-500);   /* block behind one phrase; big bold white text only */
+  --surface-page:      var(--tk-paper);
+  --surface-card:      #FFFFFF;
+  --surface-quiet:     var(--tk-indigo-50);  /* calm bands */
+  --surface-control:   var(--tk-mist-100);   /* segmented controls, quiet panels */
+  --surface-dark:      var(--tk-indigo-500);
+  --surface-darkest:   var(--tk-indigo-900); /* footer, photo overlays */
+  --on-dark-soft:      var(--tk-indigo-100); /* 12.58 on Indigo 900 */
+  --on-dark-faint:     var(--tk-indigo-200); /* 8.36 on Indigo 900 */
+  --line-input:        var(--tk-mist-700);   /* 3.07; the minimum for a field's visible edge */
+  --success-bg:        var(--tk-teal-100);   /* Teal is for success only */
+  --success-fg:        var(--tk-teal-900);   /* 8.23 on Teal 100 */
+  --success-text:      var(--tk-teal-800);
+  /* The kit has no error or warning colour. Rose 800 on Rose 50 (8.15),
+     always with an icon and words so colour is never the only signal. */
+  --error-bg:          var(--tk-rose-50);
+  --error-fg:          var(--tk-rose-800);
+  --error-line:        var(--tk-rose-200);
+  --offer-bg:          var(--tk-rose-50);    /* "new" and offer badges */
+  --offer-fg:          var(--tk-rose-700);   /* 6.01 on Rose 50 */
+
+  /* ─── shadcn/ui semantic variables ─────────────────────────────── */
+  --background: var(--tk-paper);
+  --foreground: var(--tk-ink-400);
+  --card: #FFFFFF;
+  --card-foreground: var(--tk-ink-400);
+  --popover: #FFFFFF;
+  --popover-foreground: var(--tk-ink-400);
+  --primary: var(--tk-rose-600);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--tk-indigo-50);
+  --secondary-foreground: var(--tk-indigo-500);
+  --muted: var(--tk-mist-100);
+  --muted-foreground: var(--tk-indigo-400);
+  --accent: var(--tk-indigo-50);
+  --accent-foreground: var(--tk-indigo-500);
+  --destructive: var(--tk-rose-800);
+  --destructive-foreground: #FFFFFF;
+  --border: var(--tk-mist-300);
+  --input: var(--tk-mist-700);
+  --ring: var(--tk-indigo-500);
+  --chart-1: var(--tk-indigo-500);
+  --chart-2: var(--tk-rose-500);
+  --chart-3: var(--tk-indigo-300);
+  --chart-4: var(--tk-mist-700);
+  --chart-5: var(--tk-rose-300);
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: var(--tk-ink-400);
+  --sidebar-primary: var(--tk-indigo-500);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--tk-indigo-50);
+  --sidebar-accent-foreground: var(--tk-indigo-500);
+  --sidebar-border: var(--tk-mist-300);
+  --sidebar-ring: var(--tk-indigo-500);
+  --font-sans: 'Figtree', system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
-  --radius: 0.75rem;
+  --radius: 0.875rem;
 
-  /* ─── v2 TrueKeep brand tokens (available globally) ───────────────
-     Source of truth: TrueKeeps Design System v2 (colors_and_type.css,
-     updated bundle namespace TrueKeepsDesignSystem_019dee).
-     Approach: the full primitive + semantic token set lives in :root so
-     the landing (features/landing) and the book builder (features/builder)
-     CSS — both ported from the design-system prototypes — resolve
-     identically inside the app without needing their own token files. */
+  /* ─── Old TrueKeep tokens: being retired by role, removed when unused ─ */
   --tk-cobalt:         #1D46A0;   /* Primary CTA, active states (brand: Cobalt Blue) */
   --tk-cobalt-light:   #2a5cc0;   /* Hover variant */
   --tk-cobalt-dark:    #163880;   /* Deep sections, book spines */
@@ -80,13 +172,16 @@
   --tk-gunmetal-faint: #9b9b97;   /* Placeholder, captions */
   --tk-white:          #FFFFFF;
 
-  /* Semantic foreground/border tokens used by the ported prototype CSS */
-  --color-fg1:         var(--tk-gunmetal);
-  --color-fg2:         var(--tk-gunmetal-light);
-  --color-fg3:         var(--tk-gunmetal-faint);
-  --color-border:      #d8d5c5;
+  /* Text and line colours by role */
+  --color-fg1:         var(--tk-ink-400);    /* body, 9.20; solid stand-in for the kit's Ink at 85% */
+  --color-fg2:         var(--tk-indigo-400); /* soft text, 6.78 */
+  --color-fg3:         var(--tk-mist-800);   /* captions, 4.63 */
+  --color-border:      var(--tk-mist-300);   /* decorative lines */
 
-  --font-display: 'SFC Woster Sans', 'Clash Display', 'Outfit', system-ui, sans-serif;
+  /* One token for the heading face, so changing it is a one-line edit.
+     The kit leaves the heading font undecided; this keeps the wide face the
+     site already uses. Only H1 and H2 use it (plus customers' book covers). */
+  --font-display: 'SFC Woster Sans', 'Clash Display', system-ui, sans-serif;
   --font-body:    'Figtree', 'Archivo', system-ui, sans-serif;
 
   /* Weight / tracking primitives (design-system scale) */
@@ -97,23 +192,23 @@
   --fw-bold: 700;
   --ls-tight: -0.02em;
 
-  /* Radius scale */
+  /* Radius: the kit sets cards at 14px and buttons and badges fully round */
   --radius-sm: 4px;
   --radius-md: 8px;
-  --radius-base: 12px;   /* inputs, small cards */
-  --radius-lg: 16px;     /* standard cards */
-  --radius-xl: 20px;     /* wizard cards, panels */
-  --radius-2xl: 24px;    /* hero mode cards, upload zone */
-  --radius-pill: 9999px; /* buttons, chips */
+  --radius-base: 10px;   /* inputs, small tiles */
+  --radius-lg: 14px;     /* cards */
+  --radius-xl: 14px;     /* panels */
+  --radius-2xl: 14px;    /* dialogs, upload zone */
+  --radius-pill: 9999px; /* buttons, badges */
 
-  /* Elevation scale */
-  --shadow-xs: 0 1px 3px rgba(60, 60, 59, 0.06);
-  --shadow-sm: 0 2px 8px rgba(60, 60, 59, 0.08);
-  --shadow-md: 0 4px 16px rgba(60, 60, 59, 0.10);
-  --shadow-lg: 0 8px 24px rgba(60, 60, 59, 0.12);
-  --shadow-xl: 0 16px 48px rgba(60, 60, 59, 0.14);
-  --shadow-focus: 0 0 0 4px rgba(29, 70, 160, 0.15);
-  --shadow-selected: 0 0 0 4px rgba(29, 70, 160, 0.12);
+  /* Elevation: soft and Indigo-tinted, for things that float */
+  --shadow-xs: 0 1px 3px rgba(42, 30, 92, 0.06);
+  --shadow-sm: 0 2px 8px rgba(42, 30, 92, 0.07);
+  --shadow-md: 0 4px 16px rgba(42, 30, 92, 0.08);
+  --shadow-lg: 0 8px 24px rgba(42, 30, 92, 0.10);
+  --shadow-xl: 0 16px 48px rgba(42, 30, 92, 0.14);
+  --shadow-focus: 0 0 0 4px rgba(42, 30, 92, 0.14);
+  --shadow-selected: 0 0 0 1px var(--selected);
 
   /* Motion tokens */
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
@@ -125,78 +220,17 @@
   --duration-flip: 580ms; /* book page-turn */
 }
 
-/* ─── v2 theme override — activated by .theme-v2 on <body> ─ */
-.theme-v2 {
-  --background: #EBEBD3;
-  --foreground: #3C3C3B;
-  --card: #FFFFFF;
-  --card-foreground: #3C3C3B;
-  --popover: #FFFFFF;
-  --popover-foreground: #3C3C3B;
-  --primary: #1D46A0;
-  --primary-foreground: #FFFFFF;
-  --secondary: #DB3069;
-  --secondary-foreground: #FFFFFF;
-  --muted: #F4F2E8;
-  --muted-foreground: #6b6b69;
-  --accent: #DB3069;
-  --accent-foreground: #FFFFFF;
-  --border: #d8d5c5;
-  --input: #d8d5c5;
-  --ring: #1D46A0;
-  --font-sans: 'Figtree', 'Archivo', system-ui, sans-serif;
-}
-
-.dark {
-  --background: hsl(222, 84%, 5%);
-  --foreground: hsl(210, 40%, 98%);
-  --card: hsl(222, 84%, 8%);
-  --card-foreground: hsl(210, 40%, 98%);
-  --popover: hsl(222, 84%, 8%);
-  --popover-foreground: hsl(210, 40%, 98%);
-  --primary: hsl(243, 75%, 35%);
-  --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(330, 65%, 60%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --muted: hsl(222, 84%, 10%);
-  --muted-foreground: hsl(215, 16%, 65%);
-  --accent: hsl(190, 65%, 70%);
-  --accent-foreground: hsl(222, 84%, 5%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(222, 84%, 15%);
-  --input: hsl(222, 84%, 15%);
-  --ring: hsl(243, 75%, 35%);
-  --sidebar: hsl(222, 84%, 8%);
-  --sidebar-foreground: hsl(210, 40%, 98%);
-  --sidebar-primary: hsl(243, 75%, 35%);
-  --sidebar-primary-foreground: hsl(0, 0%, 98%);
-  --sidebar-accent: hsl(222, 84%, 10%);
-  --sidebar-accent-foreground: hsl(243, 75%, 35%);
-  --sidebar-border: hsl(222, 84%, 15%);
-  --sidebar-ring: hsl(243, 75%, 35%);
-}
-
 @layer base {
   * { @apply border-border; }
   body { @apply font-sans antialiased bg-background text-foreground; }
+  /* A keyboard user always sees where they are; dark surfaces override --focus. */
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 }
 
 @layer utilities {
   /* ── Typography helpers ── */
   .font-display { font-family: var(--font-display); }
   .font-body    { font-family: var(--font-body); }
-
-  /* ── Gradient helpers ── */
-  .gradient-text {
-    background: linear-gradient(135deg, #1D4BA6, #D85365);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .hero-bg {
-    background: linear-gradient(135deg, rgba(29,75,166,0.82), rgba(216,83,101,0.60));
-  }
 
   /* ── Card hover effects ── */
   .theme-card:hover   { transform: translateY(-4px); transition: all 0.3s ease; }
@@ -218,31 +252,4 @@
   .page-flip.flipped { transform: rotateY(-180deg); }
   .page-face         { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
   .page-face-back    { transform: rotateY(180deg); }
-
-  /* ── Upload zone ── */
-  .upload-zone {
-    border: 2px dashed #d8d5c5;
-    transition: border-color 0.2s, background 0.2s;
-  }
-  .upload-zone.active {
-    border-color: #1D4BA6;
-    background: rgba(29, 75, 166, 0.04);
-  }
-
-  /* ── Option chip / pill ── */
-  .option-chip {
-    @apply px-4 py-2 rounded-full border border-border text-sm font-medium cursor-pointer transition-all select-none;
-  }
-  .option-chip.selected {
-    background: #1D4BA6;
-    color: #fff;
-    border-color: #1D4BA6;
-  }
-
-  /* ── Selection card ── */
-  .select-card {
-    @apply rounded-2xl border-2 border-border cursor-pointer transition-all p-4;
-  }
-  .select-card:hover   { border-color: #1D4BA6; box-shadow: 0 0 0 4px rgba(29,75,166,0.08); }
-  .select-card.selected { border-color: #1D4BA6; box-shadow: 0 0 0 4px rgba(29,75,166,0.12); }
 }

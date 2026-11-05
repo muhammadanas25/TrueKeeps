@@ -129,7 +129,7 @@ export function PhotoBooksPage() {
             you. Then hold it, share it, and keep it forever.
           </p>
           <div className="lp-hero-actions">
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent lp-btn-lg">
+            <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
               Make my book <ArrowRight size={18} />
             </Link>
           </div>
@@ -148,7 +148,8 @@ export function PhotoBooksPage() {
         <Steps />
         <Faq />
       </main>
-      <FinalCTA />
+      {/* this is the page "See designs" points to */}
+      <FinalCTA showDesigns={false} />
       <Footer />
       <StickyCTA />
     </div>
@@ -169,7 +170,7 @@ export function BookTypePage({ book }: { book: BookType }) {
             <h1>{book.h1}</h1>
             <p className="lp-lede">{book.intro}</p>
             <div className="lp-hero-actions">
-              <Link href={startHref} className="lp-btn lp-btn-accent lp-btn-lg">
+              <Link href={startHref} className="lp-btn lp-btn-main lp-btn-lg">
                 Make my book <ArrowRight size={18} />
               </Link>
             </div>

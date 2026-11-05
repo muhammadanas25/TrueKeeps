@@ -1,5 +1,5 @@
 /**
- * Home — renders the TrueKeep landing page.
+ * Home — renders the TrueKeeps landing page.
  *
  * The page itself lives in features/landing (design ported from the
  * updated design-system prototype); this file only binds it to the

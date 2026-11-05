@@ -1,5 +1,5 @@
 /**
- * LandingPage — the TrueKeep marketing page.
+ * LandingPage — the TrueKeeps marketing page.
  *
  * Composition ported verbatim from the updated prototype shell
  * (`~/Downloads/landing.jsx`): Nav → Hero → TrustStrip → HowItWorks →

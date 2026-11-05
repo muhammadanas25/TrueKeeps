@@ -9,13 +9,14 @@
  *  - prototype `<a href="../book_builder/...">` CTAs → wouter <Link>
  *    into the in-app builder at /wizard; occasion cards go to their
  *    /photo-books/<slug> page, which is what search engines can index
- *  - Hero + Showcase copy comes from "Website Copywriting.docx"
- *    (Oct 2026); the rest is still the prototype copy
+ *  - Hero + Showcase copy comes from "Website Copywriting.docx" (Oct 2026);
+ *    the voice and the single "Make my book" action follow Truekeeps-Brand-Kit
  *  - imagery is real product photography from "Website Images/" and
  *    "Website Assets/", pre-sized to WebP in ./assets (srcset picks
  *    1280w vs 2400w; phones get the designer's square crops, 800w/1200w)
  *  - no reviews, ratings or testimonials until real ones exist (PRODUCT.md,
- *    "Evidence on Hand"); the prototype's placeholder Proof section is gone
+ *    "Evidence on Hand"), and every claim here must be one the product or the
+ *    business can stand behind
  *  - prerendered at build time (scripts/prerender.mjs): anything touching the
  *    browser must stay inside an effect
  *  - phones (≤720px): How it works and Occasions become swipe rails
@@ -24,7 +25,7 @@
 
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { ArrowRight, Eye, Leaf, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, Baby, Cake, Check, Eye, Heart, MessageCircle, Plane, ShieldCheck, Truck } from "lucide-react";
 import { TKLogo } from "./primitives";
 import { BOOK_IMAGES } from "./book-images";
 import heroSm from "./assets/hero-1280.webp";
@@ -39,8 +40,6 @@ import ctaSm from "./assets/cta-1280.webp";
 import ctaLg from "./assets/cta-2400.webp";
 import ctaM800 from "./assets/cta-mobile-800.webp";
 import ctaM1200 from "./assets/cta-mobile-1200.webp";
-import how1 from "./assets/how-1.webp";
-import how2 from "./assets/how-2.webp";
 import how3 from "./assets/how-3.webp";
 import { AccountMenu } from "@/features/auth/AccountMenu";
 import { formatPKR, PRICE_LIST } from "@shared/pricing";
@@ -73,8 +72,8 @@ export function Nav() {
         </div>
         <div className="lp-nav-cta">
           <AccountMenu signInClassName="lp-nav-signin" />
-          <Link href={BUILDER_PATH} className="lp-btn lp-btn-cobalt lp-btn-sm">
-            Start free
+          <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-sm">
+            Make my book
           </Link>
         </div>
       </div>
@@ -123,13 +122,18 @@ export function Hero() {
       <BannerPhoto set={HERO_PHOTO} eager alt="Printed photo book on a table, with a family photo on the cover" />
       <div className="lp-wrap">
         <div className="lp-hero-copy">
-          <h1>Your best moments deserve more than a phone.</h1>
+          <h1>
+            Your best moments deserve more than <span className="lp-mark">a phone.</span>
+          </h1>
           <p className="sub">
             Design it yourself in minutes, or let us create it for you. Then hold it, share it, and keep it forever.
           </p>
           <div className="lp-hero-actions">
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent lp-btn-lg">
+            <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
               Make my book <ArrowRight size={18} />
+            </Link>
+            <Link href="/photo-books" className="lp-btn lp-btn-outline-light lp-btn-lg">
+              See designs
             </Link>
           </div>
         </div>
@@ -142,10 +146,10 @@ export function Hero() {
 
 export function TrustStrip() {
   const items = [
-    { icon: Truck, text: <span><b>Free shipping</b> from {formatPKR(PRICE_LIST.freeShippingFromMinor)}</span> },
-    { icon: Leaf, text: <span><b>Archival</b>, FSC-certified paper</span> },
-    { icon: ShieldCheck, text: <span><b>Love-it</b> guarantee</span> },
     { icon: Eye, text: <span><b>See every page</b> before you pay</span> },
+    { icon: Truck, text: <span><b>Free shipping</b> from {formatPKR(PRICE_LIST.freeShippingFromMinor)}</span> },
+    { icon: ShieldCheck, text: <span><b>Love-it</b> guarantee</span> },
+    { icon: MessageCircle, text: <span><b>Help on WhatsApp</b>, 10am to 6pm</span> },
   ];
   return (
     <div className="lp-trust">
@@ -228,6 +232,55 @@ function SwipeRail({ className, label, children }: { className: string; label: s
 
 /* ── How it works ───────────────────────────────────────────── */
 
+/*
+ * Step art. The designer's illustrations for steps 1 and 2 had an off-brand
+ * blue selected state baked into the image; drawing them here keeps selection
+ * in Indigo, and uses the same words as the quiz ("New baby").
+ */
+
+const OCCASION_TILES = [
+  { icon: Heart, label: "Wedding", on: true },
+  { icon: Baby, label: "New baby", on: false },
+  { icon: Cake, label: "Birthday", on: false },
+  { icon: Plane, label: "Travel", on: false },
+];
+
+function OccasionArt() {
+  return (
+    <div className="lp-art lp-art-occ" role="img" aria-label="Choosing Wedding from a grid of occasions">
+      {OCCASION_TILES.map((t) => (
+        <div className={"lp-art-tile" + (t.on ? " on" : "")} key={t.label}>
+          <t.icon size={20} strokeWidth={1.8} aria-hidden="true" />
+          {t.label}
+          {t.on ? (
+            <span className="lp-art-check">
+              <Check size={12} strokeWidth={3} aria-hidden="true" />
+            </span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PickPhotosArt() {
+  return (
+    <div className="lp-art lp-art-pick" role="img" aria-label="Selecting photos to add">
+      {[true, true, false, false, false, false].map((on, k) => (
+        <div className={"lp-art-tile" + (on ? " on" : "")} key={k}>
+          {on ? (
+            <span className="lp-art-check">
+              <Check size={12} strokeWidth={3} aria-hidden="true" />
+            </span>
+          ) : (
+            <span className="lp-art-box" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function HowItWorks() {
   return (
     <section className="lp-section" id="how">
@@ -239,38 +292,44 @@ export function HowItWorks() {
         </h2>
         <p className="lp-lede">
           No blank canvas, no design skills. Answer one question, add your photos, and we lay out the whole book for
-          you — change anything you like, or just order it.
+          you. Change anything you like, or just order it.
         </p>
       </div>
       <div className="lp-wrap">
         <SwipeRail className="lp-steps" label="How it works, three steps">
           <div className="lp-step lp-reveal">
-            <div className="lp-step-num">1</div>
             <div className="lp-step-vis">
-              <img src={how1} alt="Choosing Wedding from a grid of occasions" width={521} height={255} loading="lazy" />
+              <OccasionArt />
             </div>
-            <h3>Pick the moment</h3>
-            <p>Wedding, a new baby, the trip of a lifetime — tell us what you're celebrating and we set the tone.</p>
+            <h3>
+              <span className="lp-step-num">1</span>
+              Pick the moment
+            </h3>
+            <p>Wedding, a new baby, the trip of a lifetime. Tell us what you're celebrating and we set the tone.</p>
           </div>
           <div className="lp-step lp-reveal">
-            <div className="lp-step-num">2</div>
             <div className="lp-step-vis">
-              <img src={how2} alt="Selecting photos to add" width={521} height={255} loading="lazy" />
+              <PickPhotosArt />
             </div>
-            <h3>Add your photos</h3>
-            <p>Drop in a handful or a thousand. We sift out the blurry duplicates and keep the ones that matter.</p>
+            <h3>
+              <span className="lp-step-num">2</span>
+              Add your photos
+            </h3>
+            <p>Add a handful or a whole album. We'll tell you if a photo might print blurry, so there are no surprises.</p>
           </div>
           <div className="lp-step lp-reveal">
-            <div className="lp-step-num">3</div>
             <div className="lp-step-vis">
               <img src={how3} alt="A finished hardcover photo book" width={521} height={255} loading="lazy" />
             </div>
-            <h3>We design it</h3>
-            <p>A complete book appears — cover, layouts, and captions. Hold it in 3-D, tweak anything, then order.</p>
+            <h3>
+              <span className="lp-step-num">3</span>
+              We design it
+            </h3>
+            <p>A complete book appears, with cover, layouts and captions. See every page, change anything, then order.</p>
           </div>
         </SwipeRail>
         <div className="lp-steps-cta">
-          <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent lp-btn-lg">
+          <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
             Make my book <ArrowRight size={18} />
           </Link>
         </div>
@@ -282,23 +341,23 @@ export function HowItWorks() {
 /* ── Showcase: what you'll hold ─────────────────────────────── */
 
 /*
- * Feature art — small bespoke duotone drawings (raspberry + gold on
- * white) instead of stock line icons, each one depicting the actual
+ * Feature art: small bespoke drawings in Rose and white instead of stock line
+ * icons, each one depicting the actual
  * product detail: a square hardcover with its 12" dimension rule, a
  * glossy sheet over a matte one, and an open spread with a check.
  */
 
-const ART_PINK = "var(--tk-raspberry)";
-const ART_GOLD = "var(--tk-gold)";
+const ART_ROSE = "var(--tk-rose-500)";
+const ART_SOFT = "var(--tk-rose-200)";
 
 function ArtHardcover() {
   return (
     <svg viewBox="0 0 56 56" aria-hidden="true">
-      <rect x="12" y="7" width="34" height="34" rx="3" fill={ART_PINK} />
+      <rect x="12" y="7" width="34" height="34" rx="3" fill={ART_ROSE} />
       <rect x="12" y="7" width="6" height="34" rx="2" fill="#000" opacity="0.18" />
       <rect x="22" y="13" width="18" height="16" rx="1.5" fill="#fff" />
-      <path d="M22 29 l5-5 4 3 4-4 5 6 z" fill={ART_GOLD} />
-      <circle cx="35.5" cy="17.5" r="2" fill={ART_GOLD} />
+      <path d="M22 29 l5-5 4 3 4-4 5 6 z" fill={ART_SOFT} />
+      <circle cx="35.5" cy="17.5" r="2" fill={ART_SOFT} />
       <path d="M12 48.5 H46 M12 46 v5 M46 46 v5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.75" />
     </svg>
   );
@@ -314,7 +373,7 @@ function ArtFinish() {
         </linearGradient>
       </defs>
       <rect x="7" y="7" width="28" height="28" rx="3" fill="#fff" opacity="0.3" />
-      <rect x="21" y="21" width="28" height="28" rx="3" fill={ART_GOLD} />
+      <rect x="21" y="21" width="28" height="28" rx="3" fill={ART_SOFT} />
       <rect x="21" y="21" width="28" height="28" rx="3" fill="url(#lp-art-sheen)" />
       <path d="M27 27 L35 27 L27 35 Z" fill="#fff" opacity="0.6" />
     </svg>
@@ -326,10 +385,10 @@ function ArtPreview() {
     <svg viewBox="0 0 56 56" aria-hidden="true">
       <path d="M5 14 Q16 10 28 14 V44 Q16 40 5 44 Z" fill="#fff" />
       <path d="M51 14 Q40 10 28 14 V44 Q40 40 51 44 Z" fill="#fff" opacity="0.82" />
-      <rect x="9" y="18" width="15" height="11" rx="1.5" fill={ART_PINK} />
-      <rect x="32" y="18" width="15" height="6" rx="1.5" fill={ART_GOLD} />
-      <rect x="32" y="27" width="15" height="6" rx="1.5" fill={ART_PINK} opacity="0.55" />
-      <circle cx="44" cy="44" r="8" fill={ART_PINK} stroke="#1c181a" strokeOpacity="0.25" />
+      <rect x="9" y="18" width="15" height="11" rx="1.5" fill={ART_ROSE} />
+      <rect x="32" y="18" width="15" height="6" rx="1.5" fill={ART_SOFT} />
+      <rect x="32" y="27" width="15" height="6" rx="1.5" fill={ART_ROSE} opacity="0.55" />
+      <circle cx="44" cy="44" r="8" fill={ART_ROSE} stroke="var(--surface-dark)" strokeWidth="1.5" />
       <path d="M40.3 44.2 l2.6 2.6 l5-5.2" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -337,37 +396,34 @@ function ArtPreview() {
 
 export function Showcase() {
   const features = [
-    { Art: ArtHardcover, h: "Big 12×12 hardcover", p: "Large square pages that give your photos the space they deserve." },
+    { Art: ArtHardcover, h: "Big 12×12 pages", p: "Large square pages that give your photos the space they deserve." },
     { Art: ArtFinish, h: "Glossy or matte, your choice", p: "Pick the finish that feels right for your memories." },
     { Art: ArtPreview, h: "What you see is what you get", p: "Preview every page before you order. No surprises, just your book." },
   ];
   return (
     <section className="lp-showcase" id="book">
       <BannerPhoto set={KEEP_PHOTO} alt="A mother and child looking through a printed hardcover photo book of a newborn" />
-      <div className="lp-wrap">
-        <div className="lp-showcase-copy">
-          <div className="lp-eyebrow">What you'll hold</div>
-          <h2 className="lp-h2">
-            Not a print-out.
-            <br />A <span className="lp-mark">real keepsake.</span>
-          </h2>
-          <p className="lp-lede">
-            A big, beautiful hardcover book you can hold in your hands, share with family, and keep for years. Not lost
-            in a phone.
-          </p>
-          <div className="lp-quality">
-            {features.map((q) => (
-              <div className="lp-qrow lp-reveal" key={q.h}>
-                <div className="lp-qart">
-                  <q.Art />
-                </div>
-                <div>
-                  <h4>{q.h}</h4>
-                  <p>{q.p}</p>
-                </div>
+      <div className="lp-showcase-copy">
+        <div className="lp-eyebrow">What you'll hold</div>
+        <h2 className="lp-h2">
+          Not a print-out.
+          <br />A <span className="lp-mark">real keepsake.</span>
+        </h2>
+        <p className="lp-lede">
+          A big, beautiful book you can hold in your hands, share with family, and keep for years. Not lost in a phone.
+        </p>
+        <div className="lp-quality">
+          {features.map((q) => (
+            <div className="lp-qrow lp-reveal" key={q.h}>
+              <div className="lp-qart">
+                <q.Art />
               </div>
-            ))}
-          </div>
+              <div>
+                <h4>{q.h}</h4>
+                <p>{q.p}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -420,7 +476,7 @@ export function PlainFacts() {
           {SITE.name} turns the photos on your phone into a printed 12×12 inch photo book. {PRICE_SUMMARY}, with flat{" "}
           {formatPKR(PRICE_LIST.shippingMinor)} delivery nationwide, free from {formatPKR(PRICE_LIST.freeShippingFromMinor)}.
         </p>
-        <Link href="/photo-books" className="lp-facts-link">
+        <Link href="/photo-books" className="lp-link">
           See prices and questions <ArrowRight size={16} />
         </Link>
       </div>
@@ -430,27 +486,28 @@ export function PlainFacts() {
 
 /* ── Final CTA ──────────────────────────────────────────────── */
 
-export function FinalCTA() {
+/**
+ * FinalCTA — the page closes on a real book, as it opened. `showDesigns` is off
+ * on the /photo-books hub, where "See designs" would link to the page itself.
+ */
+export function FinalCTA({ showDesigns = true }: { showDesigns?: boolean }) {
   return (
     <section className="lp-cta">
-      {/* Banner 03 as a barely-there texture under the glows */}
-      <BannerPhoto set={CTA_PHOTO} className="lp-cta-photo" />
-      <div className="lp-cta-glow"></div>
-      <div className="lp-cta-glow gold"></div>
+      <BannerPhoto set={CTA_PHOTO} alt="A printed photo book on a table, with a child on the cover holding a first day of school sign" />
       <div className="lp-wrap">
         <div className="lp-cta-inner">
-          <div className="lp-eyebrow center" style={{ color: "var(--tk-gold)", justifyContent: "center" }}>
-            Your story is already written
-          </div>
-          <h2>Don’t let your best photos get lost.</h2>
+          <div className="lp-eyebrow">Your story is already written</div>
+          <h2 className="lp-h2">Don’t let your best photos get lost.</h2>
           <p>Start for free. We design your whole book, you make it yours, and you only pay when you love it.</p>
           <div className="lp-cta-actions">
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-gold lp-btn-lg">
-              Free my memories <ArrowRight size={18} />
+            <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
+              Make my book <ArrowRight size={18} />
             </Link>
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-light lp-btn-lg">
-              See a sample book
-            </Link>
+            {showDesigns ? (
+              <Link href="/photo-books" className="lp-btn lp-btn-outline-light lp-btn-lg">
+                See designs
+              </Link>
+            ) : null}
           </div>
           <div className="lp-cta-sub">Free to start · No design skills needed · See every page before you pay</div>
         </div>
@@ -494,7 +551,7 @@ export function StickyCTA() {
 
   return (
     <div className={"lp-sticky-cta" + (pastHero && !atEnd ? " on" : "")}>
-      <Link href={BUILDER_PATH} className="lp-btn lp-btn-accent">
+      <Link href={BUILDER_PATH} className="lp-btn lp-btn-main">
         Make my book <ArrowRight size={18} />
       </Link>
     </div>
