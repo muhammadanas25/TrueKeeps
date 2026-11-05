@@ -4,7 +4,6 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { isV2 } from "@/lib/config";
 import { bookTypeBySlug, metaForPath, SITE } from "@shared/site";
 import { BookTypePage, PhotoBooksPage } from "@/features/landing/pages";
 
@@ -26,7 +25,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 
 /** Minimal, brand-neutral fallback while a route chunk loads. */
 function RouteFallback() {
-  return <div style={{ minHeight: "100vh", background: "var(--tk-cream-warm)" }} aria-busy="true" />;
+  return <div style={{ minHeight: "100vh", background: "var(--surface-page)" }} aria-busy="true" />;
 }
 
 /** Set or create one <head> tag (prerendered pages start with them all). */
@@ -88,7 +87,7 @@ function Router() {
         <Route path="/wizard" component={BookBuilder} />
         {/* The previous 6-step wizard had USD prices and a fake "Order placed"
             button; with real checkout live it would mislead customers, so the
-            URL now goes to the real builder. Code kept in pages/wizard.tsx. */}
+            URL now goes to the real builder. */}
         <Route path="/wizard-classic">
           <Redirect to="/wizard" />
         </Route>
@@ -105,22 +104,12 @@ function Router() {
   );
 }
 
-function ThemeProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    if (isV2) document.body.classList.add("theme-v2");
-    else document.body.classList.remove("theme-v2");
-  }, []);
-  return <>{children}</>;
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ThemeProvider>
-          <Toaster />
-          <Router />
-        </ThemeProvider>
+        <Toaster />
+        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );

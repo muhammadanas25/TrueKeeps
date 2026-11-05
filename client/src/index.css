@@ -151,27 +151,6 @@
   --font-mono: Menlo, monospace;
   --radius: 0.875rem;
 
-  /* ─── Old TrueKeep tokens: being retired by role, removed when unused ─ */
-  --tk-cobalt:         #1D46A0;   /* Primary CTA, active states (brand: Cobalt Blue) */
-  --tk-cobalt-light:   #2a5cc0;   /* Hover variant */
-  --tk-cobalt-dark:    #163880;   /* Deep sections, book spines */
-  --tk-cobalt-dim:     rgba(29, 70, 160, 0.08);  /* Tint bg */
-  --tk-cobalt-ring:    rgba(29, 70, 160, 0.15);  /* Focus ring */
-  --tk-raspberry:      #DB3069;   /* Accent, badges (brand: Razzmatazz) */
-  --tk-raspberry-light:#e8467d;   /* Hover variant */
-  --tk-raspberry-dim:  rgba(219, 48, 105, 0.08); /* Tint bg */
-  --tk-gold:           #F5D547;   /* Royal Gold — highlight, premium accent */
-  --tk-gold-light:     #f8e07a;   /* Hover / glow */
-  --tk-gold-deep:      #d8b62e;   /* Gold text on light, borders */
-  --tk-gold-dim:       rgba(245, 213, 71, 0.16); /* Tint bg */
-  --tk-cream:          #EBEBD3;   /* Page bg, selection fill (brand: Beige) */
-  --tk-cream-muted:    #F4F2E8;   /* Muted section bg */
-  --tk-cream-warm:     #FAFAF7;   /* Near-white warm surface */
-  --tk-gunmetal:       #3C3C3B;   /* Body text, icons */
-  --tk-gunmetal-light: #6b6b69;   /* Secondary text */
-  --tk-gunmetal-faint: #9b9b97;   /* Placeholder, captions */
-  --tk-white:          #FFFFFF;
-
   /* Text and line colours by role */
   --color-fg1:         var(--tk-ink-400);    /* body, 9.20; solid stand-in for the kit's Ink at 85% */
   --color-fg2:         var(--tk-indigo-400); /* soft text, 6.78 */
@@ -232,25 +211,4 @@
   /* ── Typography helpers ── */
   .font-display { font-family: var(--font-display); }
   .font-body    { font-family: var(--font-body); }
-
-  /* ── Card hover effects ── */
-  .theme-card:hover   { transform: translateY(-4px); transition: all 0.3s ease; }
-  .product-card:hover { transform: scale(1.02);      transition: all 0.3s ease; }
-
-  /* ── Wizard step transitions ── */
-  .step-enter        { opacity: 0; transform: translateX(32px); }
-  .step-enter-active { opacity: 1; transform: translateX(0);    transition: opacity 280ms ease, transform 280ms ease; }
-  .step-exit         { opacity: 1; transform: translateX(0); }
-  .step-exit-active  { opacity: 0; transform: translateX(-32px); transition: opacity 280ms ease, transform 280ms ease; }
-
-  /* ── Page flip (used in PageReview step) ── */
-  .page-flip-container { perspective: 1200px; }
-  .page-flip {
-    transform-style: preserve-3d;
-    transition: transform 580ms cubic-bezier(0.4, 0, 0.2, 1);
-    transform-origin: left center;
-  }
-  .page-flip.flipped { transform: rotateY(-180deg); }
-  .page-face         { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-  .page-face-back    { transform: rotateY(180deg); }
 }

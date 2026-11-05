@@ -289,13 +289,13 @@ if (paymentProvider instanceof FakeProvider && !config.isProd) {
     if (!s) return res.status(404).send("Unknown test payment session");
     const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, "");
     res.type("html").send(`<!doctype html><meta name="viewport" content="width=device-width">
-<body style="font:16px system-ui;max-width:420px;margin:60px auto;padding:0 16px;color:#3C3C3B">
-<p style="color:#DB3069;font-weight:600">LOCAL TEST GATEWAY — no real payment</p>
+<body style="font:16px system-ui;max-width:420px;margin:60px auto;padding:0 16px;color:#404442">
+<p style="color:#A5324A;font-weight:600">LOCAL TEST GATEWAY — no real payment</p>
 <h2 style="margin:.2em 0">Pay Rs ${(s.amountMinor / 100).toLocaleString("en-PK")}</h2>
 <p>Order ${esc(s.orderNumber)}</p>
 <form method="post" action="/api/payments/fake/complete">
 <input type="hidden" name="ref" value="${esc(ref)}"><input type="hidden" name="redirect" value="${esc(req.query.redirect)}">
-<button name="outcome" value="pay" style="padding:12px 20px;font-size:16px;background:#1D46A0;color:#fff;border:0;border-radius:99px">Pay (test)</button>
+<button name="outcome" value="pay" style="padding:12px 20px;font-size:16px;background:#CA3A58;color:#fff;border:0;border-radius:99px">Pay (test)</button>
 <a href="${esc(safeTarget(req.query.cancel))}" style="margin-left:14px">Cancel</a></form></body>`);
   });
 
