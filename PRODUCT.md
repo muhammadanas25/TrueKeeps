@@ -17,7 +17,7 @@ Both arrive with an occasion in mind (wedding, baby, travel, birthday, or a mix)
 
 ## Product Purpose
 
-TrueKeep turns phone photos into a printed, bound photo book. A short quiz (occasion → vibe → title) plus an upload produces a complete book automatically: cover, layouts and captions. The user can view it as a book, customize any part of it, and order it printed and delivered.
+TrueKeeps turns phone photos into a printed, bound photo book. A short quiz (occasion → vibe → title) plus an upload produces a complete book automatically: cover, layouts and captions. The user can view it as a book, customize any part of it, and order it printed and delivered.
 
 Success means a first-time user goes from photos to a book they're proud of, and to a paid order, without ever feeling they had to "design" anything. Users who do want control should never hit a wall.
 
@@ -25,7 +25,7 @@ Tagline: "Beautiful quality, for beautiful moments."
 
 ## Positioning
 
-What sets TrueKeep apart from local print shops and photo studios is all four of these together:
+What sets TrueKeeps apart from local print shops and photo studios is all four of these together:
 
 1. **Done for you, in a minute.** Autopilot builds a complete, good book from the quiz and the photos. Customization is optional, not a required step.
 2. **See it and shape it before you pay.** The user views the actual book (3-D page-flip preview) and can customize the design (themes, layouts, photo swaps, captions, page order, front and back cover) before ordering. Nothing is a leap of faith.
@@ -44,26 +44,23 @@ What sets TrueKeep apart from local print shops and photo studios is all four of
 - **Market:** Pakistan only, no international shipping. Prices are in PKR, stored as integer paisa.
 - **Payments:** prepaid only through Safepay hosted checkout; no cash on delivery, because the product is personalized. Stripe isn't available in Pakistan.
 - **Live in production** on thetruekeeps.com: accounts, owned and autosaved books, builder and editor. Orders, checkout, transactional email and order status (Phase 2B) are next; the roadmap is in `roadmap`.
-- **Formats:** softcover, hardcover and layflat bindings; book themes ivory, cobalt, blush and gallery; occasions wedding, baby, travel, birthday and mix.
+- **Formats:** 12×12 inch books in softcover, hardcover and layflat; glossy or matte finish at the same price (owner confirmed 2026-11-05). Book themes include ivory, indigo, blush and gallery; `cobalt` remains only for books already saved with it. Occasions wedding, baby, travel, birthday and mix.
 - **Print pipeline:** print-safe framing exists in the builder; the 300-DPI print PDF and fulfillment are not finished. The plan is a manual PDF handoff to a local printer first, then a print API later.
 - **Planned AI capabilities** (roadmap, not built): smart curation (dedup, blur culling), chronological chaptering, aspect-aware layout, AI-written captions and titles. Copy must not describe these as working until they ship.
 - **Open decisions:**
-  - Real PKR prices per binding. `builder/data.ts` holds placeholder values 24/34/46 with no currency.
   - Shipping window and delivery promise.
-  - Reprint or quality guarantee policy.
+  - Written wording for the Love-it guarantee, and how it fits with no refunds once printing starts.
   - Whether the product is English-only or also in Urdu. It's currently English, `lang="en"`.
 
 ## Brand Commitments
 
-- **Name:** TrueKeep. The logo source is `Truekeeps New Logo 3.pdf`.
+- **Name:** TrueKeeps. The logo files are in `Truekeeps-Brand-Kit/logos`; never retype the logo.
 - **Tagline:** "Beautiful quality, for beautiful moments."
 - **No emoji anywhere in the product UI.** Icons are Lucide only.
-- **Brand identity** is the v2 TrueKeeps Design System bundle the user supplied (`TrueKeepsDesignSystem_019dee`), implemented as tokens in `client/src/index.css`:
-  - colours: Cobalt, Razzmatazz, Royal Gold, Beige, Gunmetal
-  - fonts: Clash Display and Archivo
-
-  It supersedes the older `design_guidelines.md` (Outfit, #06097e).
-- **Voice:** warm and plain-spoken. The prototype supports warm and concise copy variants.
+- **Brand identity** is `Truekeeps-Brand-Kit/` (v1, Nov 2026), implemented as tokens in `client/src/index.css` (see `docs/adr/010-brand-kit-v1.md`):
+  - colours: Indigo, Rose, Paper, with Teal for success only and Mist for lines; one Rose main action and at most one Rose highlight per screen
+  - fonts: Figtree for everything except H1 and H2, which keep the wide display face behind `--font-display`
+- **Voice:** a warm friend who's good at this: simple words, short sentences, no pressure, no jargon or hype.
 
 ## Evidence on Hand
 
@@ -73,10 +70,10 @@ What sets TrueKeep apart from local print shops and photo studios is all four of
   - testimonials
   - order volume or customer counts
   - shipping-time data
-  - a reprint guarantee
   - press
+  - any paper certification such as FSC; the printer can't prove one today
 
-  The live landing page currently shows placeholders: "4.9/5 from 12,000 reviews", the named testimonials Priya R. and James O., "Ships in 3–5 days", and "If it isn't right, we reprint it free". These must be removed or replaced with real material. Future work must not fabricate reviews, testimonials, counts, delivery promises or guarantees.
+  Owner-confirmed on 2026-11-05: free shipping from Rs 10,000 (checkout applies it), the Love-it guarantee (wording pending) and WhatsApp help from 10am to 6pm. Automatic removal of blurry or duplicate photos does not exist; the product warns about photos that may print soft. Future work must not fabricate reviews, testimonials, counts, delivery promises or guarantees.
 - **No real product photography** of printed TrueKeep books exists yet.
 
 ## Product Principles

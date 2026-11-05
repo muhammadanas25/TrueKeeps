@@ -1,3 +1,5 @@
+> **Superseded.** The current brand is `Truekeeps-Brand-Kit/`; see `docs/adr/010-brand-kit-v1.md`. Kept for history only.
+
 # TrueKeeps Photo Book Platform - Design Guidelines
 
 ## Design Approach
