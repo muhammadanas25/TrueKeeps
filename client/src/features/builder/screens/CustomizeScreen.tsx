@@ -20,7 +20,7 @@ import { AlertTriangle, Check, ChevronDown, FlipHorizontal2, GripHorizontal, Ima
 import { CoverFace, LayoutWire, PageFace, Ph } from "../book";
 import { ReframeBar } from "../reframe";
 import { indexPhotos, pageHasLowQuality, slotMaxZoom } from "../print";
-import { BOOK_THEMES, COVER_STYLES, DENSITIES, LAYOUTS, LAYOUT_SLOTS, MAX_SLOTS_PER_PAGE, generatePages, isMirrorable, layoutForCount, occasionById, pagePhotoIds, placement, type BookPage, type CopyVoice, type Placement } from "../data";
+import { COVER_STYLES, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, MAX_SLOTS_PER_PAGE, generatePages, isMirrorable, layoutForCount, occasionById, pagePhotoIds, placement, type BookPage, type CopyVoice, type Placement } from "../data";
 import { PAGE_COLOURS, THEME_COLOUR, bookTheme, pageColourById } from "../palette";
 import { themeById } from "../data";
 import type { BuilderState } from "../state";
@@ -551,7 +551,7 @@ export function CustomizeScreen({
           <div className="bb-panel-sec">
             <div className="bb-panel-label">Whole book — theme</div>
             <div className="bb-theme-cards">
-              {BOOK_THEMES.map((t) => (
+              {pickableThemes(state.themeId).map((t) => (
                 <button key={t.id} className={"bb-theme-card" + (state.themeId === t.id ? " on" : "")} onClick={() => set({ themeId: t.id })}>
                   <div className="sw" style={{ background: t.page, color: t.ink }}>
                     Aa
@@ -719,7 +719,7 @@ export function CustomizeScreen({
                     <button key={p.id} className={"bb-tray-item" + (isCurrent ? " current" : "")} onClick={() => swapPhoto(tray.pageIdx, tray.slotIdx, p.id)}>
                       <Ph photo={p} theme={theme} />
                       {isCurrent ? (
-                        <span className="inuse" style={{ background: "var(--tk-raspberry)" }}>
+                        <span className="inuse" style={{ background: "var(--selected)" }}>
                           current
                         </span>
                       ) : inUse ? (

@@ -14,10 +14,11 @@
  * prices come straight from shared/pricing.ts and FAQ answers are one array.
  *
  * Truth rule (PRODUCT.md, "Evidence on Hand"): nothing here may claim reviews,
- * ratings, customer counts, delivery times or guarantees until they are real.
- * That is why the Product data has offers but no aggregateRating, and why no
- * page states a paper type (see docs/adr/009). The 12×12 inch size was confirmed
- * by the owner on 2026-11-05.
+ * ratings, customer counts or delivery times until they are real. That is why
+ * the Product data has offers but no aggregateRating. The owner confirmed on
+ * 2026-11-05: the 12×12 inch size on every binding, glossy or matte finish, the
+ * Love-it guarantee (wording still to come) and WhatsApp help from 10am to 6pm.
+ * No page may claim a paper certification, such as FSC, without printer proof.
  */
 
 import { formatPKR, PRICE_LIST } from "./pricing";
@@ -188,6 +189,10 @@ export const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "What size is the book?",
     a: "12×12 inches, with large square pages that give your photos plenty of room.",
+  },
+  {
+    q: "Is the book glossy or matte?",
+    a: "You choose. Matte is soft with no glare, glossy is bright with a shine. Both cost the same, and you pick when you order.",
   },
   {
     q: "Do I need design skills?",

@@ -26,6 +26,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BuilderDocument } from "@shared/document";
+import { DEFAULT_FINISH } from "@shared/pricing";
 import { apiRequest } from "@/lib/queryClient";
 import { getClaim, forgetClaim } from "@/lib/claims";
 import { THEME_COLOUR } from "./palette";
@@ -108,6 +109,7 @@ export function toDocument(s: BuilderState): BuilderDocument {
     voice: s.voice,
     qty: s.qty,
     binding: s.binding,
+    finish: s.finish,
   };
 }
 
@@ -140,6 +142,7 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
     voice: d.voice,
     qty: d.qty,
     binding: d.binding,
+    finish: d.finish ?? DEFAULT_FINISH,
   };
 }
 

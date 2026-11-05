@@ -8,12 +8,22 @@
  */
 
 import { ArrowRight, Baby, Cake, Heart, Plane, Sparkles } from "lucide-react";
-import { MiniBook, Ph } from "../book";
+import { MiniBook } from "../book";
+import { BOOK_IMAGES } from "@/features/landing/book-images";
 import { OCCASIONS, VIBES, occasionById, themeById, type CopyVoice } from "../data";
 import type { BuilderState } from "../state";
 
 /** lucide components for the occasion icon names in data.ts */
 const OCC_ICONS = { Heart, Baby, Plane, Cake, Sparkles } as const;
+
+/** Real printed book shown beside the quiz, by occasion. */
+const SAMPLE_BOOK: Record<string, string> = {
+  wedding: "wedding",
+  baby: "baby",
+  travel: "travel",
+  birthday: "birthday",
+  mix: "anniversary",
+};
 
 /** One-line subtitle per occasion (keeps the blocks from feeling empty). */
 const OCC_TAGLINE: Record<string, string> = {
@@ -47,12 +57,6 @@ export function QuizScreen({
   const hw = copy.quizHello.split(" ");
   const lastWord = hw.pop();
 
-  // floating preview tiles around the assembling book
-  const tiles = [
-    { label: occ.photoLabels[0], left: -6, top: 44, r: -8, s: 102 },
-    { label: occ.photoLabels[3], left: 250, top: 18, r: 7, s: 94 },
-    { label: occ.photoLabels[6], left: 252, top: 302, r: -5, s: 90 },
-  ];
   const stageCaption = !occasion ? "Pick a moment to begin" : !vibe ? occ.label : previewTitle;
 
   return (
@@ -61,7 +65,7 @@ export function QuizScreen({
         <div className="bb-quiz-inner">
           <div className="bb-kicker">Photo book studio</div>
           <h1>
-            {hw.join(" ")} <span className="gold">{lastWord}</span>
+            {hw.join(" ")} <span className="bb-mark">{lastWord}</span>
           </h1>
           <p className="bb-sub">{copy.quizSub}</p>
 
@@ -74,11 +78,11 @@ export function QuizScreen({
                   return (
                     <button
                       key={o.id}
-                      className={"bb-occasion occ-" + o.id + (occasion === o.id ? " sel" : "")}
+                      className={"bb-occasion" + (occasion === o.id ? " sel" : "")}
                       onClick={() => advance({ occasion: o.id, title: state.title || o.suggestedTitle }, 1)}
                     >
                       <span className="bb-occ-ic">
-                        <Icon size={23} strokeWidth={2} />
+                        <Icon size={22} strokeWidth={1.8} />
                       </span>
                       <span className="bb-occ-text">
                         <b>{o.label}</b>
@@ -155,14 +159,11 @@ export function QuizScreen({
 
       <div className="bb-quiz-stage">
         <div className="bb-quiz-stage-art">
-          {tiles.map((t, k) => (
-            <div key={k} className="bb-quiz-float" style={{ left: t.left, top: t.top, animationDelay: 0.3 + k * 0.6 + "s" }}>
-              <div className="bb-quiz-tile" style={{ width: t.s, height: Math.round(t.s * 0.82), transform: "rotate(" + t.r + "deg)" }}>
-                <Ph photo={{ id: "qt" + k, label: t.label, shade: k % 3 }} theme={theme} />
-              </div>
-            </div>
-          ))}
-          <MiniBook theme={theme} coverStyle={state.coverStyle} title={previewTitle} occasion={occ} photos={state.photos} size={232} />
+          <img className="bb-quiz-sample" src={BOOK_IMAGES[SAMPLE_BOOK[occasion || "baby"] ?? "baby"]} alt="" />
+          {/* the minimal cover has no photo slot: the customer's title and look, nothing to fill in */}
+          <div className="bb-quiz-stage-book">
+            <MiniBook theme={theme} coverStyle="minimal" title={previewTitle} occasion={occ} photos={[]} size={168} />
+          </div>
         </div>
         <div className="bb-quiz-stage-cap">
           <Sparkles size={14} /> {stageCaption}

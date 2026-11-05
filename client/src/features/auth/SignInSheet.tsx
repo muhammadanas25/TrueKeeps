@@ -35,7 +35,7 @@ const COPY: Record<SignInIntent, { title: string; sub: string }> = {
     sub: "We'll send your order confirmation and shipping updates to this email.",
   },
   generic: {
-    title: "Sign in to TrueKeep",
+    title: "Sign in to TrueKeeps",
     sub: "Your books, your orders, on any device.",
   },
 };

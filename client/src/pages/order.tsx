@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Clock, CreditCard, Package, RefreshCw, Truck } from "lucide-react";
-import { formatPKR } from "@shared/pricing";
+import { finishName, formatPKR } from "@shared/pricing";
 import { STATUS_LABEL } from "@shared/orders";
 import { AppShell } from "@/features/account/AppShell";
 import { bindingName, formatDate, getJSON, postJSON, type OrderEvent, type PublicOrder } from "@/features/orders/api";
@@ -169,7 +169,7 @@ export default function OrderPage() {
               </span>
             </div>
             <div className="or-line muted">
-              <span>8×8 in · {order.pageCount} pages</span>
+              <span>12×12 in · {finishName(order.finish)} · {order.pageCount} pages</span>
               <span>{formatPKR(order.unitMinor)} each</span>
             </div>
             <div className="or-sum">

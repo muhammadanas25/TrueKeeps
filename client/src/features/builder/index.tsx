@@ -176,7 +176,7 @@ export default function BookBuilder() {
           <SavePill status={syncStatus} />
           {state.screen !== "quiz" || state.qstep > 0 ? (
             <button className="bb-btn bb-btn-ghost" onClick={reset}>
-              <RotateCcw size={15} /> Start over
+              <RotateCcw size={15} /> <span className="bb-nav-label">Start over</span>
             </button>
           ) : null}
           <AccountMenu />

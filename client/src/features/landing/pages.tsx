@@ -21,7 +21,9 @@ import { BUILDER_PATH, FinalCTA, Footer, Nav, StickyCTA } from "./sections";
 
 /** In-app links keep the old scroll position; a new page should start at the top. */
 function useScrollTopOnMount(key: string) {
-  useEffect(() => window.scrollTo(0, 0), [key]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [key]);
 }
 
 function Breadcrumbs({ items }: { items: Array<{ label: string; href?: string }> }) {

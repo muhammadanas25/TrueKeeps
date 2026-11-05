@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatPKR } from "@shared/pricing";
+import { finishName, formatPKR } from "@shared/pricing";
 import { ORDER_STATUSES, STATUS_LABEL, TRANSITIONS, type OrderStatus } from "@shared/orders";
 import { AppShell } from "@/features/account/AppShell";
 import { useSession } from "@/features/auth/useSession";
@@ -108,7 +108,7 @@ export default function AdminOrdersPage() {
             <aside className="au-section ad-detail">
               <h2>{o.orderNumber} {!o.livemode ? <span className="or-tag">TEST</span> : null}</h2>
               <div className="or-line"><span>Status</span><b>{STATUS_LABEL[o.status]}</b></div>
-              <div className="or-line"><span>Book</span><span>{o.title} — {o.qty} × {bindingName(o.binding)}, {o.pageCount} pages</span></div>
+              <div className="or-line"><span>Book</span><span>{o.title}: {o.qty} × {bindingName(o.binding)}, 12×12 in, {finishName(o.finish)}, {o.pageCount} pages</span></div>
               <div className="or-line"><span>Total</span><b>{formatPKR(o.totalMinor)}</b></div>
               <div className="or-line"><span>Customer</span><span>{o.contactEmail}</span></div>
               <address className="or-addr">

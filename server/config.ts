@@ -59,7 +59,7 @@ const envSchema = z.object({
 
   /** Email delivery (Resend when a key is set; console otherwise) */
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default("TrueKeep <hello@thetruekeeps.com>"),
+  EMAIL_FROM: z.string().default("TrueKeeps <hello@thetruekeeps.com>"),
 
   /** Media store (see server/media.ts) */
   S3_ENDPOINT: z.string().optional(),

@@ -135,6 +135,7 @@ export async function createOrder(
           totalMinor: q.totalMinor,
           priceListVersion: q.priceListVersion,
           binding: q.binding,
+          finish: body.finish,
           qty: q.qty,
           pageCount: doc.pages.length,
           title: doc.title.trim() || "Untitled book",
@@ -240,6 +241,7 @@ async function sendConfirmation(order: Order) {
       totalMinor: order.totalMinor,
       qty: order.qty,
       binding: order.binding,
+      finish: order.finish,
       orderUrl: `${config.appUrl}/orders/${order.id}`,
       testMode: !order.livemode,
     });

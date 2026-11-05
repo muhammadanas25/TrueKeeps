@@ -33,9 +33,9 @@ export interface FontDef {
 }
 
 /**
- * Four typefaces. Clash Display + Archivo are the brand faces already
- * loaded; Instrument Serif and Caveat are loaded from Google Fonts in
- * client/index.html.
+ * Four typefaces a customer can print in their book. All four are loaded in
+ * client/index.html. These are book choices, not interface fonts, so changing
+ * the site's fonts must not change them.
  */
 export const FONTS: FontDef[] = [
   { id: "classic", name: "Classic", display: "'Clash Display', var(--font-display), sans-serif", weight: 600 },
@@ -55,6 +55,7 @@ export const EDGES: Array<{ id: EdgeId; name: string }> = [
 export const LOOK_DEFAULTS: Record<string, { font: FontId; edge: EdgeId }> = {
   ivory: { font: "classic", edge: "clean" },
   cobalt: { font: "classic", edge: "clean" },
+  indigo: { font: "classic", edge: "clean" },
   blush: { font: "editorial", edge: "soft" },
   gallery: { font: "modern", edge: "clean" },
   sage: { font: "editorial", edge: "soft" },
@@ -65,7 +66,7 @@ export const LOOK_DEFAULTS: Record<string, { font: FontId; edge: EdgeId }> = {
 export const lookDefaults = (themeId: string) => LOOK_DEFAULTS[themeId] ?? LOOK_DEFAULTS.ivory;
 
 /** Order of the look cards in the editor (first four shown, rest on "more"). */
-export const LOOK_ORDER = ["ivory", "cobalt", "blush", "gallery", "sage", "midnight", "golden", "kraft"];
+export const LOOK_ORDER = ["ivory", "indigo", "blush", "gallery", "sage", "midnight", "golden", "kraft"];
 
 export interface PageLook {
   fontId: FontId;

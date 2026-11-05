@@ -8,7 +8,7 @@
 
 import { BookOpen, Check } from "lucide-react";
 import { MiniBook } from "../book";
-import { BOOK_THEMES, occasionById, themeById, type CopyVoice } from "../data";
+import { occasionById, pickableThemes, themeById, type CopyVoice } from "../data";
 import type { BuilderState } from "../state";
 
 export function RevealScreen({
@@ -24,7 +24,7 @@ export function RevealScreen({
 }) {
   const occ = occasionById(state.occasion);
   // chosen vibe first, then the alternates
-  const order = [state.vibe || "ivory", ...BOOK_THEMES.map((t) => t.id).filter((id) => id !== (state.vibe || "ivory"))].slice(0, 3);
+  const order = [state.vibe || "ivory", ...pickableThemes().map((t) => t.id).filter((id) => id !== (state.vibe || "ivory"))].slice(0, 3);
   return (
     <div className="bb-screen bb-reveal">
       <div className="bb-kicker">Designed for you</div>

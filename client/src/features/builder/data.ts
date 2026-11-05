@@ -50,7 +50,10 @@ export interface BookTheme {
 
 export const BOOK_THEMES: BookTheme[] = [
   { id: "ivory", name: "Timeless Ivory", page: "#FAF7EE", ink: "#3C3C3B", accent: "#1D46A0", soft: "#EFEAD9", stripeA: "#EFE9D6", stripeB: "#E5DEC6", scrim: "rgba(250,247,238,0.88)", dark: false },
+  // Kept so books saved with this look still render exactly as they did. New
+  // books get Bold Indigo instead; see pickableThemes().
   { id: "cobalt", name: "Bold Cobalt", page: "#1D46A0", ink: "#FFFFFF", accent: "#F5D547", soft: "#2a5cc0", stripeA: "#2A57B4", stripeB: "#3160BD", scrim: "rgba(20,52,120,0.82)", dark: true },
+  { id: "indigo", name: "Bold Indigo", page: "#2A1E5C", ink: "#FFFFFF", accent: "#F595A9", soft: "#251C4F", stripeA: "#251C4F", stripeB: "#201943", scrim: "rgba(32,25,67,0.82)", dark: true },
   { id: "blush", name: "Soft Blush", page: "#F9EEEF", ink: "#3C3C3B", accent: "#DB3069", soft: "#F2DEE0", stripeA: "#F4E2E4", stripeB: "#EBD3D6", scrim: "rgba(249,238,239,0.88)", dark: false },
   { id: "gallery", name: "Gallery White", page: "#FFFFFF", ink: "#3C3C3B", accent: "#3C3C3B", soft: "#F1F1EE", stripeA: "#F1F1EE", stripeB: "#E5E5E0", scrim: "rgba(255,255,255,0.88)", dark: false },
   // Editor v2 looks (2026-10-18). Derived the same way palette.ts derives
@@ -64,6 +67,16 @@ export const BOOK_THEMES: BookTheme[] = [
 
 export const themeById = (id: string | null | undefined): BookTheme =>
   BOOK_THEMES.find((t) => t.id === id) ?? BOOK_THEMES[0];
+
+/** Looks no longer offered to new books, still drawn for books that use them. */
+const RETIRED_THEMES = new Set(["cobalt"]);
+
+/**
+ * The looks to offer in a picker: everything current, plus the book's own look
+ * if it has been retired, so a saved book's choice stays visible and selected.
+ */
+export const pickableThemes = (currentId?: string | null): BookTheme[] =>
+  BOOK_THEMES.filter((t) => !RETIRED_THEMES.has(t.id) || t.id === currentId);
 
 /* ── Occasions (quiz step 1) ────────────────────────────────── */
 
@@ -114,7 +127,7 @@ export interface Vibe {
 
 export const VIBES: Vibe[] = [
   { id: "ivory", name: "Timeless", blurb: "Warm ivory, classic type" },
-  { id: "cobalt", name: "Bold", blurb: "Deep cobalt, confident" },
+  { id: "indigo", name: "Bold", blurb: "Deep indigo, confident" },
   { id: "blush", name: "Soft", blurb: "Gentle blush, romantic" },
   { id: "gallery", name: "Minimal", blurb: "Pure white, gallery-calm" },
 ];
@@ -190,13 +203,13 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     uploadSub: "Don't worry about the order or the layout — that's our job.",
     uploadCta: "Add photos",
     uploadMore: "Add more",
-    generating: ["Looking through your photos…", "Choosing the best moments…", "Laying out your pages…", "Adding the finishing touches…"],
+    generating: ["Looking through your photos…", "Arranging your moments…", "Laying out your pages…", "Adding the finishing touches…"],
     revealTitle: "Here is your book — three ways",
     revealSub: "Same photos, three feels. Pick the one that feels like you.",
     ourPick: "Our pick for you",
     openBook: "Open this book",
     previewHint: "Click the right-hand page to turn — just like a real book.",
-    orderCta: "I love it — order my book",
+    orderCta: "I love it, order my book",
     customizeCta: "Make it mine",
     customizeTitle: "Make it yours",
     customizeSub: "Tap any page to change it. Nothing can go wrong.",
@@ -217,7 +230,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     uploadSub: "We arrange everything automatically.",
     uploadCta: "Add photos",
     uploadMore: "Add more",
-    generating: ["Analyzing photos…", "Selecting highlights…", "Building layouts…", "Finalizing…"],
+    generating: ["Reading your photos…", "Arranging photos…", "Building layouts…", "Finalizing…"],
     revealTitle: "Your book, three ways",
     revealSub: "Pick a direction.",
     ourPick: "Recommended",

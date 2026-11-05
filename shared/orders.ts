@@ -17,7 +17,7 @@
  */
 
 import { z } from "zod";
-import { BINDING_IDS, PRICE_LIST } from "./pricing";
+import { BINDING_IDS, PRICE_LIST, FINISH_IDS, DEFAULT_FINISH } from "./pricing";
 import { builderDocumentSchema } from "./document";
 
 export const ORDER_STATUSES = [
@@ -102,6 +102,7 @@ export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
 export const createOrderSchema = z.object({
   projectId: z.string().min(1).max(64),
   binding: z.enum(BINDING_IDS),
+  finish: z.enum(FINISH_IDS).default(DEFAULT_FINISH),
   qty: z.number().int().min(1).max(PRICE_LIST.maxQty),
   address: shippingAddressSchema,
   /** the exact book the customer saw — frozen onto the order for printing */

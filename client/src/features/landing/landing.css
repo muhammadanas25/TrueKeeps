@@ -167,9 +167,9 @@
 .lp .lp-price-card h3 { font-size: 14px; line-height: 22px; font-weight: 600; margin: 0 0 4px; color: var(--color-fg2); }
 .lp-price-card p { font-weight: 700; font-size: 22px; line-height: 28px; color: var(--heading); margin: 0; }
 .lp-page-note { font-size: 14px; line-height: 22px; color: var(--color-fg2); margin: 16px 0 0; max-width: 62ch; }
-.lp-page-steps { margin: 0; padding-left: 22px; max-width: 62ch; }
+.lp-page-steps { margin: 0; padding-left: 22px; max-width: 62ch; list-style: decimal; }
 .lp-page-steps li { margin-bottom: 10px; }
-.lp-page-ideas { margin: 0; padding-left: 20px; columns: 2; column-gap: 40px; max-width: 760px; }
+.lp-page-ideas { margin: 0; padding-left: 20px; list-style: disc; columns: 2; column-gap: 40px; max-width: 760px; }
 .lp-page-ideas li { margin-bottom: 8px; break-inside: avoid; }
 .lp-page-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 28px 20px; }
 .lp-page-grid .lp-occ-card { flex: none; }

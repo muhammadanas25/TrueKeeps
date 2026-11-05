@@ -59,7 +59,7 @@ function makeDatabase() {
 }
 
 export const auth = betterAuth({
-  appName: "TrueKeep",
+  appName: "TrueKeeps",
   baseURL: config.appUrl,
   basePath: "/api/auth",
   secret: config.auth.secret,

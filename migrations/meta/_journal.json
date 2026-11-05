@@ -22,6 +22,13 @@
       "when": 1792342321015,
       "tag": "0002_phase2b_orders_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793883046411,
+      "tag": "0003_order_finish",
+      "breakpoints": true
     }
   ]
 }

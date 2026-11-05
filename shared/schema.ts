@@ -316,6 +316,8 @@ export const orders = pgTable(
     totalMinor: integer("total_minor").notNull(),
     priceListVersion: text("price_list_version").notNull(),
     binding: text("binding").notNull(),
+    /** paper finish, a printing instruction: `matte` | `glossy` */
+    finish: text("finish").notNull().default("matte"),
     qty: integer("qty").notNull(),
     pageCount: integer("page_count").notNull(),
     /** denormalised for analytics / lifecycle campaigns */

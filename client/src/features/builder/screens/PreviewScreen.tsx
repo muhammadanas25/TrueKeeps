@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight, Hand, PenLine } from "lucide-react";
 import { Book3D, type Book3DApi } from "../book";
-import { BOOK_THEMES, occasionById, toSpreads, type CopyVoice } from "../data";
+import { occasionById, pickableThemes, toSpreads, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
 import type { BuilderState } from "../state";
 
@@ -61,7 +61,7 @@ export function PreviewScreen({
   return (
     <div className="bb-screen bb-preview">
       <div className="bb-preview-meta">
-        <span>{pageCount} pages</span>·<span>8×8 in</span>·<span>{theme.name}</span>
+        <span>{pageCount} pages</span>·<span>12×12 in</span>·<span>{theme.name}</span>
       </div>
       <h1>{state.title}</h1>
 
@@ -99,8 +99,8 @@ export function PreviewScreen({
       )}
 
       <div className="bb-actionbar">
-        <div className="bb-theme-dots" style={{ marginRight: 8 }}>
-          {BOOK_THEMES.map((t) => (
+        <div className="bb-theme-dots">
+          {pickableThemes(state.themeId).map((t) => (
             <button
               key={t.id}
               className={"bb-theme-dot" + (state.themeId === t.id ? " on" : "")}

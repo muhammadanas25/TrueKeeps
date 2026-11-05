@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useReducer, useRef } from "react";
+import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
 import type { EdgeId, FontId } from "./looks";
 import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
 
@@ -60,6 +61,8 @@ export interface BuilderState {
   pos: number;
   qty: number;
   binding: string;
+  /** paper finish, chosen on the order screen */
+  finish: FinishId;
   /* ── editor v2 style (looks.ts) ── */
   /** typeface for titles/captions; defaults reproduce the pre-v2 look */
   fontId: FontId;
@@ -89,6 +92,7 @@ export const DEFAULT_STATE: BuilderState = {
   pos: 0,
   qty: 1,
   binding: "hardcover",
+  finish: DEFAULT_FINISH,
   fontId: "classic",
   edge: "clean",
   subtitle: null,

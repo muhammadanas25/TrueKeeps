@@ -27,7 +27,7 @@ import { bookTheme } from "../palette";
 import { lowQualityPageCount } from "../print";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
-import { formatPKR, PRICE_LIST, quote } from "@shared/pricing";
+import { FINISHES, formatPKR, PRICE_LIST, quote } from "@shared/pricing";
 import { PK_PROVINCES, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useSession } from "@/features/auth/useSession";
 
@@ -96,8 +96,8 @@ export function OrderScreen({
   });
 
   const idempotencyKey = useMemo(
-    () => `${nonce.current}-${hash(JSON.stringify([state.projectId, q.binding, q.qty, addr]))}`,
-    [state.projectId, q.binding, q.qty, addr],
+    () => `${nonce.current}-${hash(JSON.stringify([state.projectId, q.binding, state.finish, q.qty, addr]))}`,
+    [state.projectId, q.binding, state.finish, q.qty, addr],
   );
 
   const onPay = async (e: FormEvent) => {
@@ -129,6 +129,7 @@ export function OrderScreen({
         body: JSON.stringify({
           projectId: state.projectId,
           binding: q.binding,
+          finish: state.finish,
           qty: q.qty,
           address: parsed.data,
           document: toDocument(state),
@@ -183,7 +184,7 @@ export function OrderScreen({
             </div>
             <div className="bb-spec-row">
               <b>Details</b>
-              <span>8×8 in · {state.pages.length} pages · matte paper · {theme.name}</span>
+              <span>12×12 in · {state.pages.length} pages · {theme.name}</span>
             </div>
             {softPages > 0 ? (
               <div className="bb-spec-row bb-spec-warn">
@@ -203,6 +204,25 @@ export function OrderScreen({
                   <button type="button" key={b.id} className={"bb-binding" + (q.binding === b.id ? " on" : "")} onClick={() => set({ binding: b.id })}>
                     <b>{b.name}</b>
                     <i>{formatPKR(b.priceMinor)}</i>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="bb-panel-label" style={{ marginBottom: 8 }}>
+                Finish
+              </div>
+              <div className="bb-bindings">
+                {FINISHES.map((f) => (
+                  <button
+                    type="button"
+                    key={f.id}
+                    className={"bb-binding" + (state.finish === f.id ? " on" : "")}
+                    aria-pressed={state.finish === f.id}
+                    onClick={() => set({ finish: f.id })}
+                  >
+                    <b>{f.name}</b>
+                    <i>{f.blurb}</i>
                   </button>
                 ))}
               </div>

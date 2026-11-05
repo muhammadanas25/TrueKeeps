@@ -40,7 +40,7 @@ export const DPI_MIN = 150;
  * function below takes the page size as an argument precisely so that
  * change is a one-line call-site edit, not a refactor.
  */
-export const PAGE_INCHES = { w: 8, h: 8 };
+export const PAGE_INCHES = { w: 12, h: 12 };
 
 /* ── Slot geometry ──────────────────────────────────────────── */
 

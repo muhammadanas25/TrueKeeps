@@ -190,7 +190,7 @@
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
-  --ls-tight: -0.02em;
+  --ls-tight: -0.005em;
 
   /* Radius: the kit sets cards at 14px and buttons and badges fully round */
   --radius-sm: 4px;
@@ -225,6 +225,7 @@
   body { @apply font-sans antialiased bg-background text-foreground; }
   /* A keyboard user always sees where they are; dark surfaces override --focus. */
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  h1, h2, h3 { color: var(--heading); }
 }
 
 @layer utilities {

@@ -47,6 +47,25 @@ export const PRICE_LIST = {
 
 export const BINDING_IDS = PRICE_LIST.bindings.map((b) => b.id) as [BindingId, ...BindingId[]];
 
+/* ── Paper finish ───────────────────────────────────────────────
+   A printing instruction, not a price: both finishes cost the same, so it
+   stays out of quote() and PRICE_LIST. Matte is the default because every
+   order placed before this choice existed was printed on matte. */
+
+export type FinishId = "matte" | "glossy";
+
+export const FINISHES: Array<{ id: FinishId; name: string; blurb: string }> = [
+  { id: "matte", name: "Matte", blurb: "Soft, no glare" },
+  { id: "glossy", name: "Glossy", blurb: "Bright, with a shine" },
+];
+
+export const FINISH_IDS = FINISHES.map((f) => f.id) as [FinishId, ...FinishId[]];
+export const DEFAULT_FINISH: FinishId = "matte";
+
+/** Display name for a stored finish; unknown values read as the default. */
+export const finishName = (id: string | null | undefined): string =>
+  (FINISHES.find((f) => f.id === id) ?? FINISHES[0]).name;
+
 export interface Quote {
   currency: typeof CURRENCY;
   binding: BindingId;

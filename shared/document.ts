@@ -17,6 +17,7 @@
  */
 
 import { z } from "zod";
+import { FINISH_IDS } from "./pricing";
 
 export const DOCUMENT_MAX_BYTES = 256 * 1024;
 
@@ -95,6 +96,8 @@ export const builderDocumentSchema = z.object({
   edge: z.enum(["clean", "soft", "border"]).optional(),
   subtitle: z.string().max(120).nullable().optional(),
   captionsHidden: z.boolean().optional(),
+  /** paper finish; optional because documents saved before it existed lack it */
+  finish: z.enum(FINISH_IDS).optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
   coverStyle: z.enum(["full", "framed", "minimal", "split"]),
   voice: z.enum(["warm", "concise"]),

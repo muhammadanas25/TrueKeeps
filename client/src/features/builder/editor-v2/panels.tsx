@@ -405,7 +405,9 @@ export function StylePanel({
   const quick = COLOR_QUICK.slice(0, 6).some((c) => same(c, current)) ? COLOR_QUICK.slice(0, 6) : [current, ...COLOR_QUICK.slice(0, 5)];
   const pick = (c: string) => onColour(c, scope);
   if (view === "colors") return <ColorGrid value={current} recent={book.recentColors} onPick={pick} onBack={() => setView("main")} />;
-  const looks = LOOK_ORDER.map((id) => BOOK_THEMES.find((t) => t.id === id)!).filter(Boolean);
+  // a saved book's retired look stays listed so its choice remains visible
+  const lookIds = LOOK_ORDER.includes(book.themeId) ? LOOK_ORDER : [...LOOK_ORDER, book.themeId];
+  const looks = lookIds.map((id) => BOOK_THEMES.find((t) => t.id === id)!).filter(Boolean);
   const shown = allLooks ? looks : looks.slice(0, 4);
   const sample = photos.filter((p) => p.url);
   return (

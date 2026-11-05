@@ -18,6 +18,7 @@ export interface PublicOrder {
   shippingMinor: number;
   totalMinor: number;
   binding: string;
+  finish: string;
   qty: number;
   pageCount: number;
   title: string;

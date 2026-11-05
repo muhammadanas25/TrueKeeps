@@ -15,7 +15,6 @@ import { BookTypePage, PhotoBooksPage } from "@/features/landing/pages";
  * are prerendered at build time, which needs them resolved without Suspense.
  */
 import Home from "@/pages/home";
-const Templates = lazy(() => import("@/pages/templates"));
 const Create = lazy(() => import("@/pages/create"));
 const BookBuilder = lazy(() => import("@/features/builder"));
 const Books = lazy(() => import("@/pages/books"));
@@ -79,7 +78,11 @@ function Router() {
             return book ? <BookTypePage book={book} /> : <NotFound />;
           }}
         </Route>
-        <Route path="/templates" component={Templates} />
+        {/* The old template gallery had dead controls and stock photos, and nothing
+            links to it any more; the book types are the designs people can browse. */}
+        <Route path="/templates">
+          <Redirect to="/photo-books" />
+        </Route>
         <Route path="/create" component={Create} />
         {/* quiz-first builder — the primary "autopilot" path */}
         <Route path="/wizard" component={BookBuilder} />
