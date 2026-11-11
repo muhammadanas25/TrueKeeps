@@ -80,7 +80,10 @@ export function applySecurity(app: Express) {
   app.set("trust proxy", 1);
   app.use(wwwRedirect);
 
-  const mediaOrigin = config.s3.publicBaseUrl ? new URL(config.s3.publicBaseUrl).origin : null;
+  // Uploads PUT straight to object storage, on the bucket's own subdomain.
+  // Signed reads arrive as redirects from /media, covered by img-src https:.
+  const storageHost = config.s3.endpoint ? new URL(config.s3.endpoint).host : null;
+  const storageSources = storageHost ? [`https://${storageHost}`, `https://*.${storageHost}`] : [];
 
   app.use(
     helmet({
@@ -102,8 +105,10 @@ export function applySecurity(app: Express) {
         // Figtree/Archivo via Google Fonts, Clash Display via Fontshare (index.html)
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://api.fontshare.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdn.fontshare.com", "data:"],
-        imgSrc: ["'self'", "data:", "blob:", "https:", ...(mediaOrigin ? [mediaOrigin] : [])],
-        connectSrc: ["'self'", ...(mediaOrigin ? [mediaOrigin] : [])],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", ...storageSources],
+        // the photo-preparing Web Worker, and the HEIC decoder's WebAssembly
+        workerSrc: ["'self'", "blob:"],
         frameAncestors: ["'none'"],
         formAction: ["'self'", "https://accounts.google.com"],
         // meaningless in report-only mode and Chrome logs an error for it

@@ -42,8 +42,7 @@ import ctaM800 from "./assets/cta-mobile-800.webp";
 import ctaM1200 from "./assets/cta-mobile-1200.webp";
 import how3 from "./assets/how-3.webp";
 import { AccountMenu } from "@/features/auth/AccountMenu";
-import { formatPKR, PRICE_LIST } from "@shared/pricing";
-import { BOOK_TYPES, PRICE_SUMMARY, SITE } from "@shared/site";
+import { BOOK_TYPES, PRICE_SUMMARY, SHIPPING_LINE, SITE } from "@shared/site";
 
 /** Route the marketing CTAs land on — the quiz-first book builder. */
 export const BUILDER_PATH = "/wizard";
@@ -147,9 +146,11 @@ export function Hero() {
 export function TrustStrip() {
   const items = [
     { icon: Eye, text: <span><b>See every page</b> before you pay</span> },
-    { icon: Truck, text: <span><b>Free shipping</b> from {formatPKR(PRICE_LIST.freeShippingFromMinor)}</span> },
+    // the Rs 500 remote-area charge is stated on the prices page, the FAQ and
+    // at checkout before payment (shared/pricing.ts)
+    { icon: Truck, text: <span><b>Free shipping</b></span> },
     { icon: ShieldCheck, text: <span><b>Love-it</b> guarantee</span> },
-    { icon: MessageCircle, text: <span><b>Help on WhatsApp</b>, 10am to 6pm</span> },
+    { icon: MessageCircle, text: <span><b>Help on WhatsApp</b></span> },
   ];
   return (
     <div className="lp-trust">
@@ -401,29 +402,35 @@ export function Showcase() {
     { Art: ArtPreview, h: "What you see is what you get", p: "Preview every page before you order. No surprises, just your book." },
   ];
   return (
+    // Full-bleed Banner 02 with the copy over an Indigo 900 fade on the left and
+    // the three features on a frosted panel (the owner preferred this layout to
+    // a split panel; 2026-11-11). Phones stack: photo, then copy.
     <section className="lp-showcase" id="book">
       <BannerPhoto set={KEEP_PHOTO} alt="A mother and child looking through a printed hardcover photo book of a newborn" />
-      <div className="lp-showcase-copy">
-        <div className="lp-eyebrow">What you'll hold</div>
-        <h2 className="lp-h2">
-          Not a print-out.
-          <br />A <span className="lp-mark">real keepsake.</span>
-        </h2>
-        <p className="lp-lede">
-          A big, beautiful book you can hold in your hands, share with family, and keep for years. Not lost in a phone.
-        </p>
-        <div className="lp-quality">
-          {features.map((q) => (
-            <div className="lp-qrow lp-reveal" key={q.h}>
-              <div className="lp-qart">
-                <q.Art />
+      <div className="lp-wrap">
+        <div className="lp-showcase-copy">
+          <div className="lp-eyebrow">What you'll hold</div>
+          <h2 className="lp-h2">
+            Not a print-out.
+            <br />A <span className="lp-mark">real keepsake.</span>
+          </h2>
+          <p className="lp-lede">
+            A big, beautiful book you can hold in your hands, share with family, and keep for years. Not lost in a
+            phone.
+          </p>
+          <div className="lp-quality">
+            {features.map((q) => (
+              <div className="lp-qrow lp-reveal" key={q.h}>
+                <div className="lp-qart">
+                  <q.Art />
+                </div>
+                <div>
+                  <h4>{q.h}</h4>
+                  <p>{q.p}</p>
+                </div>
               </div>
-              <div>
-                <h4>{q.h}</h4>
-                <p>{q.p}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -473,8 +480,8 @@ export function PlainFacts() {
       <div className="lp-wrap lp-center">
         <h2 className="lp-h2">Photo books, delivered across Pakistan.</h2>
         <p className="lp-lede">
-          {SITE.name} turns the photos on your phone into a printed 12×12 inch photo book. {PRICE_SUMMARY}, with flat{" "}
-          {formatPKR(PRICE_LIST.shippingMinor)} delivery nationwide, free from {formatPKR(PRICE_LIST.freeShippingFromMinor)}.
+          {SITE.name} turns the photos on your phone into a printed 12×12 inch photo book. {PRICE_SUMMARY}.{" "}
+          {SHIPPING_LINE}
         </p>
         <Link href="/photo-books" className="lp-link">
           See prices and questions <ArrowRight size={16} />
@@ -492,11 +499,16 @@ export function PlainFacts() {
  */
 export function FinalCTA({ showDesigns = true }: { showDesigns?: boolean }) {
   return (
+    // Centred closing panel on Indigo 900: Banner 03 is only a faint texture
+    // under two soft glows (Indigo and Rose), as in the owner's preferred
+    // pre-kit version, recoloured to the kit (2026-11-11).
     <section className="lp-cta">
-      <BannerPhoto set={CTA_PHOTO} alt="A printed photo book on a table, with a child on the cover holding a first day of school sign" />
+      <BannerPhoto set={CTA_PHOTO} className="lp-cta-photo" />
+      <div className="lp-cta-glow" aria-hidden="true"></div>
+      <div className="lp-cta-glow rose" aria-hidden="true"></div>
       <div className="lp-wrap">
         <div className="lp-cta-inner">
-          <div className="lp-eyebrow">Your story is already written</div>
+          <div className="lp-eyebrow center">Your story is already written</div>
           <h2 className="lp-h2">Don’t let your best photos get lost.</h2>
           <p>Start for free. We design your whole book, you make it yours, and you only pay when you love it.</p>
           <div className="lp-cta-actions">

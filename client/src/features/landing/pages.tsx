@@ -14,8 +14,8 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ChevronDown } from "lucide-react";
-import { formatPKR, PRICE_LIST } from "@shared/pricing";
-import { BOOK_TYPES, FAQS, type BookType } from "@shared/site";
+import { formatPKR, INCLUDED_PAGES, PRICE_LIST } from "@shared/pricing";
+import { BOOK_TYPES, FAQS, SHIPPING_LINE, type BookType } from "@shared/site";
 import { BOOK_IMAGES } from "./book-images";
 import { BUILDER_PATH, FinalCTA, Footer, Nav, StickyCTA } from "./sections";
 
@@ -39,7 +39,7 @@ function Breadcrumbs({ items }: { items: Array<{ label: string; href?: string }>
   );
 }
 
-/** Binding prices and the delivery rule, straight from the checkout price list. */
+/** The book price, the extra-sheet rate and the shipping rule, straight from the checkout price list. */
 function PriceList() {
   return (
     <section className="lp-page-section" aria-labelledby="prices">
@@ -47,16 +47,22 @@ function PriceList() {
         Prices
       </h2>
       <div className="lp-price-grid">
-        {PRICE_LIST.bindings.map((b) => (
-          <div className="lp-price-card" key={b.id}>
-            <h3>{b.name}</h3>
-            <p>{formatPKR(b.unitMinor)}</p>
-          </div>
-        ))}
+        <div className="lp-price-card">
+          <h3>Book, any binding</h3>
+          <p>{formatPKR(PRICE_LIST.bookMinor)}</p>
+        </div>
+        <div className="lp-price-card">
+          <h3>Each extra sheet</h3>
+          <p>{formatPKR(PRICE_LIST.extraSheetMinor)}</p>
+        </div>
+        <div className="lp-price-card">
+          <h3>Shipping</h3>
+          <p>Free</p>
+        </div>
       </div>
       <p className="lp-page-note">
-        Delivery is a flat {formatPKR(PRICE_LIST.shippingMinor)} anywhere in Pakistan, and free on orders of{" "}
-        {formatPKR(PRICE_LIST.freeShippingFromMinor)} or more. It's free to start, and you only pay when you order.
+        The book price covers {INCLUDED_PAGES} pages, in softcover, hardcover or layflat. A sheet is
+        2 pages. {SHIPPING_LINE} It's free to start, and you only pay when you order.
       </p>
     </section>
   );

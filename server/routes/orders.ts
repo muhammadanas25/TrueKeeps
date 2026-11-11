@@ -27,6 +27,9 @@ import { config } from "../config";
 import { log } from "../logger";
 import { paymentProvider, FakeProvider } from "../payments";
 import { checkoutUrlFor, confirmPayment, createOrder, OrderError } from "../orders/service";
+import type { BuilderDocument } from "@shared/document";
+import { mediaStore } from "../media";
+import { queuePrintRender, readManifest } from "../print/render";
 import { requireAdmin, requireMember, requireUser, currentUser } from "../middleware/auth";
 import { loadOwnedProject } from "../middleware/ownership";
 import { orderLimiter, writeLimiter } from "../middleware/rate-limit";
@@ -237,6 +240,57 @@ ordersRouter.get(
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
     res.json({ order, events: await storage.listOrderEvents(order.id) });
+  }),
+);
+
+/**
+ * Everything the printer needs for an order, as signed links (two hours):
+ *   - `files`: each placed photo cut from its HD original with the customer's
+ *     framing applied, at up to 300 DPI (server/print/render.ts)
+ *   - `cover`: the cover photo's original; covers carry no framing
+ *   - `originals`: every printed photo's untouched original, as a fallback
+ * `status` is `pending` until the render job has written its manifest.
+ */
+ordersRouter.get(
+  "/api/admin/orders/:id/print-files",
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const order = await storage.getOrder(req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    const doc = order.documentSnapshot as BuilderDocument;
+    const printed = new Set(doc.pages.flatMap((pg) => pg.slots.map((s) => s.photoId)));
+    if (doc.photos[0]) printed.add(doc.photos[0].id);
+    const rows = await storage.getUploadedPhotos(order.projectId);
+    const sign = async (key: string) => (await mediaStore.signedRead(key)).url;
+    const originals = await Promise.all(
+      rows
+        .filter((r) => printed.has(r.id) && r.storageKey)
+        .map(async (r) => ({ photoId: r.id, filename: r.originalFilename, width: r.width, height: r.height, sizeBytes: r.sizeBytes, url: await sign(r.storageKey!) })),
+    );
+    const manifest = await readManifest(order.projectId, order.id);
+    if (!manifest) return res.json({ status: "pending", files: [], cover: null, problems: [], originals });
+    res.json({
+      status: "ready",
+      renderedAt: manifest.renderedAt,
+      pageInches: manifest.pageInches,
+      files: await Promise.all(manifest.items.map(async (i) => ({ ...i, url: await sign(i.key) }))),
+      cover: manifest.cover ? { ...manifest.cover, url: await sign(manifest.cover.originalKey) } : null,
+      problems: manifest.problems,
+      originals,
+    });
+  }),
+);
+
+/** Re-cut an order's print files, e.g. after the renderer is improved. */
+ordersRouter.post(
+  "/api/admin/orders/:id/print-files/render",
+  requireAdmin,
+  writeLimiter,
+  asyncHandler(async (req, res) => {
+    const order = await storage.getOrder(req.params.id);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    queuePrintRender(order.id);
+    res.status(202).json({ queued: true });
   }),
 );
 

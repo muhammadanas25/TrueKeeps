@@ -134,13 +134,79 @@ export const VIBES: Vibe[] = [
 
 /* ── Cover styles / densities / bindings ────────────────────── */
 
-export type CoverStyleId = "full" | "framed" | "minimal" | "split";
+export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" | "moment" | "signature";
 export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
+  { id: "classic", name: "Classic" },
+  { id: "moment", name: "Moment" },
+  { id: "signature", name: "Signature" },
   { id: "full", name: "Full photo" },
   { id: "framed", name: "Framed" },
   { id: "minimal", name: "Title only" },
   { id: "split", name: "Split" },
 ];
+
+/** The three covers offered first, while the photos upload. */
+export const FEEL_CHOICES: Array<{ id: CoverStyleId; name: string; line: string }> = [
+  { id: "classic", name: "Classic", line: "A clean cover, one small photo and your names." },
+  { id: "moment", name: "Moment", line: "Your favourite photo fills the whole cover. No text." },
+  { id: "signature", name: "Signature", line: "Our special design." },
+];
+
+/** Has the customer made this choice yet? The default cover isn't one of these. */
+export function isFeelChoice(id: CoverStyleId): boolean {
+  return FEEL_CHOICES.some((f) => f.id === id);
+}
+
+/**
+ * Signature cover art, one per occasion. This prints in the customer's book,
+ * so its colours are written out rather than taken from interface tokens: a
+ * later brand change must never alter a book someone has already made.
+ */
+export interface SignatureArt {
+  name: string;
+  ground: string;
+  pattern: string;
+  size: string;
+}
+const SIGNATURES: Record<string, SignatureArt> = {
+  travel: {
+    name: "Postcard",
+    ground: "#FBF6F0",
+    pattern: "repeating-linear-gradient(135deg, #EE4266 0 12px, #FBF6F0 12px 24px, #2A1E5C 24px 36px, #FBF6F0 36px 48px)",
+    size: "auto",
+  },
+  birthday: {
+    name: "Confetti",
+    ground: "#FBF6F0",
+    pattern:
+      "radial-gradient(circle at 20% 30%, #EE4266 0 7%, transparent 8%), radial-gradient(circle at 70% 20%, #2A1E5C 0 5%, transparent 6%), radial-gradient(circle at 55% 70%, #F595A9 0 9%, transparent 10%), radial-gradient(circle at 15% 80%, #8881A4 0 5%, transparent 6%)",
+    size: "26% 21%",
+  },
+  baby: {
+    name: "Little Stars",
+    ground: "#201943",
+    pattern:
+      "radial-gradient(circle at 30% 30%, #FBF6F0 0 5%, transparent 6%), radial-gradient(circle at 70% 60%, #F9BBC8 0 5%, transparent 6%), radial-gradient(circle at 50% 85%, #B2AEC4 0 4%, transparent 5%)",
+    size: "18% 14%",
+  },
+  wedding: {
+    name: "Together",
+    ground: "#A5324A",
+    pattern: "repeating-linear-gradient(45deg, #CA3A58 0 6px, #A5324A 6px 12px)",
+    size: "auto",
+  },
+  mix: {
+    name: "Keepsake",
+    ground: "#2A1E5C",
+    pattern: "repeating-linear-gradient(45deg, #595080 0 2px, transparent 2px 10px), repeating-linear-gradient(-45deg, #595080 0 2px, transparent 2px 10px)",
+    size: "auto",
+  },
+};
+
+/** The Signature art for an occasion. */
+export function signatureFor(occasionId: string): SignatureArt {
+  return SIGNATURES[occasionId] ?? SIGNATURES.mix;
+}
 
 export type DensityId = "minimal" | "balanced" | "collage";
 export const DENSITIES: Array<{ id: DensityId; name: string; blurb: string }> = [
@@ -152,18 +218,19 @@ export const DENSITIES: Array<{ id: DensityId; name: string; blurb: string }> = 
 export interface Binding {
   id: string;
   name: string;
-  /** price per copy in PAISA — from the shared PKR price list */
-  priceMinor: number;
+  /** what the binding is; every binding costs the same (shared/pricing.ts) */
+  blurb: string;
 }
-/** Bindings + prices come from shared/pricing.ts so the server's quote
- *  and what the customer sees can never drift. */
-export const BINDINGS: Binding[] = PRICE_LIST.bindings.map((b) => ({ id: b.id, name: b.name, priceMinor: b.unitMinor }));
+/** Bindings come from shared/pricing.ts so the server's quote and what the
+ *  customer sees can never drift. */
+export const BINDINGS: Binding[] = PRICE_LIST.bindings.map((b) => ({ id: b.id, name: b.name, blurb: b.blurb }));
 
 /* ── Copy voices ────────────────────────────────────────────── */
 /* Every user-facing headline/CTA lives here so tone is switchable
    (and later A/B-testable) without touching components. */
 
 export interface CopyVoice {
+  occasionSub: string;
   quizHello: string;
   quizSub: string;
   qOccasion: string;
@@ -193,6 +260,7 @@ export interface CopyVoice {
 
 export const COPY: Record<"warm" | "concise", CopyVoice> = {
   warm: {
+    occasionSub: "Pick one, add your photos, and we do the rest.",
     quizHello: "Let's make your book",
     quizSub: "Three small questions, then we do the rest.",
     qOccasion: "What are we celebrating?",
@@ -200,7 +268,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     qTitle: "What should we call it?",
     titleHint: "You can change this anytime — even on the cover.",
     uploadTitle: "Now, your photos",
-    uploadSub: "Don't worry about the order or the layout — that's our job.",
+    uploadSub: "Don't worry about the order or the layout. That's our job.",
     uploadCta: "Add photos",
     uploadMore: "Add more",
     generating: ["Looking through your photos…", "Arranging your moments…", "Laying out your pages…", "Adding the finishing touches…"],
@@ -220,10 +288,11 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
     confirmSub: "We'll email you the moment it ships. Your book is saved here — come back anytime.",
   },
   concise: {
+    occasionSub: "Choose one, then add photos.",
     quizHello: "Create your book",
     quizSub: "Three quick questions.",
     qOccasion: "What's the occasion?",
-    qVibe: "Choose a style",
+    qVibe: "Choose a cover",
     qTitle: "Name your book",
     titleHint: "You can edit this later.",
     uploadTitle: "Upload photos",
@@ -276,6 +345,10 @@ export interface BuilderPhoto {
   w?: number;
   /** natural pixel height, EXIF-rotated; undefined = not measurable */
   h?: number;
+  /** false while the HD original we print from is still on the customer's device */
+  hd?: boolean;
+  /** fingerprint of the source file, to match it again after a closed tab */
+  fp?: string;
 }
 
 /* ── Page generation ────────────────────────────────────────── */
@@ -487,7 +560,9 @@ export function prettyCaption(label: string): string {
  * Deterministic auto-design.
  *
  * Walk the density's layout pattern, dealing photos into slots:
- *  1. Page 0 is always the title page (no photos).
+ *  1. The book opens on a photo. There is no words-only title page: the
+ *     title lives on the cover (owner, 2026-11-11). Books saved before then
+ *     keep their title page at index 0; see hasTitlePage().
  *  2. Each step takes the next pattern layout; if fewer photos remain
  *     than the layout wants, it degrades (duo→single etc.).
  *  3. "single" (framed) pages get the photo's label as a caption —
@@ -495,9 +570,25 @@ export function prettyCaption(label: string): string {
  *  4. Books must have an even page count to bind; an odd book gets a
  *     closing page reprising the first photo ("until next time").
  */
+/**
+ * Books made before 2026-11-11 start with a words-only title page, which stays
+ * first (it can't be moved or deleted). New books don't have one.
+ */
+export const hasTitlePage = (pages: ReadonlyArray<{ layout: string }>): boolean => pages[0]?.layout === "title";
+
+/** Index of the first page that can be moved, deleted or have pages added before it. */
+export const firstMovablePage = (pages: ReadonlyArray<{ layout: string }>): number => (hasTitlePage(pages) ? 1 : 0);
+
+/** The number printed on page `idx` (a title page is unnumbered; photo pages count from 1). */
+export const pageNumber = (pages: ReadonlyArray<{ layout: string }>, idx: number): number => (hasTitlePage(pages) ? idx : idx + 1);
+
+/** Short label for page `idx`: "Title" for an old book's title page, else "p.N". */
+export const pageLabel = (pages: ReadonlyArray<{ layout: string }>, idx: number): string =>
+  idx === 0 && hasTitlePage(pages) ? "Title" : "p." + pageNumber(pages, idx);
+
 export function generatePages(photos: BuilderPhoto[], density: DensityId): BookPage[] {
   const pattern = DENSITY_PATTERNS[density] ?? DENSITY_PATTERNS.balanced;
-  const pages: BookPage[] = [{ id: "pg-title", layout: "title", slots: [], caption: "" }];
+  const pages: BookPage[] = [];
   let pi = 0;
   let step = 0;
   let n = 0;
@@ -516,20 +607,23 @@ export function generatePages(photos: BuilderPhoto[], density: DensityId): BookP
     step++;
     n++;
   }
-  if (pages.length % 2 === 1 && pages.length > 1) {
+  if (pages.length % 2 === 1) {
     // reprise the opening photo, but as its OWN placement — sharing the
     // object would make reframing the first page silently reframe the last
     pages.push({
       id: "pg-end",
       layout: "single",
-      slots: pages[1].slots[0] ? [{ ...pages[1].slots[0] }] : [],
+      slots: pages[0].slots[0] ? [{ ...pages[0].slots[0] }] : [],
       caption: "until next time",
     });
   }
   return pages;
 }
 
-/** Pages → spreads (pairs). The title page sits LEFT of the first spread. */
+/**
+ * Pages → spreads (pairs). The first page sits LEFT of the first spread, so a
+ * new book opens on a photo; an older book's title page sits there instead.
+ */
 export function toSpreads(pages: BookPage[]): Spread[] {
   const spreads: Spread[] = [];
   for (let i = 0; i < pages.length; i += 2) {

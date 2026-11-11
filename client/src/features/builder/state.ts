@@ -4,7 +4,7 @@
  * Ported from the updated prototype shell (`~/Downloads/app.jsx`) and
  * typed. One state object drives the whole flow:
  *
- *   quiz → upload → generating → reveal → preview ↔ (customize | order) → confirm
+ *   quiz → upload → compose → generating → reveal → preview ↔ (customize | order) → confirm
  *
  * State ownership (per project conventions): this is pure client flow
  * state — server data stays in TanStack Query; ephemeral UI stays in
@@ -12,21 +12,22 @@
  * (the screens are cooperative and always patch valid shapes) plus a
  * `reset`; screen transitions are ordinary patches of `screen`.
  *
- * Persistence: debounced snapshot to localStorage, minus photo data
- * URLs (they blow the ~5MB quota — same trade-off as the classic
- * wizard). After a reload the book structure survives; photo tiles
- * fall back to labelled placeholders until re-upload (Phase 1 of the
- * roadmap moves originals to object storage and removes this caveat).
+ * Persistence: debounced snapshot to localStorage. Photos are stored by
+ * server URL; their in-browser copies live in upload/previews.ts, because
+ * those die with the tab. A photo that hadn't reached the server when the
+ * tab closed comes back as a labelled placeholder until it's added again.
  */
 
 import { useEffect, useReducer, useRef } from "react";
 import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
+import { normalizeMediaUrl } from "@shared/media";
 import type { EdgeId, FontId } from "./looks";
 import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
   | "quiz"
   | "upload"
+  | "compose"
   | "generating"
   | "reveal"
   | "preview"
@@ -36,7 +37,7 @@ export type BuilderScreen =
 
 export interface BuilderState {
   screen: BuilderScreen;
-  /** quiz sub-step: 0 occasion, 1 vibe, 2 title */
+  /** compose sub-step, while photos upload: 0 cover feel, 1 colours, 2 title */
   qstep: 0 | 1 | 2;
   occasion: string | null;
   vibe: string | null;
@@ -103,7 +104,8 @@ export const DEFAULT_STATE: BuilderState = {
 /** Where "back" goes from each screen (quiz handles its own sub-steps). */
 export const BACK_MAP: Partial<Record<BuilderScreen, BuilderScreen>> = {
   upload: "quiz",
-  reveal: "upload",
+  compose: "upload",
+  reveal: "compose",
   preview: "reveal",
   customize: "preview",
   order: "preview",
@@ -111,22 +113,29 @@ export const BACK_MAP: Partial<Record<BuilderScreen, BuilderScreen>> = {
 
 /** Header context label per screen. */
 export const SCREEN_CONTEXT: Record<BuilderScreen, string> = {
-  quiz: "Step 1 of 3 — about your book",
-  upload: "Step 2 of 3 — your photos",
+  quiz: "Step 1 of 3: the occasion",
+  upload: "Step 2 of 3: your photos",
+  compose: "Step 3 of 3: about your book",
   generating: "Designing…",
-  reveal: "Step 3 of 3 — pick a feel",
+  reveal: "Your book, three ways",
   preview: "Your book",
   customize: "Customizing",
   order: "Order",
   confirm: "",
 };
 
-type BuilderAction = { type: "patch"; patch: Partial<BuilderState> } | { type: "reset" };
+type BuilderAction =
+  | { type: "patch"; patch: Partial<BuilderState> }
+  /** Functional, because uploads finish while the customer edits: a stale list would undo their edit. */
+  | { type: "photos"; update: (photos: BuilderPhoto[]) => BuilderPhoto[] }
+  | { type: "reset" };
 
 function reducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
     case "patch":
       return { ...state, ...action.patch };
+    case "photos":
+      return { ...state, photos: action.update(state.photos) };
     case "reset":
       return { ...DEFAULT_STATE };
   }
@@ -228,6 +237,12 @@ function loadState(): BuilderState | null {
 
     const pages = migratePages(s.pages);
     if (s.screen === "generating") s.screen = pages.length ? "reveal" : "upload";
+    // The occasion was once followed by vibe and title on the same screen; a
+    // draft saved there continues at the photos, which come first now.
+    if (s.screen === "quiz" && s.occasion) s.screen = "upload";
+    if (s.screen === "upload" || s.screen === "compose") s.qstep = s.screen === "upload" ? 0 : (s.qstep ?? 0);
+    // Older books point at a public bucket that's going private.
+    if (Array.isArray(s.photos)) s.photos = s.photos.map((p) => ({ ...p, url: normalizeMediaUrl(p.url) }));
 
     if (!fromV2) {
       // One-way upgrade: the next persist writes v2, so retire the old
@@ -299,6 +314,7 @@ export function useBuilderState(initial?: Partial<BuilderState>) {
   }, []);
 
   const set = (patch: Partial<BuilderState>) => dispatch({ type: "patch", patch });
+  const updatePhotos = (update: (photos: BuilderPhoto[]) => BuilderPhoto[]) => dispatch({ type: "photos", update });
   const reset = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -309,5 +325,5 @@ export function useBuilderState(initial?: Partial<BuilderState>) {
     dispatch({ type: "reset" });
   };
 
-  return { state, set, reset };
+  return { state, set, updatePhotos, reset };
 }

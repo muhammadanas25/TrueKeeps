@@ -33,6 +33,14 @@ const photoSchema = z.object({
   /** natural pixel size (EXIF-rotated) — drives print-DPI limits */
   w: z.number().int().positive().optional(),
   h: z.number().int().positive().optional(),
+  /**
+   * False while this photo's HD original is still on the customer's device.
+   * Absent on every photo from before the two-stage upload, whose original
+   * was the only copy and so is already in place.
+   */
+  hd: z.boolean().optional(),
+  /** Fingerprint of the source file, to match it again if the tab closed mid-upload. */
+  fp: z.string().max(32).optional(),
 });
 
 /** A photo placed in a page slot with its framing (pan/zoom/rotation). */
@@ -93,13 +101,13 @@ export const builderDocumentSchema = z.object({
   pageColor: z.string().max(24).optional(),
   /* editor v2 style — all optional so older documents still validate */
   fontId: z.enum(["classic", "editorial", "modern", "script"]).optional(),
-  edge: z.enum(["clean", "soft", "border"]).optional(),
+  edge: z.enum(["clean", "soft", "shadow", "border"]).optional(),
   subtitle: z.string().max(120).nullable().optional(),
   captionsHidden: z.boolean().optional(),
   /** paper finish; optional because documents saved before it existed lack it */
   finish: z.enum(FINISH_IDS).optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
-  coverStyle: z.enum(["full", "framed", "minimal", "split"]),
+  coverStyle: z.enum(["full", "framed", "minimal", "split", "classic", "moment", "signature"]),
   voice: z.enum(["warm", "concise"]),
   qty: z.number().int().min(1).max(20),
   binding: z.string().max(40),

@@ -32,6 +32,8 @@ import {
   type NewOrderEvent,
   type Payment,
   type NewPayment,
+  type UploadBatch,
+  type NewUploadBatch,
 } from "@shared/schema";
 import type { OrderStatus } from "@shared/orders";
 import type { BuilderDocument } from "@shared/document";
@@ -129,10 +131,15 @@ export interface IStorage {
   
   getUploadedPhotos(projectId: string): Promise<UploadedPhoto[]>;
   getUploadedPhoto(id: string): Promise<UploadedPhoto | undefined>;
-  createUploadedPhoto(photo: InsertUploadedPhoto): Promise<UploadedPhoto>;
+  createUploadedPhoto(photo: InsertUploadedPhoto & { id?: string }): Promise<UploadedPhoto>;
   /** Used by the image pipeline to attach derivative URLs/dimensions after processing. */
   updateUploadedPhoto(id: string, photo: Partial<InsertUploadedPhoto>): Promise<UploadedPhoto | undefined>;
   deleteUploadedPhoto(id: string): Promise<boolean>;
+
+  /* ── upload measurements (docs/adr/014) ── */
+  /** Insert, or replace the row with the same id (a closed tab's report, superseded). */
+  saveUploadBatch(batch: NewUploadBatch): Promise<void>;
+  listUploadBatches(since: Date, limit: number): Promise<UploadBatch[]>;
 
   /* ── orders (Phase 2B) ── */
   /** Insert an order and its `created` event together. */
@@ -189,6 +196,7 @@ export class MemStorage implements IStorage {
   private projectPages: Map<string, ProjectPage>;
   private pagePhotos: Map<string, PagePhoto>;
   private uploadedPhotos: Map<string, UploadedPhoto>;
+  private uploadBatches = new Map<string, UploadBatch>();
 
   constructor() {
     this.themes = new Map();
@@ -470,11 +478,12 @@ export class MemStorage implements IStorage {
     return this.uploadedPhotos.get(id);
   }
 
-  async createUploadedPhoto(insertPhoto: InsertUploadedPhoto): Promise<UploadedPhoto> {
-    const id = randomUUID();
+  async createUploadedPhoto(insertPhoto: InsertUploadedPhoto & { id?: string }): Promise<UploadedPhoto> {
+    const id = insertPhoto.id ?? randomUUID();
     const photo: UploadedPhoto = {
       ...insertPhoto,
       id,
+      originalUploadedAt: insertPhoto.originalUploadedAt ?? null,
       status: insertPhoto.status ?? "pending",
       storageKey: insertPhoto.storageKey ?? null,
       thumbUrl: insertPhoto.thumbUrl ?? null,
@@ -494,6 +503,44 @@ export class MemStorage implements IStorage {
     const updated: UploadedPhoto = { ...photo, ...update };
     this.uploadedPhotos.set(id, updated);
     return updated;
+  }
+
+  async saveUploadBatch(batch: NewUploadBatch): Promise<void> {
+    const now = new Date();
+    const prev = this.uploadBatches.get(batch.id);
+    this.uploadBatches.set(batch.id, {
+      projectId: null,
+      kind: "new",
+      rejectedCount: 0,
+      duplicateCount: 0,
+      heicCount: 0,
+      sourceBytes: 0,
+      originalBytes: 0,
+      displayBytes: 0,
+      firstInBookMs: null,
+      allInBookMs: null,
+      allHdMs: null,
+      hdMbps: null,
+      retries: 0,
+      stalls: 0,
+      connection: null,
+      downlinkMbps: null,
+      deviceMemoryGb: null,
+      cpuCores: null,
+      mobile: null,
+      browser: null,
+      photos: null,
+      ...batch,
+      createdAt: prev?.createdAt ?? now,
+      updatedAt: now,
+    } as UploadBatch);
+  }
+
+  async listUploadBatches(since: Date, limit: number): Promise<UploadBatch[]> {
+    return Array.from(this.uploadBatches.values())
+      .filter((b) => b.createdAt >= since)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit);
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

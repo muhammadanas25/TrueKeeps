@@ -27,6 +27,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { BuilderDocument } from "@shared/document";
 import { DEFAULT_FINISH } from "@shared/pricing";
+import { normalizeMediaUrl } from "@shared/media";
 import { apiRequest } from "@/lib/queryClient";
 import { getClaim, forgetClaim } from "@/lib/claims";
 import { THEME_COLOUR } from "./palette";
@@ -40,6 +41,32 @@ interface SyncMeta {
   version: number;
   /** ms epoch of our last successful save (or load) of this project */
   savedAt: number;
+  /** fingerprint of the last document this device SENT, even if no reply came */
+  sent?: string;
+}
+
+/**
+ * Fingerprint a document, ignoring key order: the server stores it in its
+ * schema's order, not the order we sent.
+ */
+function documentPrint(value: unknown): string {
+  const canonical = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(canonical);
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      return Object.keys(o)
+        .sort()
+        .reduce<Record<string, unknown>>((out, k) => {
+          if (o[k] !== undefined) out[k] = canonical(o[k]);
+          return out;
+        }, {});
+    }
+    return v;
+  };
+  const json = JSON.stringify(canonical(value));
+  let h = 5381;
+  for (let i = 0; i < json.length; i++) h = ((h << 5) + h + json.charCodeAt(i)) | 0;
+  return `${json.length}-${(h >>> 0).toString(36)}`;
 }
 function readMeta(projectId: string): SyncMeta | null {
   try {
@@ -76,6 +103,8 @@ export function toDocument(s: BuilderState): BuilderDocument {
       url: p.url && !p.url.startsWith("data:") ? p.url : undefined,
       w: p.w,
       h: p.h,
+      hd: p.hd,
+      fp: p.fp,
     })),
     pages: s.pages.map((pg) => ({
       id: pg.id,
@@ -118,7 +147,8 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
     occasion: d.occasion,
     vibe: d.vibe,
     title: d.title,
-    photos: d.photos.map((p) => ({ id: p.id, label: p.label, shade: p.shade, url: p.url, w: p.w, h: p.h })),
+    // normalizeMediaUrl: older books point at a public bucket that's going private
+    photos: d.photos.map((p) => ({ id: p.id, label: p.label, shade: p.shade, url: normalizeMediaUrl(p.url), w: p.w, h: p.h, hd: p.hd, fp: p.fp })),
     pages: d.pages.map((pg) => ({
       id: pg.id,
       layout: pg.layout,
@@ -238,6 +268,14 @@ export function useBuilderSync(state: BuilderState, set: (patch: Partial<Builder
       if (!project) return;
       const meta = readMeta(localId);
       const serverAt = new Date(project.updatedAt).getTime();
+      // A save sent as the page closed reaches the server but its reply never
+      // comes back, so the server looks newer than our last confirmed save. If
+      // what's there is what this device sent, it's ours: adopting it would
+      // throw away anything newer here and blame "another device" for it.
+      if (project.document && meta?.sent && documentPrint(project.document) === meta.sent) {
+        writeMeta(localId, { version: project.documentVersion, savedAt: Date.now(), sent: meta.sent });
+        return;
+      }
       // server newer than our last save by a margin → edited elsewhere
       if (project.document && (!meta || serverAt > meta.savedAt + 2000)) {
         if (meta) toast({ title: "Loaded your latest changes", description: "This book was edited on another device." });
@@ -271,7 +309,10 @@ export function useBuilderSync(state: BuilderState, set: (patch: Partial<Builder
     if (json === lastSent.current) return;
     inflight.current = true;
     setStatus("saving");
-    const version = readMeta(projectId)?.version ?? 0;
+    const meta = readMeta(projectId);
+    const version = meta?.version ?? 0;
+    const sent = documentPrint(document);
+    writeMeta(projectId, { version, savedAt: meta?.savedAt ?? 0, sent });
     try {
       const res = await fetch(`/api/projects/${projectId}/document`, {
         method: "PUT",
@@ -281,7 +322,7 @@ export function useBuilderSync(state: BuilderState, set: (patch: Partial<Builder
       });
       if (res.ok) {
         const data = (await res.json()) as { documentVersion: number };
-        writeMeta(projectId, { version: data.documentVersion, savedAt: Date.now() });
+        writeMeta(projectId, { version: data.documentVersion, savedAt: Date.now(), sent });
         lastSent.current = json;
         setStatus("saved");
         return;

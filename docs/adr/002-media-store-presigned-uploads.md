@@ -2,6 +2,8 @@
 
 **Status:** accepted · 2026-07-14
 
+**Partly superseded by [ADR 011](011-two-stage-uploads-and-private-media.md):** reads are now private, and the builder uploads in two stages without compressing originals.
+
 ## Context
 
 Photos were uploaded as base64 data URLs inside JSON bodies

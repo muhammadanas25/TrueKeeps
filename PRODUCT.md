@@ -17,7 +17,7 @@ Both arrive with an occasion in mind (wedding, baby, travel, birthday, or a mix)
 
 ## Product Purpose
 
-TrueKeeps turns phone photos into a printed, bound photo book. A short quiz (occasion → vibe → title) plus an upload produces a complete book automatically: cover, layouts and captions. The user can view it as a book, customize any part of it, and order it printed and delivered.
+TrueKeeps turns phone photos into a printed, bound photo book. The occasion, the photos and three small questions (cover, colours, title) produce a complete book automatically: cover, layouts and captions. The user can view it as a book, customize any part of it, and order it printed and delivered.
 
 Success means a first-time user goes from photos to a book they're proud of, and to a paid order, without ever feeling they had to "design" anything. Users who do want control should never hit a wall.
 
@@ -34,7 +34,7 @@ What sets TrueKeeps apart from local print shops and photo studios is all four o
 
 ## Operating Context
 
-- Primary path: the quiz-first builder at `/wizard`: quiz → upload → generating → reveal (pick a feel) → preview → customize (optional branch) → order → confirm. It's mobile-first.
+- Primary path: the quiz-first builder at `/wizard`: occasion → upload → compose (cover, colours, title, while photos upload in the background) → generating → reveal → preview → customize (optional branch) → order → confirm. It's mobile-first.
 - Power-user path: the canvas editor (`/create`) for page-level control. It's desktop-oriented and accepted as such; review and ordering work on mobile.
 - Users can build signed out (anonymous guest session) and are asked to sign in (Google or email magic link) to save or order; their guest draft carries over. Drafts autosave and can be resumed from `/books`.
 - Original founder sketches of the intended flow (auto-generated book → continue to customize the front and back cover → choose a cover style → book preview → upload your own cover photos → select a theme → order) are in `tk1.jpeg`–`tk3.jpeg` at the repo root.
@@ -73,7 +73,7 @@ What sets TrueKeeps apart from local print shops and photo studios is all four o
   - press
   - any paper certification such as FSC; the printer can't prove one today
 
-  Owner-confirmed on 2026-11-05: free shipping from Rs 10,000 (checkout applies it), the Love-it guarantee (wording pending) and WhatsApp help from 10am to 6pm. Automatic removal of blurry or duplicate photos does not exist; the product warns about photos that may print soft. Future work must not fabricate reviews, testimonials, counts, delivery promises or guarantees.
+  Owner-confirmed on 2026-11-05: the Love-it guarantee (wording pending) and help on WhatsApp (the owner dropped the 10am to 6pm hours on 2026-11-11). Owner-confirmed prices on 2026-11-11: Rs 5,690 a book in any binding with 5 sheets (10 pages) inside, Rs 550 per extra sheet, free shipping except Rs 500 for Gilgit-Baltistan, Azad Kashmir and Balochistan outside Quetta (shared/pricing.ts, docs/adr/012). New books open on a photo with the title on the cover (docs/adr/013). Automatic removal of blurry or duplicate photos does not exist; the product warns about photos that may print soft. Future work must not fabricate reviews, testimonials, counts, delivery promises or guarantees.
 - **No real product photography** of printed TrueKeep books exists yet.
 
 ## Product Principles

@@ -22,7 +22,8 @@
 import { createContext, useContext } from "react";
 
 export type FontId = "classic" | "editorial" | "modern" | "script";
-export type EdgeId = "clean" | "soft" | "border";
+/** "border" is retired from the picker (a thin white line that barely showed), kept for books that use it. */
+export type EdgeId = "clean" | "soft" | "shadow" | "border";
 
 export interface FontDef {
   id: FontId;
@@ -30,6 +31,10 @@ export interface FontDef {
   /** display face for titles (and captions in `script`) */
   display: string;
   weight: number;
+  /** caption face, for showing the title + caption pair in the editor (matches builder.css .bb-font-*) */
+  caption: string;
+  captionWeight: number;
+  captionItalic?: boolean;
 }
 
 /**
@@ -38,16 +43,17 @@ export interface FontDef {
  * the site's fonts must not change them.
  */
 export const FONTS: FontDef[] = [
-  { id: "classic", name: "Classic", display: "'Clash Display', var(--font-display), sans-serif", weight: 600 },
-  { id: "editorial", name: "Editorial", display: "'Instrument Serif', Georgia, serif", weight: 400 },
-  { id: "modern", name: "Modern", display: "'Archivo', var(--font-body), sans-serif", weight: 500 },
-  { id: "script", name: "Handwritten", display: "'Caveat', 'Segoe Script', cursive", weight: 600 },
+  { id: "classic", name: "Classic", display: "'Clash Display', var(--font-display), sans-serif", weight: 600, caption: "var(--font-display)", captionWeight: 500 },
+  { id: "editorial", name: "Editorial", display: "'Instrument Serif', Georgia, serif", weight: 400, caption: "'Instrument Serif', Georgia, serif", captionWeight: 400, captionItalic: true },
+  { id: "modern", name: "Modern", display: "'Archivo', var(--font-body), sans-serif", weight: 500, caption: "'Archivo', var(--font-body), sans-serif", captionWeight: 400 },
+  { id: "script", name: "Handwritten", display: "'Caveat', 'Segoe Script', cursive", weight: 600, caption: "'Caveat', 'Segoe Script', cursive", captionWeight: 600 },
 ];
 export const fontById = (id: string | null | undefined): FontDef => FONTS.find((f) => f.id === id) ?? FONTS[0];
 
 export const EDGES: Array<{ id: EdgeId; name: string }> = [
   { id: "clean", name: "Clean" },
   { id: "soft", name: "Rounded" },
+  { id: "shadow", name: "Shadow" },
   { id: "border", name: "Bordered" },
 ];
 
@@ -59,9 +65,9 @@ export const LOOK_DEFAULTS: Record<string, { font: FontId; edge: EdgeId }> = {
   blush: { font: "editorial", edge: "soft" },
   gallery: { font: "modern", edge: "clean" },
   sage: { font: "editorial", edge: "soft" },
-  midnight: { font: "modern", edge: "border" },
-  golden: { font: "classic", edge: "border" },
-  kraft: { font: "script", edge: "border" },
+  midnight: { font: "modern", edge: "clean" },
+  golden: { font: "classic", edge: "shadow" },
+  kraft: { font: "script", edge: "shadow" },
 };
 export const lookDefaults = (themeId: string) => LOOK_DEFAULTS[themeId] ?? LOOK_DEFAULTS.ivory;
 

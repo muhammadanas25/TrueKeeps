@@ -67,7 +67,6 @@ const envSchema = z.object({
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
-  S3_PUBLIC_BASE_URL: z.string().optional(),
 
   /** pino level; `silent` in tests */
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default(isProd ? "info" : "debug"),
@@ -142,7 +141,6 @@ export const config = {
     bucket: env.S3_BUCKET,
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-    publicBaseUrl: env.S3_PUBLIC_BASE_URL,
   },
   logLevel: env.LOG_LEVEL,
 } as const;

@@ -18,13 +18,14 @@
  * exactly like a fresh dev server.
  */
 
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import {
   themes,
   projects,
   projectPages,
   pagePhotos,
   uploadedPhotos,
+  uploadBatches,
   users,
   orders,
   orderEvents,
@@ -46,6 +47,8 @@ import {
   type InsertPagePhoto,
   type UploadedPhoto,
   type InsertUploadedPhoto,
+  type UploadBatch,
+  type NewUploadBatch,
 } from "@shared/schema";
 import type { BuilderDocument } from "@shared/document";
 import type { OrderStatus } from "@shared/orders";
@@ -312,7 +315,7 @@ export class DrizzleStorage implements IStorage {
     return rows[0];
   }
 
-  async createUploadedPhoto(photo: InsertUploadedPhoto): Promise<UploadedPhoto> {
+  async createUploadedPhoto(photo: InsertUploadedPhoto & { id?: string }): Promise<UploadedPhoto> {
     const rows = await this.db.insert(uploadedPhotos).values(photo).returning();
     return rows[0];
   }
@@ -320,6 +323,18 @@ export class DrizzleStorage implements IStorage {
   async updateUploadedPhoto(id: string, update: Partial<InsertUploadedPhoto>): Promise<UploadedPhoto | undefined> {
     const rows = await this.db.update(uploadedPhotos).set(update).where(eq(uploadedPhotos.id, id)).returning();
     return rows[0];
+  }
+
+  async saveUploadBatch(batch: NewUploadBatch): Promise<void> {
+    const { id: _id, createdAt: _c, ...rest } = batch;
+    await this.db
+      .insert(uploadBatches)
+      .values(batch)
+      .onConflictDoUpdate({ target: uploadBatches.id, set: { ...rest, updatedAt: new Date() } });
+  }
+
+  async listUploadBatches(since: Date, limit: number): Promise<UploadBatch[]> {
+    return this.db.select().from(uploadBatches).where(gte(uploadBatches.createdAt, since)).orderBy(desc(uploadBatches.createdAt)).limit(limit);
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

@@ -24,6 +24,11 @@
  *   history of BookSlice values. Edits go through the pure functions in
  *   book-ops.ts; gestures write live and record ONE undo step each.
  *
+ * The front cover comes first (owner, 2026-11-11): the editor opens on it,
+ * ← from the first spread goes back to it, and on it the Text panel edits
+ * the title and line, Layout picks the cover style, and Photos picks the
+ * cover photo (the cover shows the book's first photo).
+ *
  * Rendering reuses PageFace from book.tsx — the same component the 3-D
  * preview, the order screen and the print snapshot use — so what you
  * edit is exactly what prints. Typeface/edges/subtitle/captions reach it
@@ -56,17 +61,17 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { PageFace } from "../book";
-import { occasionById, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
+import { CoverFace, PageFace } from "../book";
+import { firstMovablePage, hasTitlePage, occasionById, pageNumber, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
 import { PageLookContext, usePageLook, type EdgeId, type FontId } from "../looks";
 import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
 import type { BuilderState } from "../state";
 import type { SyncStatus } from "../sync";
 import { TKLogo } from "@/features/landing/primitives";
-import { apiRequest } from "@/lib/queryClient";
-import { readImageSize, uploadPhotoFile } from "@/lib/uploads";
-import { formatPKR, quote } from "@shared/pricing";
+import { useUploads } from "../upload/UploadContext";
+import { UploadPill } from "../upload/UploadStatus";
+import { formatPKR, printedPageCount, quote } from "@shared/pricing";
 import * as ops from "./book-ops";
 import { LayoutPanel, PhotosPanel, StylePanel, TextPanel } from "./panels";
 import { SlotLayer } from "./SlotLayer";
@@ -134,7 +139,9 @@ export function EditorV2({
   const baseLook = usePageLook();
 
   /* ── view state ─────────────────────────────────────────────── */
-  const [cur, setCur] = useState(() => Math.min(1, Math.max(0, pages.length - 1)));
+  const [cur, setCur] = useState(0);
+  /** the front cover is on the stage (the editor opens on it) */
+  const [onCover, setOnCover] = useState(true);
   const [dir, setDir] = useState(0);
   const [sel, setSel] = useState<Sel>(null);
   const [crop, setCrop] = useState(false);
@@ -142,7 +149,7 @@ export function EditorV2({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [arrange, setArrange] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const uploads = useUploads();
   const [toast, setToast] = useState<{ msg: string; undoable?: boolean; k: number } | null>(null);
   const toolInit = useRef(false);
   useEffect(() => {
@@ -167,8 +174,9 @@ export function EditorV2({
         { page: pages[2 * spreadK] ?? null, idx: 2 * spreadK },
         { page: pages[2 * spreadK + 1] ?? null, idx: 2 * spreadK + 1 },
       ];
-  const activePage =
-    shown.find((s) => s.page && s.page.id === activeId)?.page ??
+  const activePage = onCover
+    ? null
+    : shown.find((s) => s.page && s.page.id === activeId)?.page ??
     shown.find((s) => s.page && s.page.layout !== "title")?.page ??
     shown.find((s) => s.page)?.page ??
     null;
@@ -217,7 +225,28 @@ export function EditorV2({
   };
 
   /* ── navigation ─────────────────────────────────────────────── */
+  const clearSel = () => {
+    setSel(null);
+    setCrop(false);
+    setActiveId(null);
+  };
   const go = (d: number) => {
+    // the cover sits before the first page: → leaves it, ← from the start returns to it
+    if (onCover) {
+      if (d > 0 && pages.length) {
+        setDir(1);
+        setOnCover(false);
+        setCur(0);
+        clearSel();
+      }
+      return;
+    }
+    if (d < 0 && (isMobile ? idx === 0 : spreadK === 0)) {
+      setDir(-1);
+      setOnCover(true);
+      clearSel();
+      return;
+    }
     const n = isMobile ? clamp(idx + d, 0, last) : clamp(2 * (spreadK + d), 0, last);
     if ((isMobile && n === idx) || (!isMobile && Math.floor(n / 2) === spreadK)) return;
     setDir(d);
@@ -227,7 +256,8 @@ export function EditorV2({
     setActiveId(null);
   };
   const jumpTo = (i: number) => {
-    setDir(i >= idx ? 1 : -1);
+    setDir(onCover || i >= idx ? 1 : -1);
+    setOnCover(false);
     setCur(i);
     setSel(null);
     setCrop(false);
@@ -239,7 +269,13 @@ export function EditorV2({
   const selSlot = selPage && sel ? selPage.slots[sel.slot] ?? null : null;
   const selPhoto = selSlot ? photos.find((p) => p.id === selSlot.photoId) : undefined;
   const usage = useMemo(() => ops.photoUsage(pages), [pages]);
-  const spreadPageIds = shown.map((s) => s.page?.id).filter(Boolean) as string[];
+  const jumpCover = () => {
+    if (onCover) return;
+    setDir(-1);
+    setOnCover(true);
+    clearSel();
+  };
+  const spreadPageIds = onCover ? [] : (shown.map((s) => s.page?.id).filter(Boolean) as string[]);
   const spreadBg = shown.find((s) => s.page?.bg)?.page?.bg ?? null;
 
   /* ── actions ────────────────────────────────────────────────── */
@@ -276,6 +312,13 @@ export function EditorV2({
         say("Photo swapped", true);
         return;
       }
+      if (onCover) {
+        // the cover shows the book's first photo, so the pick moves to the front
+        const chosen = photos.find((p) => p.id === photoId);
+        if (chosen) set({ photos: [chosen, ...photos.filter((p) => p.id !== photoId)] });
+        if (isMobile) setTool(null);
+        return say("Cover photo changed");
+      }
       if (!activePage || activePage.layout === "title") return say("Go to a photo page first");
       const next = ops.addPhotoToPage(slice(), activePage.id, photoId);
       if (!next) return say("This page is full — select a photo on it to swap instead");
@@ -296,7 +339,7 @@ export function EditorV2({
     mirror: () => activePage && commit((b) => ({ ...b, pages: b.pages.map((p) => (p.id === activePage.id ? { ...p, mirror: !p.mirror } : p)) })),
     reflow: (d: BuilderState["density"]) => {
       commit((b) => ops.reflow(b, d, photos));
-      jumpTo(1);
+      jumpTo(firstMovablePage(stateRef.current.pages));
       say("Re-arranged the whole book", true);
     },
     movePage: (from: number, to: number) => {
@@ -326,44 +369,13 @@ export function EditorV2({
 
   /* ── adding photos from the Photos panel ────────────────────── */
   const addFiles = async (files: FileList) => {
-    const images = Array.from(files).filter((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
-    if (!images.length) return;
-    setUploading(true);
-    try {
-      let projectId = stateRef.current.projectId;
-      if (!projectId) {
-        const res = await apiRequest("POST", "/api/projects", { name: stateRef.current.title || occ.suggestedTitle, status: "draft" });
-        projectId = ((await res.json()) as { id: string }).id;
-        set({ projectId });
-      }
-      const added: BuilderPhoto[] = [];
-      let n = stateRef.current.photos.length;
-      for (const file of images) {
-        try {
-          const up = await uploadPhotoFile(file, projectId);
-          const size = up.width && up.height ? { w: up.width, h: up.height } : await readImageSize(file);
-          added.push({
-            id: up.id,
-            label: occ.photoLabels[n % occ.photoLabels.length] || file.name.replace(/\.[^.]+$/, ""),
-            shade: n % 3,
-            url: up.url,
-            w: size?.w,
-            h: size?.h,
-          });
-          n++;
-        } catch {
-          /* one bad file shouldn't stop the rest */
-        }
-      }
-      if (added.length) {
-        set({ photos: [...stateRef.current.photos, ...added] });
-        say(`${added.length} photo${added.length > 1 ? "s" : ""} added — tap one to place it`);
-      } else say("Couldn't upload those photos. Please try again.");
-    } catch {
-      say("You seem to be offline — try again in a moment.");
-    } finally {
-      setUploading(false);
-    }
+    const before = stateRef.current.photos.length;
+    await uploads.addFiles(Array.from(files));
+    // photos appear straight away; the upload engine carries on in the background
+    window.setTimeout(() => {
+      const added = stateRef.current.photos.length - before;
+      if (added > 0) say(`${added} photo${added > 1 ? "s" : ""} added. Tap one to place it.`);
+    }, 0);
   };
 
   /* ── keyboard ───────────────────────────────────────────────── */
@@ -536,10 +548,11 @@ export function EditorV2({
   /* ── panels ─────────────────────────────────────────────────── */
   const spreadTargets = shown
     .filter((s) => s.page && s.page.layout !== "title")
-    .map((s, i, arr) => ({ id: s.page!.id, label: (arr.length > 1 ? (i === 0 ? "Left" : "Right") + " · " : "") + "p." + s.idx }));
+    .map((s, i, arr) => ({ id: s.page!.id, label: (arr.length > 1 ? (i === 0 ? "Left" : "Right") + " · " : "") + "p." + pageNumber(pages, s.idx) }));
   const panel =
     tool === "layout" ? (
       <LayoutPanel
+        cover={onCover ? { style: state.coverStyle, onStyle: (id) => set({ coverStyle: id }) } : null}
         theme={activePage?.bg ? deriveTheme(theme, activePage.bg) : theme}
         activePage={activePage}
         spreadTargets={spreadTargets}
@@ -550,14 +563,16 @@ export function EditorV2({
         onReflow={A.reflow}
       />
     ) : tool === "photos" ? (
-      <PhotosPanel photos={photos} usage={usage} selecting={Boolean(sel)} isMobile={isMobile} uploading={uploading} onPick={A.pickPhoto} onAddFiles={addFiles} />
+      <PhotosPanel photos={photos} usage={usage} selecting={Boolean(sel)} isMobile={isMobile} uploading={false} onPick={A.pickPhoto} onAddFiles={addFiles} />
     ) : tool === "style" ? (
-      <StylePanel book={ops.sliceOf(state)} photos={photos} spreadBg={spreadBg} onLook={A.look} onColour={A.colour} onFont={A.font} onEdge={A.edge} />
+      <StylePanel book={ops.sliceOf(state)} photos={photos} spreadBg={spreadBg} onLook={A.look} onColour={A.colour} onEdge={A.edge} />
     ) : tool === "text" ? (
       <TextPanel
         book={ops.sliceOf(state)}
         subtitleDefault={occ.subtitle}
+        onCover={onCover}
         activePage={activePage}
+        onFont={A.font}
         onTitle={A.title}
         onSubtitle={A.subtitle}
         onCaption={A.caption}
@@ -576,7 +591,7 @@ export function EditorV2({
     }),
     [baseLook, commit],
   );
-  const ctx: ThumbCtx = { photos, theme, title: state.title, occasion: occ };
+  const ctx: ThumbCtx = { photos, theme, title: state.title, occasion: occ, coverStyle: state.coverStyle };
 
   const renderPage = (entry: { page: BookPage | null; idx: number }, side: string) => {
     const page = entry.page;
@@ -626,15 +641,23 @@ export function EditorV2({
     );
   };
 
-  const pageLabel = isMobile
-    ? idx === 0
-      ? `Title page · ${pages.length} pages`
-      : `Page ${idx} of ${last}`
-    : spreadK === 0
-      ? `Title page · Page 1 of ${last}`
-      : `Pages ${2 * spreadK}${pages[2 * spreadK + 1] ? "–" + (2 * spreadK + 1) : ""} of ${last}`;
+  // An old book's title page is unnumbered; everything else counts from 1.
+  const hasTitle = hasTitlePage(pages);
+  const numbered = hasTitle ? last : pages.length;
+  const num = (i: number) => pageNumber(pages, i);
+  const pageLabel = onCover
+    ? `Front cover · ${numbered} pages inside`
+    : isMobile
+      ? idx === 0 && hasTitle
+        ? `Title page · ${pages.length} pages`
+        : `Page ${num(idx)} of ${numbered}`
+      : spreadK === 0 && hasTitle
+        ? `Title page · Page 1 of ${numbered}`
+        : `Pages ${num(2 * spreadK)}${pages[2 * spreadK + 1] ? "–" + num(2 * spreadK + 1) : ""} of ${numbered}`;
 
-  const q = quote({ binding: state.binding, qty: state.qty });
+  // no address yet in the editor, so this is the book price before any
+  // remote-area delivery charge; it moves as sheets are added or removed
+  const q = quote({ binding: state.binding, qty: state.qty, printedPages: printedPageCount(pages) });
 
   return (
     <PageLookContext.Provider value={editLook}>
@@ -676,6 +699,7 @@ export function EditorV2({
             </div>
           </div>
           <div className="tke-top-r">
+            <UploadPill />
             <button className="tke-iconbtn" onClick={undo} disabled={!hist.current.past.length} aria-label="Undo" title="Undo (⌘Z)">
               <Undo2 size={18} />
             </button>
@@ -762,15 +786,23 @@ export function EditorV2({
               }}
             >
               {!isMobile ? (
-                <button className="tke-turn l" onClick={() => go(-1)} disabled={spreadK === 0} aria-label="Previous pages">
+                <button className="tke-turn l" onClick={() => go(-1)} disabled={onCover} aria-label="Previous pages">
                   <ChevronLeft size={22} />
                 </button>
               ) : null}
-              <div className="tke-spread-wrap" ref={spreadRef} style={{ width: isMobile ? pw : pw * 2 }}>
-                <div key={isMobile ? idx : spreadK} className={"tke-spread" + (dir > 0 ? " in-r" : dir < 0 ? " in-l" : "")}>
-                  {shown.map((s, i) => renderPage(s, i === 0 && !isMobile ? "left" : "right"))}
-                  {!isMobile ? <span className="tke-gutter" /> : null}
-                </div>
+              <div className="tke-spread-wrap" ref={spreadRef} style={{ width: isMobile || onCover ? pw : pw * 2 }}>
+                {onCover ? (
+                  <div key="cover" className={"tke-spread tke-cover" + (dir > 0 ? " in-r" : dir < 0 ? " in-l" : "")}>
+                    <div className="tke-pagebox" style={{ width: pw, height: pw, "--pw": pw + "px" } as CSSProperties}>
+                      <CoverFace theme={theme} coverStyle={state.coverStyle} title={state.title} occasion={occ} photos={photos} editable onTitle={A.title} />
+                    </div>
+                  </div>
+                ) : (
+                  <div key={isMobile ? idx : spreadK} className={"tke-spread" + (dir > 0 ? " in-r" : dir < 0 ? " in-l" : "")}>
+                    {shown.map((s, i) => renderPage(s, i === 0 && !isMobile ? "left" : "right"))}
+                    {!isMobile ? <span className="tke-gutter" /> : null}
+                  </div>
+                )}
                 {barPos ? (
                   <div className="tke-float" style={barPos} onPointerDown={(e) => e.stopPropagation()}>
                     {actions.map(({ id, label, Icon, on }) => (
@@ -783,23 +815,25 @@ export function EditorV2({
                 ) : null}
               </div>
               {!isMobile ? (
-                <button className="tke-turn r" onClick={() => go(1)} disabled={2 * (spreadK + 1) > last} aria-label="Next pages">
+                <button className="tke-turn r" onClick={() => go(1)} disabled={onCover ? !pages.length : 2 * (spreadK + 1) > last} aria-label="Next pages">
                   <ChevronRight size={22} />
                 </button>
               ) : null}
               <div className="tke-meta">
                 {isMobile ? (
-                  <button className="tke-iconbtn sm" onClick={() => go(-1)} disabled={idx === 0} aria-label="Previous page">
+                  <button className="tke-iconbtn sm" onClick={() => go(-1)} disabled={onCover} aria-label="Previous page">
                     <ChevronLeft size={18} />
                   </button>
                 ) : null}
                 <span>{pageLabel}</span>
                 {isMobile ? (
-                  <button className="tke-iconbtn sm" onClick={() => go(1)} disabled={idx >= last} aria-label="Next page">
+                  <button className="tke-iconbtn sm" onClick={() => go(1)} disabled={onCover ? !pages.length : idx >= last} aria-label="Next page">
                     <ChevronRight size={18} />
                   </button>
                 ) : null}
-                {!isMobile && !sel ? <em>Click a photo to adjust, swap or rotate · ← → to turn</em> : null}
+                {!isMobile && !sel ? (
+                  <em>{onCover ? "Click the title to change it · Layout for the cover style · Photos for the cover photo" : "Click a photo to adjust, swap or rotate · ← → to turn"}</em>
+                ) : null}
               </div>
               {!isMobile && crop ? cropBar : null}
             </div>
@@ -812,6 +846,8 @@ export function EditorV2({
               onMove={A.movePage}
               onAdd={A.addPage}
               onArrange={() => setArrange(true)}
+              onCover={onCover}
+              onJumpCover={jumpCover}
             />
           </main>
         </div>

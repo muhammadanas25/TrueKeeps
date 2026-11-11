@@ -22,6 +22,7 @@ import {
   DEFAULT_FRAMING,
   LAYOUT_SLOTS,
   placement,
+  signatureFor,
   themeById,
   type BookPage,
   type BookTheme,
@@ -36,6 +37,7 @@ import { clampTilt, slotAspect, tiltCover } from "./print";
 import { deriveTheme, mix } from "./palette";
 import { lookClasses, usePageLook } from "./looks";
 import { SlotHit } from "./reframe";
+import { hasImage, photoSources, type PhotoVariant } from "./upload/previews";
 
 /* ── Photo tile ─────────────────────────────────────────────── */
 
@@ -117,6 +119,7 @@ export function Ph({
   showLabel = true,
   placement,
   slotAspect = 1,
+  variant = "display",
 }: {
   photo: BuilderPhoto | undefined | null;
   theme?: BookTheme;
@@ -126,16 +129,19 @@ export function Ph({
   placement?: Placement | null;
   /** printed w/h of the slot this tile fills; only read when turned */
   slotAspect?: number;
+  /** `thumb` for grids and strips: 200 display copies would exhaust a phone's memory */
+  variant?: PhotoVariant;
 }) {
   if (!photo) return null;
   // The striped tile is the fallback for BOTH "no image yet" and "the
   // image failed to load". Built here, once, so the loaded path can hand
   // it back on error without duplicating the markup.
   const stripes = <Stripes photo={photo} theme={theme} className={className} showLabel={showLabel} />;
-  if (!photo.url) return stripes;
+  if (!hasImage(photo)) return stripes;
   return (
     <LoadedTile
       photo={photo}
+      variant={variant}
       className={className}
       placement={placement}
       slotAspect={slotAspect}
@@ -149,26 +155,31 @@ export function Ph({
  * of state `Ph` cannot: whether the image 404'd. A dropped media file
  * used to render as an empty frame with no explanation, which reads as
  * a design choice rather than a fault — so a failure now falls back to
- * the same labelled placeholder an un-uploaded photo gets.
+ * the same labelled placeholder an un-uploaded photo gets. An older book's
+ * lighter copy may not exist, so each candidate in turn gets a chance first.
  */
 function LoadedTile({
   photo,
+  variant,
   className,
   placement,
   slotAspect = 1,
   fallback,
 }: {
   photo: BuilderPhoto;
+  variant: PhotoVariant;
   className: string;
   placement?: Placement | null;
   slotAspect?: number;
   fallback: JSX.Element;
 }) {
-  const [broken, setBroken] = useState(false);
+  const sources = photoSources(photo, variant);
+  const sourceKey = sources.join("|");
+  const [attempt, setAttempt] = useState(0);
   // A new src deserves a fresh attempt — otherwise replacing a missing
   // photo would keep showing the placeholder for the photo that worked.
-  useEffect(() => setBroken(false), [photo.url]);
-  if (broken) return fallback;
+  useEffect(() => setAttempt(0), [sourceKey]);
+  if (attempt >= sources.length) return fallback;
   const { fx, fy, zoom, turn, tilt } = { ...DEFAULT_FRAMING, ...(placement ?? {}) };
   // Guard against a corrupt/old draft rather than trusting the type:
   // a NaN here would blank the photo with no clue why.
@@ -177,10 +188,11 @@ function LoadedTile({
   const z = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
   const img = (
     <img
-      src={photo.url}
+      src={sources[attempt]}
       alt={photo.label}
       draggable={false}
-      onError={() => setBroken(true)}
+      decoding="async"
+      onError={() => setAttempt((a) => a + 1)}
       style={{
         objectPosition: `${px}% ${py}%`,
         ...(z !== 1 ? { transform: `scale(${z})`, transformOrigin: `${px}% ${py}%` } : null),
@@ -628,7 +640,7 @@ export function CoverFace({
   onTitle?: (title: string) => void;
 }) {
   const photo: BuilderPhoto = photos[0]
-    ? { ...photos[0], label: photos[0].url ? photos[0].label : "your cover photo" }
+    ? { ...photos[0], label: hasImage(photos[0]) ? photos[0].label : "your cover photo" }
     : { id: "c", label: "your cover photo", shade: 0 };
   const titleEl = editable ? (
     <div
@@ -654,6 +666,37 @@ export function CoverFace({
   const sub = <div className="bb-cover-sub">{look.subtitle ?? occasion.subtitle}</div>;
   const base: CSSProperties = { background: theme.page, color: theme.ink };
 
+  if (coverStyle === "classic") {
+    return (
+      <div className={"bb-cover bb-cover-classic" + lc} style={base}>
+        <Ph photo={photo} theme={theme} showLabel={false} />
+        {titleEl}
+        <div className="rule" style={{ background: theme.accent }}></div>
+        {sub}
+      </div>
+    );
+  }
+  if (coverStyle === "moment") {
+    // No words on purpose: the photo is the cover. The 0.5in border is 4.17% of a 12in book.
+    return (
+      <div className={"bb-cover bb-cover-moment" + lc} style={base}>
+        <Ph photo={photo} theme={theme} showLabel={false} />
+      </div>
+    );
+  }
+  if (coverStyle === "signature") {
+    const art = signatureFor(occasion.id);
+    return (
+      <div className={"bb-cover bb-cover-signature" + lc} style={{ background: art.ground, color: theme.ink }}>
+        <div className="art" style={{ backgroundImage: art.pattern, backgroundSize: art.size }}></div>
+        <div className="plate" style={{ background: theme.page }}>
+          <Ph photo={photo} theme={theme} showLabel={false} />
+          <div className="name">{art.name}</div>
+          {titleEl}
+        </div>
+      </div>
+    );
+  }
   if (coverStyle === "minimal") {
     return (
       <div className={"bb-cover bb-cover-minimal" + lc} style={base}>

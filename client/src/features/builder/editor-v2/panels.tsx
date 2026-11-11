@@ -8,6 +8,7 @@
  * offers depth without a wall of controls.
  */
 
+import { hasImage, photoSrc } from "../upload/previews";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Check,
@@ -17,6 +18,7 @@ import {
   Columns2,
   FlipHorizontal2,
   Frame,
+  Layers,
   LayoutDashboard,
   Loader2,
   Plus,
@@ -27,6 +29,7 @@ import {
 import { LayoutWire } from "../book";
 import {
   BOOK_THEMES,
+  COVER_STYLES,
   DENSITIES,
   LAYOUTS,
   isMirrorable,
@@ -34,6 +37,7 @@ import {
   type BookPage,
   type BookTheme,
   type BuilderPhoto,
+  type CoverStyleId,
   type DensityId,
   type PageLayoutId,
 } from "../data";
@@ -99,6 +103,7 @@ function Swatch({ c, on, onClick, label }: { c: string; on: boolean; onClick: ()
 /* ── Layout ────────────────────────────────────────────────────── */
 
 export function LayoutPanel({
+  cover,
   theme,
   activePage,
   spreadTargets,
@@ -108,6 +113,8 @@ export function LayoutPanel({
   onMirror,
   onReflow,
 }: {
+  /** set while the front cover is on the stage: the panel picks its style */
+  cover: { style: CoverStyleId; onStyle: (id: CoverStyleId) => void } | null;
   theme: BookTheme;
   activePage: BookPage | null;
   /** the photo pages on this spread, to choose which one the panel edits */
@@ -119,6 +126,21 @@ export function LayoutPanel({
   onReflow: (d: DensityId) => void;
 }) {
   const [openBook, setOpenBook] = useState(false);
+  if (cover) {
+    return (
+      <div>
+        <Section label="Cover style" hint="The cover uses your first photo. To change it, open Photos and tap another.">
+          <div className="tke-coverstyles" role="radiogroup" aria-label="Cover style">
+            {COVER_STYLES.map((c) => (
+              <button key={c.id} role="radio" aria-checked={cover.style === c.id} className={cover.style === c.id ? "on" : ""} onClick={() => cover.onStyle(c.id)}>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </Section>
+      </div>
+    );
+  }
   return (
     <div>
       {!activePage || activePage.layout === "title" ? (
@@ -255,7 +277,7 @@ export function PhotosPanel({
                 }}
                 onClick={() => onPick(p.id)}
               >
-                {p.url ? <img src={p.url} alt={p.label} draggable={false} loading="lazy" /> : <span className="tke-ph-missing">{p.label}</span>}
+                {hasImage(p) ? <img src={photoSrc(p, "thumb")} alt={p.label} draggable={false} loading="lazy" decoding="async" /> : <span className="tke-ph-missing">{p.label}</span>}
                 {n ? <span className="tke-ph-used">{n > 1 ? "×" + n : <Check size={11} strokeWidth={3} />}</span> : <span className="tke-ph-new">New</span>}
               </button>
             );
@@ -302,9 +324,9 @@ function LookCard({ theme, on, photo, onClick }: { theme: BookTheme; on: boolean
         <span style={{ background: theme.page }}>
           <em
             style={{
-              background: photo?.url ? `url("${photo.url}") center/cover` : theme.stripeB,
+              background: photo && hasImage(photo) ? `url("${photoSrc(photo, "thumb")}") center/cover` : theme.stripeB,
               borderRadius: d.edge === "soft" ? 3 : 0,
-              boxShadow: d.edge === "border" ? "0 0 0 1.5px #fff" : "none",
+              boxShadow: d.edge === "shadow" ? "0 2px 5px rgba(0,0,0,.28)" : d.edge === "border" ? "0 0 0 1.5px #fff" : "none",
             }}
           />
         </span>
@@ -381,7 +403,6 @@ export function StylePanel({
   spreadBg,
   onLook,
   onColour,
-  onFont,
   onEdge,
 }: {
   book: BookSlice;
@@ -390,7 +411,6 @@ export function StylePanel({
   spreadBg: string | null;
   onLook: (themeId: string) => void;
   onColour: (colour: string | null, scope: "book" | "spread") => void;
-  onFont: (f: FontId) => void;
   onEdge: (e: EdgeId) => void;
 }) {
   const [view, setView] = useState<"main" | "colors">("main");
@@ -409,7 +429,7 @@ export function StylePanel({
   const lookIds = LOOK_ORDER.includes(book.themeId) ? LOOK_ORDER : [...LOOK_ORDER, book.themeId];
   const looks = lookIds.map((id) => BOOK_THEMES.find((t) => t.id === id)!).filter(Boolean);
   const shown = allLooks ? looks : looks.slice(0, 4);
-  const sample = photos.filter((p) => p.url);
+  const sample = photos.filter(hasImage);
   return (
     <div>
       <Section label="Look" right={customized ? <button className="tke-link" onClick={() => onLook(book.themeId)}>Reset</button> : null}>
@@ -464,22 +484,14 @@ export function StylePanel({
           </button>
         </div>
       </Section>
-      <Section label="Type">
-        <div className="tke-fonts">
-          {FONTS.map((f) => (
-            <button key={f.id} className={book.fontId === f.id ? "on" : ""} onClick={() => onFont(f.id)} aria-pressed={book.fontId === f.id}>
-              <span style={{ fontFamily: f.display, fontWeight: f.weight, fontSize: f.id === "script" ? 30 : f.id === "editorial" ? 28 : 24 } as CSSProperties}>Aa</span>
-              <small>{f.name}</small>
-            </button>
-          ))}
-        </div>
-      </Section>
       <Section label="Photo edges">
         <Seg
           options={[
             { v: "clean" as const, label: "Clean", icon: <Square size={15} /> },
             { v: "soft" as const, label: "Rounded", icon: <SquareDashed size={15} /> },
-            { v: "border" as const, label: "Bordered", icon: <Frame size={15} /> },
+            { v: "shadow" as const, label: "Shadow", icon: <Layers size={15} /> },
+            // retired: only listed for a book that already uses it
+            ...(book.edge === "border" ? [{ v: "border" as const, label: "Bordered", icon: <Frame size={15} /> }] : []),
           ]}
           value={book.edge}
           onChange={onEdge}
@@ -491,36 +503,73 @@ export function StylePanel({
 
 /* ── Text ──────────────────────────────────────────────────────── */
 
+/**
+ * Text: on the front cover (or an older book's title page) it edits the
+ * title and the line underneath; on every other page only that page's
+ * caption and the captions switch. The font pair is book-wide, so it shows
+ * everywhere. There is no text colour choice: ink follows the page colour by
+ * contrast (palette.ts deriveTheme), so words stay readable on any page.
+ */
 export function TextPanel({
   book,
   subtitleDefault,
+  onCover,
   activePage,
   onTitle,
   onSubtitle,
   onCaption,
   onCaptions,
+  onFont,
 }: {
   book: BookSlice;
   subtitleDefault: string;
+  /** the front cover is on the stage */
+  onCover: boolean;
   activePage: BookPage | null;
   onTitle: (v: string) => void;
   onSubtitle: (v: string) => void;
   onCaption: (pageId: string, v: string) => void;
   onCaptions: (hidden: boolean) => void;
+  onFont: (f: FontId) => void;
 }) {
+  const titleView = onCover || activePage?.layout === "title";
   const capable = activePage && activePage.layout !== "title" && activePage.layout !== "collage";
+  const fontPairs = (
+    <Section label="Font pair" hint="Titles and captions change together. Text turns dark or light by itself to stay readable on your page colour.">
+      <div className="tke-pairs" role="radiogroup" aria-label="Font pair">
+        {FONTS.map((f) => (
+          <button key={f.id} role="radio" aria-checked={book.fontId === f.id} className={book.fontId === f.id ? "on" : ""} onClick={() => onFont(f.id)}>
+            <span className="tke-pair-t" style={{ fontFamily: f.display, fontWeight: f.weight, fontSize: f.id === "script" ? 26 : f.id === "editorial" ? 24 : 19 } as CSSProperties}>
+              Our day
+            </span>
+            <span className="tke-pair-c" style={{ fontFamily: f.caption, fontWeight: f.captionWeight, fontStyle: f.captionItalic ? "italic" : "normal", fontSize: f.id === "script" ? 17 : 13 } as CSSProperties}>
+              the first dance
+            </span>
+            <small>{f.name}</small>
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+  if (titleView) {
+    return (
+      <div>
+        <Section label={onCover ? "Front cover" : "Title page"}>
+          <label className="tke-field">
+            <span>Title</span>
+            <input className="tke-input" value={book.title} maxLength={48} onChange={(e) => onTitle(e.target.value)} />
+          </label>
+          <label className="tke-field">
+            <span>Line underneath</span>
+            <input className="tke-input" value={book.subtitle ?? subtitleDefault} maxLength={60} onChange={(e) => onSubtitle(e.target.value)} />
+          </label>
+        </Section>
+        {fontPairs}
+      </div>
+    );
+  }
   return (
     <div>
-      <Section label="Cover & title page">
-        <label className="tke-field">
-          <span>Title</span>
-          <input className="tke-input" value={book.title} maxLength={48} onChange={(e) => onTitle(e.target.value)} />
-        </label>
-        <label className="tke-field">
-          <span>Line underneath</span>
-          <input className="tke-input" value={book.subtitle ?? subtitleDefault} maxLength={60} onChange={(e) => onSubtitle(e.target.value)} />
-        </label>
-      </Section>
       <Section label="Caption for this page" hint="Tip: you can also tap a caption right on the page.">
         {capable ? (
           <textarea
@@ -532,11 +581,7 @@ export function TextPanel({
             onChange={(e) => onCaption(activePage!.id, e.target.value)}
           />
         ) : (
-          <p className="tke-empty">
-            {activePage?.layout === "title"
-              ? "Pick a photo page to caption it."
-              : "Collage pages let the photos speak. Switch to another layout to add words."}
-          </p>
+          <p className="tke-empty">Collage pages let the photos speak. Switch to another layout to add words.</p>
         )}
       </Section>
       <Section label="Captions in the book">
@@ -549,6 +594,7 @@ export function TextPanel({
           onChange={onCaptions}
         />
       </Section>
+      {fontPairs}
     </div>
   );
 }

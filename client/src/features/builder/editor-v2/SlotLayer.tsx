@@ -26,6 +26,7 @@
  * finger of a pinch is caught even if it lands outside this photo.
  */
 
+import { hasImage, photoSrc } from "../upload/previews";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { BuilderPhoto, PageLayoutId, Placement } from "../data";
 import { panFrame, panOverflow } from "../reframe";
@@ -277,7 +278,7 @@ export function SlotLayer(p: SlotLayerProps) {
  * little benefit.
  */
 function Ghost({ photo, placement, size, aspect }: { photo: BuilderPhoto; placement: Placement; size: { w: number; h: number }; aspect: number }) {
-  if (!photo.url || !photo.w || !photo.h || placement.turn !== 0 || !size.w || !size.h) return null;
+  if (!hasImage(photo) || !photo.w || !photo.h || placement.turn !== 0 || !size.w || !size.h) return null;
   const cover = Math.max(size.w / photo.w, size.h / photo.h);
   const Iw = photo.w * cover * Math.max(1, placement.zoom);
   const Ih = photo.h * cover * Math.max(1, placement.zoom);
@@ -296,7 +297,7 @@ function Ghost({ photo, placement, size, aspect }: { photo: BuilderPhoto; placem
       style={deg ? { transform: `rotate(${deg}deg) scale(${tiltCover(deg, aspect)})` } : undefined}
       aria-hidden="true"
     >
-      <img src={photo.url} alt="" draggable={false} style={img} />
+      <img src={photoSrc(photo)} alt="" draggable={false} style={img} />
     </div>
   );
 }

@@ -43,6 +43,7 @@ import {
   timestamp,
   decimal,
   integer,
+  bigint,
   real,
   boolean,
   jsonb,
@@ -272,7 +273,7 @@ export const uploadedPhotos = pgTable(
     storageKey: text("storage_key"),
     /** Servable URL of the ~400px thumbnail derivative (set async by the image pipeline) */
     thumbUrl: text("thumb_url"),
-    /** Servable URL of the ~1200px preview derivative (set async by the image pipeline) */
+    /** Servable URL of the ~1600px display copy (from the browser, or the image pipeline for /create) */
     previewUrl: text("preview_url"),
     /** Pixel dimensions of the (EXIF-rotated) original; set async by the image pipeline */
     width: integer("width"),
@@ -280,9 +281,67 @@ export const uploadedPhotos = pgTable(
     sizeBytes: integer("size_bytes"),
     /** `pending` (derivatives queued) | `ready` | `invalid` (sharp could not decode) */
     status: text("status").notNull().default("pending"),
+    /**
+     * When the untouched HD original finished uploading. Null while only the
+     * display copy has arrived; a book can't be ordered until every placed
+     * photo has this, because the original is what gets printed.
+     */
+    originalUploadedAt: ts("original_uploaded_at"),
     uploadedAt: ts("uploaded_at").defaultNow().notNull(),
   },
   (t) => [index("uploaded_photos_project_idx").on(t.projectId), index("uploaded_photos_user_idx").on(t.userId)],
+);
+
+/**
+ * One row per batch of photos a customer added, reported by their browser so
+ * upload speed can be compared across batch sizes, file sizes and connections
+ * (docs/adr/014). Holds measurements only: no file names, no photos.
+ *
+ * `id` is chosen by the browser, so a report sent as the page closed can be
+ * overwritten by the finished one if the customer comes back.
+ */
+export const uploadBatches = pgTable(
+  "upload_batches",
+  {
+    id: varchar("id").primaryKey(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: varchar("project_id"),
+    /** `complete` (every photo settled) | `unfinished` (the page closed first) */
+    status: text("status").notNull(),
+    /** `new` (first pick) | `resume` (photos picked again after a closed tab) */
+    kind: text("kind").notNull().default("new"),
+    photoCount: integer("photo_count").notNull(),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    duplicateCount: integer("duplicate_count").notNull().default(0),
+    heicCount: integer("heic_count").notNull().default(0),
+    sourceBytes: bigint("source_bytes", { mode: "number" }).notNull().default(0),
+    originalBytes: bigint("original_bytes", { mode: "number" }).notNull().default(0),
+    displayBytes: bigint("display_bytes", { mode: "number" }).notNull().default(0),
+    /** ms from picking to the first photo usable in the book */
+    firstInBookMs: integer("first_in_book_ms"),
+    /** ms from picking to every editing copy on the server */
+    allInBookMs: integer("all_in_book_ms"),
+    /** ms from picking to every HD original on the server */
+    allHdMs: integer("all_hd_ms"),
+    /** average upload speed of the originals, megabits per second */
+    hdMbps: real("hd_mbps"),
+    retries: integer("retries").notNull().default(0),
+    stalls: integer("stalls").notNull().default(0),
+    /** navigator.connection.effectiveType, where the browser offers it */
+    connection: text("connection"),
+    downlinkMbps: real("downlink_mbps"),
+    deviceMemoryGb: real("device_memory_gb"),
+    cpuCores: integer("cpu_cores"),
+    mobile: boolean("mobile"),
+    browser: text("browser"),
+    /** per-photo rows: [sourceKB, megapixels, prepareMs, displayMs, originalMs, type] */
+    photos: jsonb("photos"),
+    createdAt: createdAt(),
+    updatedAt: ts("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("upload_batches_created_idx").on(t.createdAt)],
 );
 
 /* ── Commerce (Phase 2B, docs/adr/005) ──────────────────────────── */
@@ -483,6 +542,8 @@ export type InsertPagePhoto = z.infer<typeof insertPagePhotoSchema>;
 export type PagePhoto = typeof pagePhotos.$inferSelect;
 export type InsertUploadedPhoto = z.infer<typeof insertUploadedPhotoSchema>;
 export type UploadedPhoto = typeof uploadedPhotos.$inferSelect;
+export type UploadBatch = typeof uploadBatches.$inferSelect;
+export type NewUploadBatch = typeof uploadBatches.$inferInsert;
 export type Order = typeof orders.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type OrderEvent = typeof orderEvents.$inferSelect;

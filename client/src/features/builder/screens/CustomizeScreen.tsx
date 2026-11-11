@@ -20,6 +20,7 @@ import { AlertTriangle, Check, ChevronDown, FlipHorizontal2, GripHorizontal, Ima
 import { CoverFace, LayoutWire, PageFace, Ph } from "../book";
 import { ReframeBar } from "../reframe";
 import { indexPhotos, pageHasLowQuality, slotMaxZoom } from "../print";
+import { hasImage } from "../upload/previews";
 import { COVER_STYLES, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, MAX_SLOTS_PER_PAGE, generatePages, isMirrorable, layoutForCount, occasionById, pagePhotoIds, placement, type BookPage, type CopyVoice, type Placement } from "../data";
 import { PAGE_COLOURS, THEME_COLOUR, bookTheme, pageColourById } from "../palette";
 import { themeById } from "../data";
@@ -638,15 +639,15 @@ export function CustomizeScreen({
               return (
                 <div
                   key={p.id}
-                  className={"bb-strip-item" + (used ? " used" : "") + (p.url ? "" : " missing")}
+                  className={"bb-strip-item" + (used ? " used" : "") + (hasImage(p) ? "" : " missing")}
                   draggable
                   onDragStart={(e) => startDrag({ kind: "photo", photoId: p.id }, e)}
                   onDragEnd={endDrag}
-                  title={p.url ? p.label : p.label + " — this photo's image is missing"}
+                  title={hasImage(p) ? p.label : p.label + " — this photo's image is missing"}
                 >
-                  <Ph photo={p} theme={theme} showLabel={false} />
+                  <Ph photo={p} theme={theme} showLabel={false} variant="thumb" />
                   {used ? <span className="bb-strip-dot" aria-label="in the book" /> : null}
-                  {p.url ? null : (
+                  {hasImage(p) ? null : (
                     <span className="bb-strip-missing" aria-label="image missing">
                       <ImageOff size={12} />
                     </span>

@@ -29,6 +29,20 @@
       "when": 1793883046411,
       "tag": "0003_order_finish",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793928001995,
+      "tag": "0004_photo_originals",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794413724226,
+      "tag": "0005_upload_batches",
+      "breakpoints": true
     }
   ]
 }

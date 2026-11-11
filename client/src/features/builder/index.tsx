@@ -5,13 +5,15 @@
  * sticky nav (back + wordmark + step context + start over) over a
  * screen switch driven by one state machine (see state.ts):
  *
- *   quiz → upload → generating → reveal → preview ↔ (customize | order) → confirm
+ *   quiz → upload → compose → generating → reveal → preview ↔ (customize | order) → confirm
  *
  * App adaptations vs the prototype:
  *  - typed TSX, screens in ./screens/*, data in ./data.ts
- *  - real photo uploads (UploadScreen reads files; Ph renders them)
+ *  - real photo uploads, running in the background from the moment photos
+ *    are chosen (upload/engine.ts); the provider lives here so they carry
+ *    on across every screen
  *  - ?occasion=<id> deep link (landing occasion cards) pre-selects the
- *    quiz answer and skips straight to the vibe question
+ *    quiz answer and skips straight to the photos
  *  - the prototype's TweaksPanel (a design-review overlay) is not
  *    ported — its controls exist in-product on Customize
  *
@@ -24,7 +26,7 @@
  *    required before checkout (SignInSheet, intent "order")
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
@@ -37,6 +39,11 @@ import { SignInSheet } from "@/features/auth/SignInSheet";
 import { AccountMenu } from "@/features/auth/AccountMenu";
 import { QuizScreen } from "./screens/QuizScreen";
 import { UploadScreen } from "./screens/UploadScreen";
+import { ComposeScreen } from "./screens/ComposeScreen";
+import { uploadEngine } from "./upload/engine";
+import { UploadProvider } from "./upload/UploadContext";
+import { UploadHairline, UploadPill } from "./upload/UploadStatus";
+import "./upload/upload.css";
 import { GeneratingScreen } from "./screens/GeneratingScreen";
 import { RevealScreen } from "./screens/RevealScreen";
 import { PreviewScreen } from "./screens/PreviewScreen";
@@ -51,7 +58,7 @@ import { TKLogo } from "@/features/landing/primitives";
 function seedFromUrl(): Partial<BuilderState> {
   const occasion = new URLSearchParams(window.location.search).get("occasion");
   if (occasion && OCCASIONS.some((o) => o.id === occasion)) {
-    return { occasion, title: occasionById(occasion).suggestedTitle, qstep: 1 };
+    return { occasion, title: occasionById(occasion).suggestedTitle, screen: "upload" };
   }
   return {};
 }
@@ -81,9 +88,14 @@ function SavePill({ status }: { status: SyncStatus }) {
 const SAVE_PROMPT_KEY = "tk_save_prompted_v1";
 
 export default function BookBuilder() {
-  const { state, set, reset } = useBuilderState(seedFromUrl());
+  const { state, set, updatePhotos, reset: resetState } = useBuilderState(seedFromUrl());
+  const reset = () => {
+    uploadEngine.reset();
+    resetState();
+  };
   const copy = COPY[state.voice] ?? COPY.warm;
   const { status: syncStatus } = useBuilderSync(state, set);
+  const uploadsBusy = useSyncExternalStore(uploadEngine.subscribe, () => uploadEngine.getSnapshot().active);
   const { loading: sessionLoading, isMember } = useSession();
   const [editorVersion, setEditorVersion] = useEditorVersion();
 
@@ -129,9 +141,11 @@ export default function BookBuilder() {
   }, []);
 
   const goBack = () => {
+    // Back walks through the three questions before it leaves them.
+    if (state.screen === "compose" && state.qstep > 0) return set({ qstep: (state.qstep - 1) as 0 | 1 });
     const to = BACK_MAP[state.screen];
-    // re-entering the quiz lands on its last sub-step, not question 1
-    if (to) set({ screen: to, ...(to === "quiz" ? { qstep: 2 as const } : null) });
+    // re-entering the questions lands on the last one, not the first
+    if (to) set({ screen: to, ...(to === "compose" ? { qstep: 2 as const } : null) });
   };
   const onGenerated = () =>
     set({ pages: generatePages(state.photos, state.density), screen: "reveal", pos: 0 });
@@ -141,7 +155,9 @@ export default function BookBuilder() {
   if (v2Customize) {
     return (
       <PageLookContext.Provider value={look}>
+        <UploadProvider state={state} set={set} updatePhotos={updatePhotos}>
         <div className="bb-shell">
+          <UploadHairline />
           <EditorV2
             state={state}
             set={set}
@@ -153,13 +169,16 @@ export default function BookBuilder() {
             onSwitchClassic={() => setEditorVersion("classic")}
           />
         </div>
+        </UploadProvider>
       </PageLookContext.Provider>
     );
   }
 
   return (
     <PageLookContext.Provider value={look}>
+    <UploadProvider state={state} set={set} updatePhotos={updatePhotos}>
     <div className="bb-shell">
+      <UploadHairline />
       <header className="bb-nav">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {BACK_MAP[state.screen] ? (
@@ -173,8 +192,12 @@ export default function BookBuilder() {
         </div>
         <div className="bb-nav-right">
           <span className="bb-nav-context">{SCREEN_CONTEXT[state.screen] || ""}</span>
-          <SavePill status={syncStatus} />
-          {state.screen !== "quiz" || state.qstep > 0 ? (
+          {/* while uploading, the counter says more than "Saved" and phones only fit one */}
+          <span className={uploadsBusy ? "ck-save-while-busy" : undefined} style={{ display: "contents" }}>
+            <SavePill status={syncStatus} />
+          </span>
+          <UploadPill onRepick={state.screen === "upload" ? undefined : () => set({ screen: "upload" })} />
+          {state.screen !== "quiz" ? (
             <button className="bb-btn bb-btn-ghost" onClick={reset}>
               <RotateCcw size={15} /> <span className="bb-nav-label">Start over</span>
             </button>
@@ -186,8 +209,9 @@ export default function BookBuilder() {
       <main className="bb-main">
         {state.screen === "quiz" ? <QuizScreen key="quiz" state={state} set={set} copy={copy} onDone={() => set({ screen: "upload" })} /> : null}
         {state.screen === "upload" ? (
-          <UploadScreen key="upload" state={state} set={set} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "generating" })} />
+          <UploadScreen key="upload" state={state} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "compose", qstep: 0 })} />
         ) : null}
+        {state.screen === "compose" ? <ComposeScreen key="compose" state={state} set={set} copy={copy} onDone={() => set({ screen: "generating" })} /> : null}
         {state.screen === "generating" ? <GeneratingScreen key="gen" copy={copy} onDone={onGenerated} /> : null}
         {state.screen === "reveal" ? <RevealScreen key="reveal" state={state} set={set} copy={copy} onOpen={() => set({ screen: "preview", pos: 0 })} /> : null}
         {state.screen === "preview" ? (
@@ -210,6 +234,7 @@ export default function BookBuilder() {
       {savePrompt && !orderGate ? <SignInSheet intent="save" onClose={dismissSavePrompt} /> : null}
       {orderGate ? <SignInSheet intent="order" onClose={() => set({ screen: "preview", pos: 0 })} /> : null}
     </div>
+    </UploadProvider>
     </PageLookContext.Provider>
   );
 }

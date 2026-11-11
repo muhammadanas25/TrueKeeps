@@ -12,13 +12,17 @@
  * travel the whole book without letting go.
  *
  * Thumbnails are the real PageFace at thumbnail size, so they show the
- * book's actual typeface, edges and colours.
+ * book's actual typeface, edges and colours. The filmstrip starts with the
+ * front cover (its own thumb, not draggable), then the spreads.
+ *
+ * Page numbers: new books open on a photo, so pages count from 1. Books made
+ * before 2026-11-11 keep a fixed title page first (see hasTitlePage in data.ts).
  */
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { LayoutGrid, Plus, Trash2 } from "lucide-react";
-import { PageFace } from "../book";
-import { toSpreads, type BookPage, type BookTheme, type BuilderPhoto, type Occasion } from "../data";
+import { CoverFace, PageFace } from "../book";
+import { firstMovablePage, pageLabel, toSpreads, type BookPage, type BookTheme, type BuilderPhoto, type CoverStyleId, type Occasion } from "../data";
 import { indexPhotos, pageHasLowQuality } from "../print";
 import { PageLookContext, usePageLook } from "../looks";
 
@@ -30,7 +34,8 @@ interface DragState {
   side: "before" | "after";
 }
 
-export function useReorder(onMove: (from: number, to: number) => void, scrollRef: React.RefObject<HTMLElement>, axis: "x" | "y") {
+/** `minIdx`: the first page that can move (1 when an old book's title page is fixed first). */
+export function useReorder(onMove: (from: number, to: number) => void, scrollRef: React.RefObject<HTMLElement>, axis: "x" | "y", minIdx = 0) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const s = useRef<{
     idx: number;
@@ -94,7 +99,7 @@ export function useReorder(onMove: (from: number, to: number) => void, scrollRef
     r.wasDrag = r.active;
     if (r.active && r.over != null) {
       let to = r.over + (r.side === "after" ? 1 : 0);
-      if (to < 1) to = 1;
+      if (to < minIdx) to = minIdx;
       if (to !== r.idx && to !== r.idx + 1) cb.current(r.idx, to);
     }
     r.active = false;
@@ -109,7 +114,7 @@ export function useReorder(onMove: (from: number, to: number) => void, scrollRef
   useEffect(() => cleanup, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const down = (e: React.PointerEvent, idx: number) => {
-    if (idx === 0 || e.button > 0) return; // the title page stays first
+    if (idx < minIdx || e.button > 0) return; // an old book's title page stays first
     const r = s.current;
     Object.assign(r, { idx, x0: e.clientX, y0: e.clientY, active: false, pt: e.pointerType, over: null, side: "before", wasDrag: false });
     if (e.pointerType !== "mouse") {
@@ -132,6 +137,7 @@ export interface ThumbCtx {
   theme: BookTheme;
   title: string;
   occasion: Occasion;
+  coverStyle: CoverStyleId;
 }
 
 function PageThumb({ page, size, ctx }: { page: BookPage; size: number; ctx: ThumbCtx }) {
@@ -147,8 +153,26 @@ function PageThumb({ page, size, ctx }: { page: BookPage; size: number; ctx: Thu
   );
 }
 
+/** The front cover at thumbnail size, first in the filmstrip. */
+function CoverThumb({ size, ctx, active, onJump }: { size: number; ctx: ThumbCtx; active: boolean; onJump: () => void }) {
+  const { fontId, edge, subtitle, captionsHidden } = usePageLook();
+  return (
+    <div className={"tke-fs-spread tke-fs-cover" + (active ? " on" : "")} data-spread="cover">
+      <button type="button" className="tke-th fixed" style={{ width: size }} onClick={onJump} aria-label="Front cover" aria-current={active || undefined}>
+        <PageLookContext.Provider value={{ fontId, edge, subtitle, captionsHidden }}>
+          <div className="tke-th-pg" style={{ width: size, height: size, "--pw": size + "px" } as CSSProperties} aria-hidden="true">
+            <CoverFace theme={ctx.theme} coverStyle={ctx.coverStyle} title={ctx.title} occasion={ctx.occasion} photos={ctx.photos} />
+          </div>
+        </PageLookContext.Provider>
+        <span>Cover</span>
+      </button>
+    </div>
+  );
+}
+
 function Thumb({
   page,
+  pages,
   idx,
   size,
   ctx,
@@ -159,6 +183,7 @@ function Thumb({
   soft,
 }: {
   page: BookPage | null;
+  pages: BookPage[];
   idx: number;
   size: number;
   ctx: ThumbCtx;
@@ -176,12 +201,13 @@ function Thumb({
       </div>
     );
   const d = R.drag;
+  const fixed = idx < firstMovablePage(pages);
   const cls =
     "tke-th" +
     (active ? " on" : "") +
     (d && d.from === idx ? " is-lifted" : "") +
     (d && d.over === idx ? " drop-" + d.side : "") +
-    (idx === 0 ? " fixed" : "");
+    (fixed ? " fixed" : "");
   return (
     <div
       className={cls}
@@ -193,13 +219,13 @@ function Thumb({
     >
       <PageThumb page={page} size={size} ctx={ctx} />
       <span>
-        {idx === 0 ? "Title" : "p." + idx}
+        {pageLabel(pages, idx)}
         {soft ? <i className="tke-warn" title="A photo here may print soft" /> : null}
       </span>
-      {onDelete && idx !== 0 ? (
+      {onDelete && !fixed ? (
         <button
           className="tke-th-del"
-          aria-label={"Delete page " + idx}
+          aria-label={"Delete " + pageLabel(pages, idx).replace("p.", "page ")}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -231,6 +257,8 @@ export function Filmstrip({
   onMove,
   onAdd,
   onArrange,
+  onCover,
+  onJumpCover,
 }: {
   pages: BookPage[];
   ctx: ThumbCtx;
@@ -240,18 +268,21 @@ export function Filmstrip({
   onMove: (from: number, to: number) => void;
   onAdd: () => void;
   onArrange: () => void;
+  /** the front cover is what's on the stage */
+  onCover: boolean;
+  onJumpCover: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const R = useReorder(onMove, ref, "x");
+  const R = useReorder(onMove, ref, "x", firstMovablePage(pages));
   const size = isMobile ? 46 : 60;
   const spreads = toSpreads(pages);
-  const spreadIdx = Math.floor(activeIdx / 2);
+  const spreadIdx = onCover ? -1 : Math.floor(activeIdx / 2);
   const index = indexPhotos(ctx.photos);
 
   // keep the current spread in view
   useEffect(() => {
     const sc = ref.current;
-    const el = sc?.querySelector<HTMLElement>(`[data-spread="${spreadIdx}"]`);
+    const el = sc?.querySelector<HTMLElement>(`[data-spread="${spreadIdx < 0 ? "cover" : spreadIdx}"]`);
     if (!sc || !el) return;
     sc.scrollTo({ left: el.offsetLeft - sc.clientWidth / 2 + el.offsetWidth / 2, behavior: "smooth" });
   }, [spreadIdx]);
@@ -265,6 +296,7 @@ export function Filmstrip({
           if (ref.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) ref.current.scrollLeft += e.deltaY;
         }}
       >
+        <CoverThumb size={size} ctx={ctx} active={onCover} onJump={onJumpCover} />
         {spreads.map((sp, k) => (
           <div key={k} data-spread={k} className={"tke-fs-spread" + (k === spreadIdx ? " on" : "")}>
             {[sp.left, sp.right].map((pg, j) => {
@@ -273,10 +305,11 @@ export function Filmstrip({
                 <Thumb
                   key={j}
                   page={pg}
+                  pages={pages}
                   idx={idx}
                   size={size}
                   ctx={ctx}
-                  active={isMobile && idx === activeIdx}
+                  active={isMobile && !onCover && idx === activeIdx}
                   R={R}
                   onJump={onJump}
                   soft={Boolean(pg && pageHasLowQuality(pg, index))}
@@ -321,7 +354,7 @@ export function Arrange({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const R = useReorder(onMove, ref, "y");
+  const R = useReorder(onMove, ref, "y", firstMovablePage(pages));
   const size = isMobile ? 74 : 112;
   const spreadIdx = Math.floor(activeIdx / 2);
   const index = indexPhotos(ctx.photos);
@@ -346,6 +379,7 @@ export function Arrange({
                 <Thumb
                   key={j}
                   page={pg}
+                  pages={pages}
                   idx={2 * k + j}
                   size={size}
                   ctx={ctx}

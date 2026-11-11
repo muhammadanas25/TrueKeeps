@@ -359,3 +359,15 @@ export function lowQualityPageCount(pages: BookPage[], photos: BuilderPhoto[]): 
   const idx = indexPhotos(photos);
   return pages.reduce((n, pg) => n + (pageHasLowQuality(pg, idx) ? 1 : 0), 0);
 }
+
+/**
+ * Photos that would print but whose HD original isn't on the server yet:
+ * everything placed on a page, plus the first photo, which is what covers
+ * show. Mirrors `photosWithoutOriginals` on the server, which has the final
+ * say; this one is here so the customer hears about it before filling in a form.
+ */
+export function photosAwaitingOriginal(pages: BookPage[], photos: BuilderPhoto[]): BuilderPhoto[] {
+  const printed = new Set(pages.flatMap((pg) => pg.slots.map((s) => s.photoId)));
+  if (photos[0]) printed.add(photos[0].id);
+  return photos.filter((p) => printed.has(p.id) && (p.hd === false || !p.url));
+}

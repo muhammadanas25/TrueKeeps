@@ -6,9 +6,11 @@
    phrase per screen. Colours come from role tokens in
    client/src/index.css, so a colour's job is readable where it's used.
 
-   Elegance here comes from restraint: no glows, no glass, no blobs.
-   Hover feedback changes colour rather than lifting cards, so the
-   customer's photos stay the thing that draws the eye.
+   Elegance here comes from restraint. The two exceptions are the owner's
+   choice (2026-11-11): the frosted feature panel in "What you'll hold" and
+   the soft glows in the closing section. Hover feedback changes colour
+   rather than lifting cards, so the customer's photos stay the thing that
+   draws the eye.
 
    Scoping: every rule is prefixed `.lp` / `.lp-*`, so this file can be
    imported globally without leaking into the rest of the app.
@@ -25,7 +27,9 @@
 .lp-wrap { width: min(1180px, 100% - 48px); margin: 0 auto; }
 .lp-section { padding: clamp(64px, 8vw, 112px) 0; }
 
-/* ── type: kit scale (H1 48/56, H2 32/40, H3 20/28, small 14/22) ── */
+/* ── type: hero H1 up to 60px, section H2 up to 50px (the owner asked for the
+   larger pre-kit headings, 2026-11-11; the kit suggests 48 and 32), H3 20/28,
+   small 14/22 ── */
 /* The wide display face is for H1 and H2 only. It reads loud when large and
    tight, and its word spaces are narrow, so it stays at the kit's sizes with
    opened tracking and wider word spacing. */
@@ -34,8 +38,8 @@
 .lp-eyebrow { font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-fg2); display: inline-flex; align-items: center; gap: 10px; }
 .lp-eyebrow::before { content: ''; width: 22px; height: 2px; background: var(--highlight); }
 .lp-eyebrow.center { justify-content: center; }
-.lp-h2 { font-size: clamp(26px, 2.8vw, 32px); line-height: 1.25; margin: 16px 0 0; }
-.lp-lede { color: var(--color-fg2); margin: 14px 0 0; max-width: 60ch; }
+.lp-h2 { font-size: clamp(30px, 4vw, 50px); line-height: 1.1; margin: 18px 0 0; }
+.lp-lede { color: var(--color-fg2); font-size: clamp(16px, 1.5vw, 19px); line-height: 1.6; margin: 16px 0 0; max-width: 56ch; }
 .lp-center { text-align: center; }
 .lp-center .lp-lede { margin-left: auto; margin-right: auto; }
 /* The signature highlight: a Rose block behind the one most emotional phrase.
@@ -82,18 +86,21 @@
 .lp-hero .lp-banner-photo img { object-position: 62% 50%; }
 .lp-hero::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(22, 20, 41, 0.85) 0%, rgba(22, 20, 41, 0.72) 34%, rgba(22, 20, 41, 0.14) 58%, transparent 72%); }
 .lp-hero .lp-wrap { position: relative; z-index: 2; padding: clamp(56px, 7vw, 104px) 0; }
-.lp-hero-copy { max-width: 540px; }
-.lp-hero h1 { font-size: clamp(32px, 3.7vw, 48px); line-height: 1.17; margin: 0; color: #fff; }
+.lp-hero-copy { max-width: 620px; }
+.lp-hero h1 { font-size: clamp(36px, 4.6vw, 60px); line-height: 1.1; margin: 0; color: #fff; }
 .lp-hero p.sub { color: var(--on-dark-soft); margin: 20px 0 0; max-width: 440px; }
 .lp-hero-actions { display: flex; align-items: center; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
 
 /* ── trust band ─────────────────────────────── */
-.lp-trust { background: var(--surface-quiet); color: var(--color-fg2); }
-.lp-trust .lp-wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0; flex-wrap: wrap; }
+/* The dark charcoal band the owner preferred (2026-11-11), in the kit's Ink 400,
+   which is within a shade of the old Gunmetal. Rose 300 icons replace the old
+   gold (4.7:1 on Ink 400); body text is white at 86% (8.3:1). */
+.lp-trust { background: var(--tk-ink-400); color: rgba(255, 255, 255, 0.86); --focus: #fff; }
+.lp-trust .lp-wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 0; flex-wrap: wrap; }
 .lp-trust-item { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 22px; }
-.lp-trust-item b { color: var(--heading); font-weight: 600; }
-.lp-trust-item svg { color: var(--heading); flex: none; }
-.lp-trust-rule { width: 1px; height: 22px; background: var(--tk-indigo-100); }
+.lp-trust-item b { color: #fff; font-weight: 600; }
+.lp-trust-item svg { color: var(--tk-rose-300); flex: none; }
+.lp-trust-rule { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.18); }
 
 /* ── how it works ───────────────────────────── */
 .lp-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; }
@@ -117,23 +124,30 @@
 .lp-art-check { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--selected); color: #fff; }
 .lp-art-box { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--tk-mist-800); }
 
-/* ── the book: solid Indigo panel beside an undimmed photo ── */
-/* Banner 02 is bright (tissue paper, a white book cover), so an overlay would
-   turn it grey. Splitting the section keeps the photo at full colour and gives
-   the page its Indigo weight. */
-.lp-showcase { display: grid; grid-template-columns: minmax(0, 46fr) minmax(0, 54fr); background: var(--surface-dark); color: #fff; min-height: clamp(560px, 46vw, 720px); }
-.lp-showcase .lp-banner-photo { position: relative; grid-column: 2; grid-row: 1; }
-.lp-showcase .lp-banner-photo img { position: absolute; inset: 0; object-position: 66% 50%; }
-.lp-showcase-copy { grid-column: 1; grid-row: 1; align-self: center; justify-self: end; width: min(590px, 100%); padding: clamp(56px, 6vw, 88px) clamp(32px, 4vw, 56px) clamp(56px, 6vw, 88px) 24px; }
-.lp-showcase .lp-eyebrow { color: var(--on-dark-soft); }
+/* ── the book: full-bleed photo, copy on a frosted panel ── */
+/* Banner 02 fills the section. An Indigo 900 fade on the left carries the
+   heading and stops before the baby, and the features sit on a frosted Indigo
+   panel. This is the owner's preferred pre-kit layout, recoloured
+   (2026-11-11). */
+.lp-showcase { position: relative; overflow: hidden; background: var(--surface-darkest); color: #fff; min-height: clamp(560px, 46vw, 800px); display: flex; align-items: center; }
+/* On wide screens the photo starts 16% in and fades in from the left, so the
+   baby clears the frosted panel instead of sitting blurred under it. Phones
+   reset this when the section stacks. */
+.lp-showcase .lp-banner-photo { left: 16%; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%); mask-image: linear-gradient(90deg, transparent, #000 24%); }
+.lp-showcase .lp-banner-photo img { object-position: 38% 50%; }
+.lp-showcase::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(22, 20, 41, 0.86) 0%, rgba(22, 20, 41, 0.64) 36%, rgba(22, 20, 41, 0.1) 60%, transparent 72%); }
+.lp-showcase .lp-wrap { position: relative; z-index: 2; padding: clamp(64px, 8vw, 120px) 0; }
+.lp-showcase-copy { max-width: 520px; }
+.lp-showcase .lp-eyebrow { color: rgba(255, 255, 255, 0.86); }
 .lp-showcase .lp-h2 { color: #fff; }
-.lp-showcase .lp-lede { color: var(--on-dark-soft); max-width: 46ch; }
-.lp-quality { display: flex; flex-direction: column; margin-top: 26px; }
-.lp-qrow { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid rgba(255, 255, 255, 0.16); }
-.lp-qart { flex: none; width: 44px; height: 44px; }
-.lp-qart svg { width: 100%; height: 100%; overflow: visible; }
-.lp .lp-qrow h4 { font-size: 16px; line-height: 24px; margin: 0 0 2px; color: #fff; }
-.lp-qrow p { font-size: 14px; line-height: 22px; color: var(--on-dark-soft); margin: 0; }
+.lp-showcase .lp-lede { color: rgba(255, 255, 255, 0.9); max-width: 44ch; }
+.lp-quality { display: flex; flex-direction: column; margin-top: 30px; background: rgba(22, 20, 41, 0.4); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: var(--radius-lg); padding: 6px 22px; box-shadow: 0 20px 50px rgba(22, 20, 41, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.lp-qrow { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.lp-qrow:first-child { border-top: none; }
+.lp-qart { flex: none; width: 52px; height: 52px; }
+.lp-qart svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 10px rgba(22, 20, 41, 0.24)); }
+.lp .lp-qrow h4 { font-family: var(--font-display); font-weight: 600; font-size: 17px; line-height: 24px; letter-spacing: -0.005em; word-spacing: 0.1em; margin: 0 0 4px; color: #fff; }
+.lp-qrow p { font-size: 15px; line-height: 23px; color: rgba(255, 255, 255, 0.84); margin: 0; }
 
 /* ── occasions ──────────────────────────────── */
 /* 7 book types: 4 across, the last row centred (flex-wrap, not grid). No card
@@ -158,9 +172,9 @@
 .lp-page-head { padding: 26px 0 8px; max-width: 720px; }
 .lp-page-hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: clamp(28px, 5vw, 64px); align-items: center; padding: 26px 0 12px; }
 .lp-page-hero img { width: 100%; height: auto; border-radius: var(--radius-lg); }
-.lp-page h1 { font-size: clamp(30px, 3.7vw, 48px); line-height: 1.17; margin: 0; }
+.lp-page h1 { font-size: clamp(32px, 4.4vw, 56px); line-height: 1.1; margin: 0; }
 .lp-page-section { padding-top: clamp(44px, 6vw, 72px); }
-.lp-page-h2 { font-size: clamp(24px, 2.6vw, 32px); line-height: 1.25; margin: 0 0 22px; }
+.lp-page-h2 { font-size: clamp(26px, 3vw, 38px); line-height: 1.15; margin: 0 0 22px; }
 .lp-page main { padding-bottom: clamp(56px, 8vw, 100px); }
 .lp-price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .lp-price-card { background: var(--surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px 22px; }
@@ -183,18 +197,20 @@
 .lp-faq details p { margin: 0 0 16px; color: var(--color-fg2); max-width: 62ch; }
 
 /* ── final CTA ──────────────────────────────── */
-/* Banner 03 under the kit's Indigo overlay, so the page opens and closes on a
-   real book. The book sits left of centre in this photo, so copy goes on the
-   right: the overlay stays off the child's face. */
-.lp-cta { background: var(--surface-darkest); color: #fff; position: relative; overflow: hidden; min-height: clamp(460px, 36vw, 580px); display: flex; align-items: center; }
-.lp-cta .lp-banner-photo img { object-position: 40% 50%; }
-.lp-cta::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(270deg, rgba(22, 20, 41, 0.85) 0%, rgba(22, 20, 41, 0.8) 34%, rgba(22, 20, 41, 0.12) 54%, transparent 66%); }
-.lp-cta-inner { position: relative; z-index: 2; width: min(460px, 100%); margin-left: auto; padding: clamp(56px, 7vw, 96px) 0; }
-.lp-cta .lp-eyebrow { color: var(--on-dark-soft); }
-.lp-cta .lp-h2 { color: #fff; }
-.lp-cta p { color: var(--on-dark-soft); margin: 14px 0 0; max-width: 46ch; }
-.lp-cta-actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
-.lp-cta .lp-cta-sub { font-size: 14px; line-height: 22px; color: var(--on-dark-faint); margin-top: 20px; }
+/* Centred on Indigo 900. Banner 03 is a faint texture (7%), not a picture, under
+   an Indigo glow above and a Rose glow below. The owner's preferred pre-kit
+   version, with the gold swapped for Rose (2026-11-11). */
+.lp-cta { background: var(--surface-darkest); color: #fff; position: relative; overflow: hidden; }
+.lp-cta-photo { opacity: 0.07; filter: grayscale(0.35); }
+.lp-cta-photo img { object-position: 50% 50%; }
+.lp-cta-glow { position: absolute; z-index: 0; width: 620px; height: 620px; border-radius: 50%; background: radial-gradient(circle, rgba(89, 80, 128, 0.55), transparent 62%); top: -40%; left: 50%; transform: translateX(-50%); pointer-events: none; }
+.lp-cta-glow.rose { background: radial-gradient(circle, rgba(238, 66, 102, 0.16), transparent 60%); top: auto; bottom: -50%; }
+.lp-cta-inner { position: relative; z-index: 1; text-align: center; padding: clamp(60px, 8vw, 110px) 0; }
+.lp-cta .lp-eyebrow { color: var(--tk-rose-300); }
+.lp-cta .lp-h2 { color: #fff; max-width: 18ch; margin: 14px auto 0; }
+.lp-cta p { font-size: 17px; line-height: 28px; color: var(--on-dark-soft); margin: 20px auto 0; max-width: 46ch; }
+.lp-cta-actions { display: flex; gap: 14px; justify-content: center; margin-top: 36px; flex-wrap: wrap; }
+.lp-cta .lp-cta-sub { font-size: 14px; line-height: 22px; color: var(--on-dark-faint); margin-top: 22px; }
 
 /* ── footer ─────────────────────────────────── */
 .lp-footer { background: var(--surface-darkest); color: var(--on-dark-soft); padding: 64px 0 32px; }
@@ -222,9 +238,15 @@
   .lp-occ-card { flex-basis: calc((100% - 24px) / 2); }
   .lp-footer .lp-wrap { grid-template-columns: 1fr 1fr; }
   .lp-nav-links { display: none; }
-  .lp-showcase { grid-template-columns: 1fr; }
-  .lp-showcase .lp-banner-photo { grid-column: 1; grid-row: 1; aspect-ratio: 16 / 10; }
-  .lp-showcase-copy { grid-column: 1; grid-row: 2; width: min(720px, 100%); justify-self: center; padding: 48px 24px 56px; }
+}
+/* Below 1200px wide: the frosted panel would cover the baby's face, so
+   "What you'll hold" stacks here (16:10 photo, then copy on Indigo 900, joined
+   by a short fade). Phones switch the photo to the square crop below. */
+@media (max-width: 1199px) {
+  .lp-showcase { display: block; min-height: 0; }
+  .lp-showcase .lp-banner-photo { position: relative; display: block; left: 0; width: 100%; aspect-ratio: 16 / 10; max-height: 560px; -webkit-mask-image: none; mask-image: none; }
+  .lp-showcase::before { inset: auto 0 auto 0; top: calc(min(62.5vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
+  .lp-showcase .lp-wrap { padding: 8px 0 64px; }
 }
 /* Phones: shorter page and thumb-sized targets. Steps and occasions become
    native scroll-snap rails; the next card peeks in to signal there is more.
@@ -271,27 +293,23 @@
   .lp-sticky-cta.on { transform: none; visibility: visible; }
   .lp-sticky-cta .lp-btn { width: 100%; }
 
-  /* Hero stacks: the square photo on top, copy below on Indigo 900, joined by a
-     short fade across the seam. */
-  .lp-hero { display: block; min-height: 0; }
-  .lp-hero .lp-banner-photo { position: relative; display: block; aspect-ratio: 1; max-height: 560px; }
+  /* Hero and "What you'll hold" stack: the square photo on top, copy below on
+     Indigo 900, joined by a short fade across the seam. */
+  .lp-hero, .lp-showcase { display: block; min-height: 0; }
+  .lp-hero .lp-banner-photo, .lp-showcase .lp-banner-photo { position: relative; display: block; aspect-ratio: 1; max-height: 560px; }
   .lp-banner-photo img { object-position: 50% 50%; }
-  .lp-hero::before { inset: auto 0 auto 0; top: calc(min(100vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
+  .lp-hero::before, .lp-showcase::before { inset: auto 0 auto 0; top: calc(min(100vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
   .lp-hero .lp-wrap { width: calc(100% - 32px); padding: 8px 0 44px; }
+  .lp-showcase .lp-wrap { width: calc(100% - 32px); padding: 8px 0 52px; }
+  .lp-quality { padding: 4px 18px; }
   .lp-hero-actions .lp-btn { width: 100%; }
 
   .lp-nav .tk-logo { --tk-logo-h: 28px !important; }
   .lp-footer .tk-logo { --tk-logo-h: 30px !important; }
 
-  .lp-showcase-copy { padding: 40px 16px 44px; }
-
-  /* Final CTA keeps the photo behind the copy, with an even overlay, so the
-     phone page stays short. */
-  .lp-cta .lp-banner-photo img { object-position: 50% 50%; }
-  .lp-cta::before { background: linear-gradient(180deg, rgba(22, 20, 41, 0.72), rgba(22, 20, 41, 0.85)); }
-  .lp-cta-inner { width: 100%; margin-left: 0; padding: 48px 0 52px; }
+  .lp-cta-inner { padding: 52px 0 56px; }
   .lp-cta p, .lp-cta .lp-cta-sub { text-wrap: pretty; }
-  .lp-cta-actions { flex-direction: column; align-items: stretch; }
+  .lp-cta-actions { flex-direction: column; align-items: stretch; max-width: 340px; margin-left: auto; margin-right: auto; }
 }
 @media (max-width: 720px) and (prefers-reduced-motion: reduce) {
   .lp-sticky-cta { transition: none; }

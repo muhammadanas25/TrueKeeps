@@ -1,60 +1,34 @@
 /**
- * UploadScreen — step 2 of 3: real photo upload, persisted server-side.
+ * UploadScreen — step 2 of 3: choose photos.
  *
- * Ported from `book_builder/screens1.jsx`; upload path is the Phase 1
- * media pipeline (client/src/lib/uploads.ts):
- *  - a backing project is created lazily on the first upload (the
- *    builder is otherwise fully client-side until then)
- *  - each file is compressed in a worker, PUT directly to the media
- *    store via presigned URL, and registered — the returned server URL
- *    is small enough to persist in the localStorage draft, so photos
- *    now SURVIVE reloads
- *  - if the server is unreachable, we fall back to an in-memory data
- *    URL so the flow never blocks (that photo just won't survive
- *    reload — same as the pre-Phase-1 behavior)
- *  - each photo gets a curated caption label from the chosen occasion,
- *    assigned round-robin (a vision captioner slots in later)
+ * Choosing is the whole job. The moment files are picked they go to the upload
+ * engine (see ../upload/engine.ts) and the customer moves straight on to
+ * ComposeScreen, so nobody waits here. Coming back shows every photo with its
+ * state, and a way to add more or to re-add any whose original was lost when a
+ * tab closed mid-upload.
  *
- * The live page-count estimate re-runs the pure generatePages() on the
- * current photo set so "N photos — a M-page book" is always truthful.
+ * Print advice lives on this screen, before the picker, because it can still
+ * change what they choose. Afterwards it's only worth saying about the actual
+ * photos they picked (see ../upload/tips.ts).
  */
 
 import { useRef, useState } from "react";
-import { CheckCircle2, ImagePlus, Plus, Sparkles } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
-import { readImageSize, uploadPhotoFile } from "@/lib/uploads";
+import { ArrowRight, CheckCircle2, ImagePlus, Plus, RotateCcw, X } from "lucide-react";
 import { Ph } from "../book";
-import { generatePages, occasionById, type BookTheme, type BuilderPhoto, type CopyVoice } from "../data";
+import { generatePages, type BookTheme, type CopyVoice } from "../data";
 import type { BuilderState } from "../state";
-
-/** "IMG_2041.jpeg" → "img 2041"; falls back to occasion labels for captions. */
-function cleanLabel(filename: string): string {
-  return filename
-    .replace(/\.[^.]+$/, "")
-    .replace(/[-_]+/g, " ")
-    .trim()
-    .toLowerCase()
-    .slice(0, 28);
-}
-
-function readAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+import { uploadEngine } from "../upload/engine";
+import { BEFORE_TIPS } from "../upload/tips";
+import { useUploads } from "../upload/UploadContext";
+import { TipLine } from "../upload/UploadStatus";
 
 export function UploadScreen({
   state,
-  set,
   copy,
   theme,
   onContinue,
 }: {
   state: BuilderState;
-  set: (patch: Partial<BuilderState>) => void;
   copy: CopyVoice;
   theme: BookTheme;
   onContinue: () => void;
@@ -63,79 +37,13 @@ export function UploadScreen({
   const hasPhotos = photos.length > 0;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const { addFiles, progress, snapshot } = useUploads();
 
-  const occ = occasionById(state.occasion);
-
-  /** Create the backing server project on first use (name = book title). */
-  const ensureProject = async (): Promise<string | null> => {
-    if (state.projectId) return state.projectId;
-    try {
-      const res = await apiRequest("POST", "/api/projects", {
-        name: state.title.trim() || occ.suggestedTitle,
-        status: "draft",
-      });
-      const project: { id: string } = await res.json();
-      set({ projectId: project.id });
-      return project.id;
-    } catch {
-      return null; // offline/dev hiccup → photos fall back to data URLs
-    }
-  };
-
-  /** Ingest files: upload server-side (preferred) → BuilderPhoto[]. */
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files || busy) return;
-    const images = Array.from(files).filter((f) => f.type.startsWith("image/") || /\.heic$/i.test(f.name));
-    if (!images.length) return;
-    setBusy(true);
-    const projectId = await ensureProject();
-    const startIdx = photos.length;
-    const next: BuilderPhoto[] = [];
-    for (let i = 0; i < images.length; i++) {
-      const file = images[i];
-      const n = startIdx + i;
-      let id = "p" + Date.now().toString(36) + "-" + n;
-      let url: string | undefined;
-      // True pixel size of the uploaded bytes. Recorded on the photo so
-      // the editor can bound zoom and flag soft pages WITHOUT re-reading
-      // the file or waiting on the server's async sharp pass.
-      let w: number | undefined;
-      let h: number | undefined;
-      if (projectId) {
-        try {
-          const uploaded = await uploadPhotoFile(file, projectId);
-          id = uploaded.id;
-          url = uploaded.url; // server URL — persists across reloads
-          w = uploaded.width ?? undefined;
-          h = uploaded.height ?? undefined;
-        } catch {
-          url = undefined; // fall through to the local-only path below
-        }
-      }
-      if (!url) {
-        try {
-          url = await readAsDataURL(file); // offline fallback, session-only
-          // the upload path never ran, so measure the original directly
-          const size = await readImageSize(file);
-          w = size?.w;
-          h = size?.h;
-        } catch {
-          url = undefined; // unreadable file → labelled placeholder tile
-        }
-      }
-      next.push({
-        id,
-        // occasion labels give captions charm; filename is the fallback
-        label: occ.photoLabels[n % occ.photoLabels.length] || cleanLabel(file.name),
-        shade: n % 3,
-        url,
-        w,
-        h,
-      });
-    }
-    set({ photos: [...photos, ...next] });
-    setBusy(false);
+  /** First photos of a book carry straight on; adding more stays here to review. */
+  const take = (files: FileList | File[] | null) => {
+    const first = !hasPhotos;
+    void addFiles(files);
+    if (first && files && files.length) onContinue();
   };
 
   const openPicker = () => inputRef.current?.click();
@@ -144,7 +52,6 @@ export function UploadScreen({
   return (
     <div className="bb-screen bb-upload">
       <div className="bb-upload-inner">
-        <div className="bb-kicker">Step 2 — photos</div>
         <h1>{copy.uploadTitle}</h1>
         <p className="bb-sub">{copy.uploadSub}</p>
 
@@ -152,63 +59,99 @@ export function UploadScreen({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,.heic"
+          accept="image/*,.heic,.heif"
           multiple
           style={{ display: "none" }}
           onChange={(e) => {
-            addFiles(e.target.files);
+            take(e.target.files ? Array.from(e.target.files) : null);
             e.target.value = ""; // allow re-picking the same files
           }}
         />
 
         {!hasPhotos ? (
-          <div
-            className={"bb-dropzone" + (dragOver ? " drag" : "")}
-            onClick={openPicker}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") openPicker();
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              addFiles(e.dataTransfer.files);
-            }}
-          >
-            <ImagePlus size={40} strokeWidth={1.4} />
-            <p>{busy ? "Adding your photos…" : "Drop your photos here, or browse your device"}</p>
-            <button className="bb-btn bb-btn-primary" onClick={openPicker}>
-              {copy.uploadCta}
-            </button>
-            <span className="bb-formats">JPG, PNG, and HEIC — we handle the rest</span>
-          </div>
+          <>
+            <div
+              className={"bb-dropzone" + (dragOver ? " drag" : "")}
+              onClick={openPicker}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openPicker();
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                take(e.dataTransfer.files);
+              }}
+            >
+              <ImagePlus size={40} strokeWidth={1.4} />
+              <p>Drop your photos here, or browse your device</p>
+              <button
+                type="button"
+                className="bb-btn bb-btn-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPicker();
+                }}
+              >
+                {copy.uploadCta}
+              </button>
+              <span className="bb-formats">JPG, PNG, and HEIC. We handle the rest.</span>
+            </div>
+            <TipLine className="ck-before" lineFor={(n) => BEFORE_TIPS[n % BEFORE_TIPS.length]} />
+          </>
         ) : (
           <>
+            {progress.needRepick > 0 && !progress.active ? (
+              <div className="ck-repick" role="status">
+                <p>
+                  <b>
+                    {progress.needRepick} {progress.needRepick === 1 ? "photo needs" : "photos need"} adding again.
+                  </b>{" "}
+                  The page closed before the full-quality {progress.needRepick === 1 ? "copy" : "copies"} finished. Choose the same photos and we'll pick up where we left off.
+                </p>
+                <button type="button" className="bb-btn bb-btn-secondary" onClick={openPicker}>
+                  <RotateCcw size={15} /> Choose photos
+                </button>
+              </div>
+            ) : null}
+            {snapshot.rejected.length ? (
+              <div className="ck-rejected" role="alert">
+                <p>
+                  We couldn't open {snapshot.rejected.length === 1 ? snapshot.rejected[0] : `${snapshot.rejected.length} files`}, so{" "}
+                  {snapshot.rejected.length === 1 ? "it isn't" : "they aren't"} in your book.
+                </p>
+                <button type="button" aria-label="Dismiss" onClick={() => uploadEngine.dismissRejected()}>
+                  <X size={15} />
+                </button>
+              </div>
+            ) : null}
             <div
               className="bb-photo-grid"
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                addFiles(e.dataTransfer.files);
+                take(e.dataTransfer.files);
               }}
             >
               {photos.map((p) => (
-                <Ph key={p.id} photo={p} theme={theme} />
+                <div key={p.id} className={"ck-tile" + (p.url ? "" : " waiting")}>
+                  <Ph photo={p} theme={theme} variant="thumb" showLabel={Boolean(p.url)} />
+                </div>
               ))}
             </div>
             <div className="bb-upload-meta">
               <span className="bb-upload-count">
                 <CheckCircle2 size={17} />
-                {photos.length} photos — a {estPages}-page book
+                {photos.length} {photos.length === 1 ? "photo" : "photos"}, a {estPages}-page book
               </span>
-              <button className="bb-btn bb-btn-ghost" onClick={openPicker} disabled={busy}>
-                <Plus size={16} /> {busy ? "Adding…" : copy.uploadMore}
+              <button type="button" className="bb-btn bb-btn-ghost" onClick={openPicker}>
+                <Plus size={16} /> {copy.uploadMore}
               </button>
             </div>
           </>
@@ -217,8 +160,8 @@ export function UploadScreen({
 
       {hasPhotos ? (
         <div className="bb-actionbar">
-          <button className="bb-btn bb-btn-primary bb-btn-lg" onClick={onContinue}>
-            <Sparkles size={18} /> Design my book
+          <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={onContinue}>
+            Continue <ArrowRight size={18} />
           </button>
         </div>
       ) : null}

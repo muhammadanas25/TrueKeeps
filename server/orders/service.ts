@@ -30,9 +30,11 @@
 
 import { randomInt } from "crypto";
 import type { Order } from "@shared/schema";
-import { quote } from "@shared/pricing";
+import type { BuilderDocument } from "@shared/document";
+import { printedPageCount, quote } from "@shared/pricing";
 import { PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
+import { queuePrintRender } from "../print/render";
 import { config } from "../config";
 import { log } from "../logger";
 import { paymentProvider } from "../payments";
@@ -99,6 +101,20 @@ export async function checkoutUrlFor(order: Order): Promise<{ order: Order; chec
 
 /* ── create ────────────────────────────────────────────────────── */
 
+/**
+ * Photo ids the book prints whose original isn't in the media store: everything
+ * placed on a page, plus the first photo, which is what covers show. Photos
+ * sitting unused in the library don't hold an order up.
+ */
+export async function photosWithoutOriginals(projectId: string, doc: BuilderDocument): Promise<string[]> {
+  const known = new Set(doc.photos.map((p) => p.id));
+  const printed = new Set(doc.pages.flatMap((pg) => pg.slots.map((s) => s.photoId)).filter((id) => known.has(id)));
+  if (doc.photos[0]) printed.add(doc.photos[0].id);
+  const rows = await storage.getUploadedPhotos(projectId);
+  const ready = new Set(rows.filter((r) => r.originalUploadedAt).map((r) => r.id));
+  return Array.from(printed).filter((id) => !ready.has(id));
+}
+
 export async function createOrder(
   user: { id: string; email: string; phone?: string | null },
   body: CreateOrderBody,
@@ -114,9 +130,20 @@ export async function createOrder(
   if (doc.pages.length < 2 || doc.photos.length === 0) {
     throw new OrderError("Finish designing your book before ordering", 400, "BOOK_INCOMPLETE");
   }
+  // We print from the HD originals, so all of them must be here before money
+  // changes hands. The client shows this first; this is the part that holds.
+  const waiting = await photosWithoutOriginals(body.projectId, doc);
+  if (waiting.length) {
+    throw new OrderError(
+      `${waiting.length} of your photos ${waiting.length === 1 ? "is" : "are"} still uploading. Your book will be ready to order once they finish.`,
+      409,
+      "PHOTOS_PENDING",
+    );
+  }
 
-  // 2. authoritative price
-  const q = quote({ binding: body.binding, qty: body.qty });
+  // 2. authoritative price: from the saved book's page count and the address
+  //    the customer submitted, never from a total sent by the browser
+  const q = quote({ binding: body.binding, qty: body.qty, printedPages: printedPageCount(doc.pages), address: body.address });
 
   // 3. insert (retry on the astronomically rare order-number collision)
   let order: Order | undefined;
@@ -230,6 +257,9 @@ export async function confirmPayment(orderId: string, actor: ConfirmActor, provi
 
   log.info({ orderId, orderNumber: order.orderNumber, actor, livemode: order.livemode }, "[orders] paid");
   void sendConfirmation(paid);
+  // Paid means it will be printed: cut the print files from the HD originals now,
+  // in the background, so they're ready before anyone opens the order.
+  queuePrintRender(paid.id);
   return paid;
 }
 

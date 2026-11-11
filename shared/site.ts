@@ -17,11 +17,12 @@
  * ratings, customer counts or delivery times until they are real. That is why
  * the Product data has offers but no aggregateRating. The owner confirmed on
  * 2026-11-05: the 12×12 inch size on every binding, glossy or matte finish, the
- * Love-it guarantee (wording still to come) and WhatsApp help from 10am to 6pm.
+ * Love-it guarantee (wording still to come) and help on WhatsApp (no hours promised).
+ * Prices and the free-shipping rule (owner, 2026-11-11) come from shared/pricing.ts.
  * No page may claim a paper certification, such as FSC, without printer proof.
  */
 
-import { formatPKR, PRICE_LIST } from "./pricing";
+import { formatPKR, INCLUDED_PAGES, PRICE_LIST, REMOTE_AREAS_TEXT } from "./pricing";
 
 export const SITE = {
   url: "https://thetruekeeps.com",
@@ -168,13 +169,16 @@ export const bookTypeBySlug = (slug: string) => BOOK_TYPES.find((b) => b.slug ==
 
 /* ── FAQ ────────────────────────────────────────────────────── */
 
-const prices = PRICE_LIST.bindings;
-const lowest = Math.min(...prices.map((b) => b.unitMinor));
-const highest = Math.max(...prices.map((b) => b.unitMinor));
-const shippingLine = `Delivery is a flat ${formatPKR(PRICE_LIST.shippingMinor)} anywhere in Pakistan, and free on orders of ${formatPKR(PRICE_LIST.freeShippingFromMinor)} or more.`;
+const bindingNames = PRICE_LIST.bindings.map((b) => b.name.toLowerCase());
+
+/** Shipping rule in one sentence, straight from the checkout price list. */
+export const SHIPPING_LINE = `Shipping is free anywhere in Pakistan, except ${REMOTE_AREAS_TEXT}, where delivery is ${formatPKR(PRICE_LIST.remoteDeliveryMinor)}.`;
+const shippingLine = SHIPPING_LINE;
 
 /** One-line price summary shared by the homepage, hub page and llms.txt. */
-export const PRICE_SUMMARY = prices.map((b) => `${b.name} ${formatPKR(b.unitMinor)}`).join(", ");
+export const PRICE_SUMMARY =
+  `A book is ${formatPKR(PRICE_LIST.bookMinor)} in any binding (${bindingNames.slice(0, -1).join(", ")} or ${bindingNames.at(-1)}) ` +
+  `and includes ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}`;
 
 /** Rendered visibly on the page AND as FAQPage data, so the two always match. */
 export const FAQS: Array<{ q: string; a: string }> = [
@@ -277,12 +281,13 @@ function product(name: string, description: string, path: string, image: string)
     image: abs(image),
     url: abs(path),
     brand: { "@type": "Brand", name: SITE.name },
+    // every binding starts at the same price; more sheets cost more, so only
+    // the lowest price is stated
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "PKR",
-      lowPrice: (lowest / 100).toFixed(0),
-      highPrice: (highest / 100).toFixed(0),
-      offerCount: prices.length,
+      lowPrice: (PRICE_LIST.bookMinor / 100).toFixed(0),
+      offerCount: PRICE_LIST.bindings.length,
       availability: "https://schema.org/InStock",
       url: abs(path),
     },
@@ -301,7 +306,7 @@ const HOME_META: PageMeta = {
 const HUB_META: PageMeta = {
   path: "/photo-books",
   title: "Photo Books in Pakistan: Prices & Types | TrueKeeps",
-  description: `Printed photo books made from your own photos, from ${formatPKR(lowest)}, delivered across Pakistan. Free to start, and you only pay when you love it.`,
+  description: `Printed photo books made from your own photos, from ${formatPKR(PRICE_LIST.bookMinor)}, delivered across Pakistan. Free to start, and you only pay when you love it.`,
   ogImage: SITE.defaultOgImage,
   jsonLd: [
     product("Custom photo book", "A printed 12×12 inch photo book made from your own photos and delivered across Pakistan.", "/photo-books", SITE.defaultOgImage),
@@ -406,7 +411,7 @@ export function llmsTxt(): string {
     "",
     "## Prices",
     "",
-    `- ${PRICE_SUMMARY}, per book, in Pakistani rupees.`,
+    `- ${PRICE_SUMMARY}. Prices are in Pakistani rupees.`,
     `- ${shippingLine}`,
     "- Free to start. You only pay when you order.",
     "- Payment is online by card or Google Pay through Safepay. No cash on delivery.",

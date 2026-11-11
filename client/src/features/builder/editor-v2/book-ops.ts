@@ -18,6 +18,8 @@
  */
 
 import {
+  firstMovablePage,
+  hasTitlePage,
   LAYOUT_SLOTS,
   MAX_SLOTS_PER_PAGE,
   generatePages,
@@ -145,18 +147,19 @@ export function removeSlot(b: BookSlice, pageId: string, slot: number): { book: 
 
 /* ── pages ─────────────────────────────────────────────────────── */
 
-/** Move page `from` so it lands before index `to` (0 is the title, fixed). */
+/** Move page `from` so it lands before index `to` (an old book's title page stays first). */
 export function movePage(b: BookSlice, from: number, to: number): BookSlice {
-  if (from <= 0 || from >= b.pages.length) return b;
+  const first = firstMovablePage(b.pages);
+  if (from < first || from >= b.pages.length) return b;
   const pages = b.pages.slice();
   const [it] = pages.splice(from, 1);
-  const at = Math.max(1, Math.min(pages.length, to > from ? to - 1 : to));
+  const at = Math.max(first, Math.min(pages.length, to > from ? to - 1 : to));
   pages.splice(at, 0, it);
   return { ...b, pages };
 }
 
 export function deletePage(b: BookSlice, idx: number): BookSlice {
-  if (idx <= 0) return b;
+  if (idx < firstMovablePage(b.pages)) return b;
   return { ...b, pages: b.pages.filter((_, i) => i !== idx) };
 }
 
@@ -165,7 +168,7 @@ export function addPage(b: BookSlice, afterIdx: number, photos: BuilderPhoto[]):
   const photoId = unusedPhotoIds(b.pages, photos)[0] ?? photos[0]?.id;
   if (!photoId) return null;
   const id = newPageId();
-  const at = Math.max(1, Math.min(b.pages.length, afterIdx + 1));
+  const at = Math.max(firstMovablePage(b.pages), Math.min(b.pages.length, afterIdx + 1));
   const pages = b.pages.slice();
   pages.splice(at, 0, { id, layout: "single", slots: [placement(photoId)], caption: "" });
   return { book: { ...b, pages }, index: at, id };
@@ -189,9 +192,9 @@ export function reflow(b: BookSlice, density: DensityId, photos: BuilderPhoto[])
       order.push(ph);
     }
   const fresh = generatePages(order, density);
-  // keep the user's title page (it may carry their own caption/colour)
-  const title = b.pages[0]?.layout === "title" ? b.pages[0] : fresh[0];
-  const pages = [title, ...fresh.slice(1)].map((p) => ({
+  // an older book keeps its title page (it may carry their own colour);
+  // generatePages no longer makes one
+  const pages = (hasTitlePage(b.pages) ? [b.pages[0], ...fresh] : fresh).map((p) => ({
     ...p,
     slots: p.slots.map((s) => ({ ...(framing.get(s.photoId) ?? s), photoId: s.photoId })),
   }));

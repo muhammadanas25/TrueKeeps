@@ -4,8 +4,9 @@
  *
  * Keyed by user id when a session exists (so one abusive account can't
  * hide behind a shared office/NAT IP) and by IP otherwise. Limits are
- * generous for real use: a person uploading a 200-photo book presigns
- * 200 times in a few minutes and never gets near the ceiling.
+ * generous for real use: a 400-photo book (the document cap) makes 4 calls
+ * per photo, about 1600, and those mostly land within a few minutes while
+ * the display copies go up.
  *
  * In-memory store: fine at one replica (docs/deploy-railway.md keeps
  * us at one until pg-boss lands); move to a shared store when scaling out.
@@ -31,7 +32,7 @@ const common = {
 export const createProjectLimiter = rateLimit({ ...common, windowMs: 10 * 60 * 1000, limit: 30 });
 
 /** Presign + complete — each presign reserves R2 storage. */
-export const uploadLimiter = rateLimit({ ...common, windowMs: 10 * 60 * 1000, limit: 600 });
+export const uploadLimiter = rateLimit({ ...common, windowMs: 10 * 60 * 1000, limit: 2000 });
 
 /** Document autosave — client debounces, but cap runaway loops. */
 export const saveLimiter = rateLimit({ ...common, windowMs: 60 * 1000, limit: 120 });

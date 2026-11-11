@@ -20,14 +20,17 @@
 
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpen, Check, Lock, Minus, Plus, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { MiniBook } from "../book";
 import { BINDINGS, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
-import { lowQualityPageCount } from "../print";
+import { lowQualityPageCount, photosAwaitingOriginal } from "../print";
+import { uploadEngine } from "../upload/engine";
+import { formatEta } from "../upload/tips";
+import { useUploads } from "../upload/UploadContext";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
-import { FINISHES, formatPKR, PRICE_LIST, quote } from "@shared/pricing";
+import { FINISHES, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
 import { PK_PROVINCES, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useSession } from "@/features/auth/useSession";
 
@@ -69,11 +72,17 @@ export function OrderScreen({
   const { user } = useSession();
   const occ = occasionById(state.occasion);
   const theme = bookTheme(state.themeId, state.pageColor);
-  const q = quote({ binding: state.binding, qty: state.qty });
   // Last honest chance to mention print quality before money changes
   // hands. Silent at zero — nobody needs a green tick telling them
   // nothing is wrong.
   const softPages = lowQualityPageCount(state.pages, state.photos);
+  // We print from the HD originals, so payment waits for all of them. The
+  // form stays usable: filling in an address is a good use of the wait.
+  const awaiting = photosAwaitingOriginal(state.pages, state.photos);
+  const { addFiles, snapshot } = useUploads();
+  const repickRef = useRef<HTMLInputElement>(null);
+  const stillSending = awaiting.filter((p) => uploadEngine.holdsFile(p.id)).length;
+  const needRepick = awaiting.length - stillSending;
 
   const pricing = useQuery<PricingResponse>({ queryKey: ["/api/pricing"], staleTime: 5 * 60_000 });
   const checkout = pricing.data?.checkout;
@@ -81,6 +90,10 @@ export function OrderScreen({
   const [addr, setAddr] = useState<AddressForm>(
     () => loadAddress() ?? { ...EMPTY_ADDRESS, fullName: user?.name ?? "", phone: user?.phone ?? "" },
   );
+  // Same quote the server will make: the pages inside the book decide the
+  // extra sheets, and the address decides the remote-area delivery charge, so
+  // the total updates while the customer types their city and province.
+  const q = quote({ binding: state.binding, qty: state.qty, printedPages: printedPageCount(state.pages), address: addr });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -151,7 +164,7 @@ export function OrderScreen({
     }
   };
 
-  const disabled = busy || pricing.isLoading || !checkout?.enabled;
+  const disabled = busy || pricing.isLoading || !checkout?.enabled || awaiting.length > 0;
 
   return (
     <div className="bb-screen bb-order">
@@ -203,7 +216,7 @@ export function OrderScreen({
                 {BINDINGS.map((b) => (
                   <button type="button" key={b.id} className={"bb-binding" + (q.binding === b.id ? " on" : "")} onClick={() => set({ binding: b.id })}>
                     <b>{b.name}</b>
-                    <i>{formatPKR(b.priceMinor)}</i>
+                    <i>{b.blurb}</i>
                   </button>
                 ))}
               </div>
@@ -292,17 +305,22 @@ export function OrderScreen({
             <div className="bb-price-rows">
               <div className="bb-spec-row">
                 <b>
-                  Subtotal ({q.qty} × {formatPKR(q.unitMinor)})
+                  {q.qty === 1 ? "Book" : `Books (${q.qty} × ${formatPKR(q.unitMinor)})`}
                 </b>
                 <span>{formatPKR(q.subtotalMinor)}</span>
               </div>
+              <span className="bb-price-note">
+                {q.extraSheets > 0
+                  ? `${formatPKR(PRICE_LIST.bookMinor)} for the first ${INCLUDED_PAGES} pages, plus ${q.extraSheets} extra ${q.extraSheets === 1 ? "sheet" : "sheets"} at ${formatPKR(PRICE_LIST.extraSheetMinor)} each (a sheet is 2 pages)`
+                  : `Includes up to ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}.`}
+              </span>
               <div className="bb-spec-row">
                 <b>Shipping</b>
-                <span>{q.freeShipping ? "Free" : formatPKR(q.shippingMinor)}</span>
+                <span>{q.remoteArea ? formatPKR(q.shippingMinor) : "Free"}</span>
               </div>
-              {!q.freeShipping ? (
-                <span className="bb-free-ship">
-                  <Truck size={14} /> Free shipping on orders of {formatPKR(PRICE_LIST.freeShippingFromMinor)} or more
+              {q.remoteArea ? (
+                <span className="bb-price-note">
+                  <Truck size={14} /> Delivery to {REMOTE_AREAS_TEXT} is {formatPKR(PRICE_LIST.remoteDeliveryMinor)}.
                 </span>
               ) : null}
               <div className="bb-spec-row total">
@@ -315,6 +333,44 @@ export function OrderScreen({
               <p className="bb-pay-error" role="alert">
                 {error}
               </p>
+            ) : null}
+            {awaiting.length ? (
+              <div className="ck-order-wait" role="status">
+                {needRepick ? (
+                  <>
+                    <p>
+                      <b>
+                        {needRepick} {needRepick === 1 ? "photo needs" : "photos need"} adding again before you can pay.
+                      </b>{" "}
+                      The page closed before the full-quality {needRepick === 1 ? "copy" : "copies"} we print from finished. Choose the same photos and we'll pick up where we left off.
+                    </p>
+                    <input
+                      ref={repickRef}
+                      type="file"
+                      accept="image/*,.heic,.heif"
+                      multiple
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        void addFiles(e.target.files ? Array.from(e.target.files) : null);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button type="button" className="bb-btn bb-btn-secondary" onClick={() => repickRef.current?.click()}>
+                      <RotateCcw size={15} /> Choose photos
+                    </button>
+                  </>
+                ) : (
+                  <p>
+                    <b>
+                      {stillSending} {stillSending === 1 ? "photo is" : "photos are"} still uploading
+                      {snapshot.etaSeconds !== null ? `, ${formatEta(snapshot.etaSeconds)} left` : ""}.
+                    </b>{" "}
+                    {snapshot.offline
+                      ? "Waiting for a connection. We'll carry on by ourselves."
+                      : "We print from these full-quality copies, so you can pay as soon as they finish. Please keep this page open."}
+                  </p>
+                )}
+              </div>
             ) : null}
             {checkout && !checkout.enabled ? (
               <p className="bb-pay-error" role="alert">

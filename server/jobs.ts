@@ -9,21 +9,24 @@
  * swaps its internals for pg-boss (Postgres-backed, survives restarts)
  * without touching any enqueue call sites.
  *
- * The one job today — "media.derivatives" — is the image pipeline:
+ * The one job today — "media.derivatives" — is the image pipeline. The
+ * builder no longer uses it: the browser makes its own display copies, so
+ * the server never has to decode thousands of full-size photos. It remains
+ * for the canvas editor (/create), which uploads only the original:
  *   1. read original bytes from the media store
  *   2. sharp().rotate()  → applies EXIF orientation (phone photos
  *      otherwise render sideways in the book)
  *   3. probe rotated dimensions (needed for print preflight later)
  *   4. emit two webp derivatives next to the original:
  *        <key>.thumb.webp   (~400px, grids/thumbnail rails)
- *        <key>.preview.webp (~1200px, book preview spreads)
+ *        <key>.preview.webp (~1600px, book preview spreads)
  *   5. PATCH the uploaded_photos row with URLs + dimensions
  * Clients keep working if this fails — they fall back to the original
  * URL until thumbUrl/previewUrl appear.
  */
 
 import sharp, { type Metadata } from "sharp";
-import { derivativeKey, mediaStore } from "./media";
+import { derivativeKey, mediaStore, mediaUrl } from "./media";
 import { storage } from "./storage";
 
 /* ── Minimal queue (pg-boss-shaped surface) ─────────────────── */
@@ -36,7 +39,8 @@ const waiting: Array<() => void> = [];
 /** Max jobs processing at once — image work is CPU-bound; keep small. */
 const MAX_CONCURRENCY = 2;
 
-function register(name: string, handler: JobHandler): void {
+/** Register a job handler. Modules register their own jobs on import. */
+export function register(name: string, handler: JobHandler): void {
   handlers.set(name, handler);
 }
 
@@ -75,7 +79,7 @@ export interface DerivativesPayload {
 }
 
 const THUMB_WIDTH = 400;
-const PREVIEW_WIDTH = 1200;
+const PREVIEW_WIDTH = 1600;
 
 async function makeDerivatives(payload: unknown): Promise<void> {
   const { photoId, storageKey } = payload as DerivativesPayload;
@@ -98,7 +102,7 @@ async function makeDerivatives(payload: unknown): Promise<void> {
 
   const [thumb, preview] = await Promise.all([
     base.clone().resize({ width: THUMB_WIDTH, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer(),
-    base.clone().resize({ width: PREVIEW_WIDTH, withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),
+    base.clone().resize({ width: PREVIEW_WIDTH, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer(),
   ]);
 
   const thumbKey = derivativeKey(storageKey, "thumb");
@@ -109,10 +113,12 @@ async function makeDerivatives(payload: unknown): Promise<void> {
   ]);
 
   await storage.updateUploadedPhoto(photoId, {
-    thumbUrl: mediaStore.publicUrl(thumbKey),
-    previewUrl: mediaStore.publicUrl(previewKey),
-    width: meta.width ?? null,
-    height: meta.height ?? null,
+    thumbUrl: mediaUrl(thumbKey),
+    previewUrl: mediaUrl(previewKey),
+    // metadata() reports the file's stored size even after .rotate(), which is
+    // sideways for most phone portraits; autoOrient is the size as displayed.
+    width: meta.autoOrient?.width ?? meta.width ?? null,
+    height: meta.autoOrient?.height ?? meta.height ?? null,
     status: "ready",
   });
 }
