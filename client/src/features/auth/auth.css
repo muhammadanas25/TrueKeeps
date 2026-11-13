@@ -136,7 +136,9 @@
 .au-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform var(--duration-base) var(--ease-out); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 .au-toggle.on { background: var(--selected); }
 .au-toggle.on::after { transform: translateX(18px); }
-.au-danger { color: var(--error-fg); }
+/* Two classes as well: on My books this sits on a .bb-btn-ghost, and builder.css
+   can load after this file in production, so a single class would lose. */
+.au-danger, .bb-btn.au-danger { color: var(--error-fg); }
 
 .au-spin { animation: au-rot 900ms linear infinite; }
 @keyframes au-rot { to { transform: rotate(360deg); } }
