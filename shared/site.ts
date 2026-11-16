@@ -346,14 +346,25 @@ export const isPublicPath = (path: string) => PUBLIC_PATHS.has(path);
 /** Fallback for app routes (builder, account): they carry noindex anyway. */
 export const DEFAULT_META: PageMeta = { ...HOME_META, jsonLd: [] };
 
-export const metaForPath = (path: string): PageMeta => PUBLIC_PAGES.find((p) => p.path === path) ?? { ...DEFAULT_META, path };
+/** App routes with their own tab title. Not indexed (see APP_ROUTE below). */
+const APP_PAGES: PageMeta[] = [
+  {
+    ...DEFAULT_META,
+    path: "/feedback",
+    title: `Share feedback | ${SITE.name}`,
+    description: `Tell the ${SITE.name} team how making your photo book went: what you loved, what went wrong, or an idea.`,
+  },
+];
+
+export const metaForPath = (path: string): PageMeta =>
+  PUBLIC_PAGES.find((p) => p.path === path) ?? APP_PAGES.find((p) => p.path === path) ?? { ...DEFAULT_META, path };
 
 /**
  * Client-only app routes. These answer 200 so the app can load, but with
  * noindex, because they are private or empty without a session. Anything
  * neither public nor listed here is a true 404. Keep in sync with App.tsx.
  */
-const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin\/orders)$/;
+const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin\/orders|feedback|admin\/feedback)$/;
 export const isAppRoute = (path: string) => APP_ROUTE.test(path);
 
 /* ── Generators ─────────────────────────────────────────────── */

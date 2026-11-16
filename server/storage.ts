@@ -34,9 +34,12 @@ import {
   type NewPayment,
   type UploadBatch,
   type NewUploadBatch,
+  type Feedback,
+  type NewFeedback,
 } from "@shared/schema";
 import type { OrderStatus } from "@shared/orders";
 import type { BuilderDocument } from "@shared/document";
+import type { FeedbackStatus } from "@shared/feedback";
 import { randomUUID } from "crypto";
 import { DrizzleStorage } from "./storage-pg";
 import { memDb } from "./mem-db";
@@ -141,6 +144,13 @@ export interface IStorage {
   saveUploadBatch(batch: NewUploadBatch): Promise<void>;
   listUploadBatches(since: Date, limit: number): Promise<UploadBatch[]>;
 
+  /* ── customer feedback (docs/adr/015) ── */
+  createFeedback(row: NewFeedback): Promise<Feedback>;
+  /** Newest first; `status` narrows to new or read messages. */
+  listFeedback(opts: { status?: FeedbackStatus; limit: number }): Promise<Feedback[]>;
+  /** Returns the updated row, or undefined when the id doesn't exist. */
+  setFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback | undefined>;
+
   /* ── orders (Phase 2B) ── */
   /** Insert an order and its `created` event together. */
   createOrder(order: NewOrder, event: Omit<NewOrderEvent, "orderId">): Promise<Order>;
@@ -197,6 +207,7 @@ export class MemStorage implements IStorage {
   private pagePhotos: Map<string, PagePhoto>;
   private uploadedPhotos: Map<string, UploadedPhoto>;
   private uploadBatches = new Map<string, UploadBatch>();
+  private feedbackRows = new Map<string, Feedback>();
 
   constructor() {
     this.themes = new Map();
@@ -541,6 +552,39 @@ export class MemStorage implements IStorage {
       .filter((b) => b.createdAt >= since)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
+  }
+
+  async createFeedback(row: NewFeedback): Promise<Feedback> {
+    const saved: Feedback = {
+      id: row.id ?? randomUUID(),
+      userId: row.userId ?? null,
+      topic: row.topic,
+      rating: row.rating ?? null,
+      message: row.message,
+      name: row.name ?? null,
+      contact: row.contact ?? null,
+      orderNumber: row.orderNumber ?? null,
+      fromPath: row.fromPath ?? null,
+      status: row.status ?? "new",
+      createdAt: new Date(),
+    };
+    this.feedbackRows.set(saved.id, saved);
+    return saved;
+  }
+
+  async listFeedback(opts: { status?: FeedbackStatus; limit: number }): Promise<Feedback[]> {
+    return Array.from(this.feedbackRows.values())
+      .filter((f) => !opts.status || f.status === opts.status)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, opts.limit);
+  }
+
+  async setFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback | undefined> {
+    const row = this.feedbackRows.get(id);
+    if (!row) return undefined;
+    const next = { ...row, status };
+    this.feedbackRows.set(id, next);
+    return next;
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

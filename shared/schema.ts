@@ -433,6 +433,34 @@ export const orderEvents = pgTable(
 );
 
 /**
+ * Customer feedback from /feedback (docs/adr/015). Private: read on
+ * /admin/feedback, never shown publicly. `user_id` links a signed-in (or
+ * guest) visitor when there is one and survives the user being deleted.
+ * Topic and rating ids are listed in shared/feedback.ts.
+ */
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: uuidPk(),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    topic: text("topic").notNull(),
+    /** `loved` | `good` | `okay` | `poor`, or null when skipped */
+    rating: text("rating"),
+    message: text("message").notNull(),
+    name: text("name"),
+    /** email or WhatsApp number, only so the team can reply */
+    contact: text("contact"),
+    orderNumber: text("order_number"),
+    /** the page the visitor came from */
+    fromPath: text("from_path"),
+    /** `new` | `read` */
+    status: text("status").notNull().default("new"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("feedback_status_created_idx").on(t.status, t.createdAt)],
+);
+
+/**
  * Every confirmed money movement we learn about, for audit and
  * idempotency. `provider_event_id` (the webhook's own id) is unique, so a
  * re-delivered webhook can't record twice.
@@ -550,3 +578,5 @@ export type OrderEvent = typeof orderEvents.$inferSelect;
 export type NewOrderEvent = typeof orderEvents.$inferInsert;
 export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
+export type Feedback = typeof feedback.$inferSelect;
+export type NewFeedback = typeof feedback.$inferInsert;

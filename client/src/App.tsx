@@ -21,6 +21,8 @@ const Account = lazy(() => import("@/pages/account"));
 const Orders = lazy(() => import("@/pages/orders"));
 const Order = lazy(() => import("@/pages/order"));
 const AdminOrders = lazy(() => import("@/pages/admin-orders"));
+const Feedback = lazy(() => import("@/features/feedback"));
+const AdminFeedback = lazy(() => import("@/pages/admin-feedback"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 /** Minimal, brand-neutral fallback while a route chunk loads. */
@@ -98,6 +100,9 @@ function Router() {
         <Route path="/orders" component={Orders} />
         <Route path="/orders/:id" component={Order} />
         <Route path="/admin/orders" component={AdminOrders} />
+        {/* private customer feedback (docs/adr/015) */}
+        <Route path="/feedback" component={Feedback} />
+        <Route path="/admin/feedback" component={AdminFeedback} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

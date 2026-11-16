@@ -10,7 +10,8 @@
  *
  * Every domain router validates bodies with zod and resolves rows
  * through the ownership helpers — there are no unauthenticated writes
- * left (docs/adr/004).
+ * left (docs/adr/004), except POST /api/feedback, which anyone may send
+ * and which is rate limited and honeypotted instead (docs/adr/015).
  */
 
 import type { Express } from "express";
@@ -22,6 +23,7 @@ import { pagesRouter } from "./routes/pages";
 import { uploadsRouter } from "./routes/uploads";
 import { uploadMetricsRouter } from "./routes/upload-metrics";
 import { ordersRouter } from "./routes/orders";
+import { feedbackRouter } from "./routes/feedback";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Liveness probe — used by the hosting platform (Railway healthcheck)
@@ -38,6 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(uploadsRouter);
   app.use(uploadMetricsRouter);
   app.use(ordersRouter);
+  app.use(feedbackRouter);
 
   // unknown /api paths must never fall through to the SPA index.html
   app.use("/api", (_req, res) => {

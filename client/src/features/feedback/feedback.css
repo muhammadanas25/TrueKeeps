@@ -1,0 +1,105 @@
+/* ============================================================
+   /feedback and /admin/feedback (docs/adr/015).
+
+   Brand kit v1: Paper ground (from .lp), Indigo headings, Figtree text,
+   one Rose action (the landing's .lp-btn-main), Indigo for selected
+   choices, Mist lines, 14px cards. Errors are Rose 50 + Rose 800 with an
+   icon and words; the thank-you mark is Teal, the kit's success colour.
+   No emoji.
+
+   Specificity: every rule is scoped under .fb (public page) or .fba
+   (admin page) and is at least two classes deep, because in production
+   the landing and builder stylesheets can load after this one, and a
+   single-class rule here would lose to theirs on a shared element.
+   ============================================================ */
+
+/* ── layout: intro on the left, the form on the right; stacked on phones ── */
+.fb .fb-wrap { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: clamp(32px, 6vw, 88px); align-items: start; padding: clamp(40px, 6vw, 88px) 0 clamp(56px, 8vw, 112px); }
+.fb .fb-intro { position: sticky; top: 110px; }
+.fb .fb-intro h1 { font-size: clamp(32px, 4.4vw, 56px); line-height: 1.1; margin: 16px 0 0; }
+.fb .fb-lede { margin: 18px 0 0; max-width: 44ch; font-size: clamp(16px, 1.4vw, 18px); line-height: 1.6; color: var(--color-fg2); }
+.fb .fb-promises { list-style: none; margin: 28px 0 0; padding: 22px 0 0; border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 12px; max-width: 44ch; }
+.fb .fb-promises li { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; line-height: 22px; color: var(--color-fg1); }
+.fb .fb-promises svg { flex: none; margin-top: 3px; color: var(--selected); }
+
+/* ── the card ── */
+.fb .fb-card { background: var(--surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: clamp(22px, 3vw, 36px); box-shadow: var(--shadow-sm); }
+
+/* ── choice groups: real radios inside labels, drawn as pills ── */
+.fb .fb-group { border: 0; margin: 0 0 26px; padding: 0; min-width: 0; }
+.fb .fb-group legend, .fb .fb-field > span { display: block; padding: 0; margin: 0 0 10px; font-size: 15px; line-height: 22px; font-weight: 700; color: var(--heading); }
+.fb .fb-group legend i, .fb .fb-field > span i { font-style: normal; font-weight: 400; color: var(--color-fg3); }
+.fb .fb-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fb .fb-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 10px 16px; border-radius: var(--radius-pill); border: 1.5px solid var(--tk-mist-300); background: var(--surface-card); font-size: 14px; line-height: 20px; font-weight: 500; color: var(--color-fg1); cursor: pointer; transition: border-color 0.15s, background-color 0.15s, color 0.15s; }
+.fb .fb-chip:hover { border-color: var(--tk-mist-600); }
+.fb .fb-chip.on { border-color: var(--selected); background: var(--selected-bg); color: var(--selected); font-weight: 600; }
+.fb .fb-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.fb .fb-chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ── text fields ── */
+.fb .fb-field { display: flex; flex-direction: column; margin: 0 0 22px; min-width: 0; }
+.fb .fb-field input, .fb .fb-field textarea { width: 100%; font: inherit; font-size: 16px; line-height: 24px; color: var(--color-fg1); background: #fff; border: 1.5px solid var(--line-input); border-radius: var(--radius-base); padding: 11px 14px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+.fb .fb-field textarea { resize: vertical; min-height: 148px; }
+.fb .fb-field input::placeholder, .fb .fb-field textarea::placeholder { color: var(--color-fg3); }
+.fb .fb-field input:focus, .fb .fb-field textarea:focus { border-color: var(--selected); box-shadow: var(--shadow-focus); }
+.fb .fb-field [aria-invalid="true"] { border-color: var(--error-fg); }
+.fb .fb-field small { margin-top: 6px; font-size: 13px; line-height: 18px; color: var(--color-fg3); }
+.fb .fb-field small.fb-near { color: var(--error-fg); }
+.fb .fb-err { display: block; margin-top: 6px; font-style: normal; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--error-fg); }
+.fb .fb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.fb .fb-order input { max-width: 260px; }
+
+/* honeypot: off-screen, not display:none (some bots skip hidden fields) */
+.fb .fb-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+.fb .fb-alert { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 22px; padding: 12px 14px; border-radius: var(--radius-base); background: var(--error-bg); border: 1px solid var(--error-line); color: var(--error-fg); font-size: 14px; line-height: 21px; font-weight: 500; }
+.fb .fb-alert svg { flex: none; margin-top: 2px; }
+.fb .fb-submit { margin-top: 6px; }
+.fb .fb-submit button:disabled { opacity: 0.7; cursor: progress; }
+
+/* ── sent ── */
+.fb .fb-thanks { text-align: center; padding-top: clamp(36px, 5vw, 56px); padding-bottom: clamp(36px, 5vw, 56px); }
+.fb .fb-thanks-mark { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--success-bg); color: var(--success-fg); }
+.fb .fb-thanks h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 3vw, 34px); line-height: 1.2; margin: 18px 0 0; color: var(--heading); }
+.fb .fb-thanks p { margin: 10px auto 0; max-width: 40ch; color: var(--color-fg2); }
+.fb .fb-thanks-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 22px; margin-top: 28px; }
+
+/* ── tablets and phones: stack, intro first ── */
+@media (max-width: 900px) {
+  .fb .fb-wrap { grid-template-columns: 1fr; gap: 28px; padding-top: 28px; }
+  .fb .fb-intro { position: static; }
+  .fb .fb-promises { margin-top: 20px; padding-top: 18px; }
+}
+@media (max-width: 560px) {
+  .fb .fb-row { grid-template-columns: 1fr; }
+  .fb .fb-order input { max-width: none; }
+  .fb .fb-card { padding: 20px 16px; }
+  .fb .fb-submit button { width: 100%; }
+  .fb .fb-thanks-actions .lp-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fb .fb-chip, .fb .fb-field input, .fb .fb-field textarea { transition: none; }
+}
+
+/* ============================================================
+   /admin/feedback — the inbox (inside the app shell)
+   ============================================================ */
+.fba .fba-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.fba .fba-head h1 { margin: 4px 0 0; }
+.fba .fba-head p { margin: 4px 0 0; font-size: 14px; color: var(--color-fg2); }
+.fba .fba-head p a { color: var(--heading); font-weight: 600; text-underline-offset: 3px; }
+.fba .fba-filter { font: inherit; font-size: 14px; padding: 9px 12px; border-radius: var(--radius-base); border: 1.5px solid var(--line-input); background: #fff; color: var(--color-fg1); }
+.fba .fba-list { display: flex; flex-direction: column; gap: 12px; }
+.fba .fba-item { background: var(--surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 18px 20px; }
+/* new messages carry the "New" tag; a slightly firmer line is enough */
+.fba .fba-item.is-new { border-color: var(--tk-indigo-200); }
+.fba .fba-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; line-height: 18px; color: var(--color-fg2); }
+.fba .fba-tag { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--selected-bg); color: var(--selected); font-weight: 600; }
+.fba .fba-tag.new { background: var(--offer-bg); color: var(--offer-fg); }
+.fba .fba-rating { font-weight: 600; color: var(--heading); }
+.fba .fba-msg { margin: 12px 0 0; font-size: 15px; line-height: 24px; color: var(--color-fg1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fba .fba-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-fg2); }
+.fba .fba-foot a { color: var(--heading); font-weight: 600; text-underline-offset: 3px; }
+.fba .fba-foot button { font: inherit; font-size: 13px; font-weight: 600; color: var(--heading); background: none; border: 1.5px solid var(--tk-mist-300); border-radius: var(--radius-pill); padding: 7px 14px; cursor: pointer; }
+.fba .fba-foot button:hover { border-color: var(--selected); }
+.fba .fba-empty { padding: 40px 20px; text-align: center; color: var(--color-fg2); background: var(--surface-card); border: 1px dashed var(--tk-mist-500); border-radius: var(--radius-lg); }

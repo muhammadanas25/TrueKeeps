@@ -26,6 +26,7 @@ import {
   pagePhotos,
   uploadedPhotos,
   uploadBatches,
+  feedback,
   users,
   orders,
   orderEvents,
@@ -49,9 +50,12 @@ import {
   type InsertUploadedPhoto,
   type UploadBatch,
   type NewUploadBatch,
+  type Feedback,
+  type NewFeedback,
 } from "@shared/schema";
 import type { BuilderDocument } from "@shared/document";
 import type { OrderStatus } from "@shared/orders";
+import type { FeedbackStatus } from "@shared/feedback";
 import { getDb } from "./db";
 import { SEED_THEMES, denormalise, type IStorage, type ProjectFull, type ProjectSummary, type SaveDocumentResult } from "./storage";
 
@@ -335,6 +339,21 @@ export class DrizzleStorage implements IStorage {
 
   async listUploadBatches(since: Date, limit: number): Promise<UploadBatch[]> {
     return this.db.select().from(uploadBatches).where(gte(uploadBatches.createdAt, since)).orderBy(desc(uploadBatches.createdAt)).limit(limit);
+  }
+
+  async createFeedback(row: NewFeedback): Promise<Feedback> {
+    const [saved] = await this.db.insert(feedback).values(row).returning();
+    return saved;
+  }
+
+  async listFeedback(opts: { status?: FeedbackStatus; limit: number }): Promise<Feedback[]> {
+    const q = this.db.select().from(feedback);
+    return (opts.status ? q.where(eq(feedback.status, opts.status)) : q).orderBy(desc(feedback.createdAt)).limit(opts.limit);
+  }
+
+  async setFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback | undefined> {
+    const [row] = await this.db.update(feedback).set({ status }).where(eq(feedback.id, id)).returning();
+    return row;
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

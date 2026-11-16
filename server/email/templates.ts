@@ -94,6 +94,48 @@ export function orderConfirmedEmail(params: {
   };
 }
 
+/**
+ * New-feedback alert for the team (ADMIN_EMAILS). Everything the customer
+ * typed is escaped: this mail renders their words, so they must never become
+ * markup. Line breaks are kept so longer messages stay readable.
+ */
+export function feedbackReceivedEmail(params: {
+  topic: string;
+  rating: string | null;
+  message: string;
+  name: string | null;
+  contact: string | null;
+  orderNumber: string | null;
+  adminUrl: string;
+}) {
+  const { topic, rating, message, name, contact, orderNumber, adminUrl } = params;
+  const rows: Array<[string, string | null]> = [
+    ["About", topic],
+    ["How it went", rating],
+    ["From", name],
+    ["Reply to", contact],
+    ["Order", orderNumber],
+  ];
+  const facts = rows
+    .filter(([, v]) => v)
+    .map(([k, v]) => `<b>${k}:</b> ${escapeHtml(v!)}`)
+    .join("<br>");
+  const body = escapeHtml(message).replace(/\n/g, "<br>");
+  return {
+    subject: `New feedback: ${topic}${rating ? ` (${rating})` : ""}`,
+    html: shell(
+      "New feedback",
+      para(facts) +
+        `<tr><td style="font-size:16px;line-height:26px;padding:14px 16px;margin-top:8px;background:${BRAND.paper};border-radius:10px">${body}</td></tr>` +
+        button(adminUrl, "Open feedback"),
+    ),
+    text:
+      `New feedback\n\n` +
+      rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("\n") +
+      `\n\n${message}\n\nOpen feedback: ${adminUrl}`,
+  };
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

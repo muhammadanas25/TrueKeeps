@@ -40,5 +40,8 @@ export const saveLimiter = rateLimit({ ...common, windowMs: 60 * 1000, limit: 12
 /** Generic write ceiling for everything else under /api. */
 export const writeLimiter = rateLimit({ ...common, windowMs: 60 * 1000, limit: 300 });
 
+/** Feedback form — each message is a row and an email to the team. */
+export const feedbackLimiter = rateLimit({ ...common, windowMs: 10 * 60 * 1000, limit: 5 });
+
 /** Order creation + payment retries — each one opens a gateway session. */
 export const orderLimiter = rateLimit({ ...common, windowMs: 10 * 60 * 1000, limit: 20 });

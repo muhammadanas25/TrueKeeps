@@ -210,6 +210,14 @@ export default function OrderPage() {
                 <span>{order.trackingNumber}</span>
               </div>
             ) : null}
+            {/* prefilled with this order, so the team knows which book it's about */}
+            <Link
+              href={`/feedback?order=${encodeURIComponent(order.orderNumber)}&from=${encodeURIComponent(`/orders/${order.id}`)}`}
+              className="bb-btn bb-btn-ghost"
+              style={{ alignSelf: "flex-start" }}
+            >
+              Tell us how it went
+            </Link>
           </section>
         </div>
 

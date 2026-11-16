@@ -590,6 +590,7 @@ export function Footer() {
         { label: "My books", href: "/books" },
         { label: "My orders", href: "/orders" },
         { label: "Account", href: "/account" },
+        { label: "Share feedback", href: "/feedback" },
       ],
     },
   ];
