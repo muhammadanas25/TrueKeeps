@@ -1,5 +1,6 @@
 /**
- * Customer feedback (docs/adr/015).
+ * Customer feedback, shown to customers as private "reviews" on /review and
+ * read on /admin/reviews (docs/adr/015). The API and table keep the name.
  *
  *   POST  /api/feedback               anyone; signed-in or guest visitors are linked
  *   GET   /api/admin/feedback?status=  the inbox, newest first           (admin)
@@ -41,7 +42,7 @@ async function notifyTeam(row: Feedback): Promise<void> {
     name: row.name,
     contact: row.contact,
     orderNumber: row.orderNumber,
-    adminUrl: `${config.appUrl}/admin/feedback`,
+    adminUrl: `${config.appUrl}/admin/reviews`,
   });
   await Promise.all(
     to.map((email) =>

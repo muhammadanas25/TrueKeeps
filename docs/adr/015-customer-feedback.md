@@ -48,3 +48,17 @@ recorded.
 - **Email only, no table:** loses messages when email fails and leaves no
   inbox to work through.
 - **Sign-in required:** stops the people most likely to have a problem.
+
+## Update 2026-11-16: called "reviews", still private
+
+The owner renamed the page for customers: **`/review`**, "Leave a review", a
+"Send review" button, "Leave a review" in the footer and on order pages, and
+the inbox at **`/admin/reviews`** titled "Reviews"; alert emails say "New
+review". `/feedback` and `/admin/feedback` redirect, keeping any query string
+so old prefilled links still carry their order number.
+
+Reviews stay private: the page says "Your review stays private. We don't
+publish what you write." If they are ever shown publicly, that line must
+change first and customers must be told before they write. The API
+(`/api/feedback`), the `feedback` table and the code keep their names, so
+there is no migration.

@@ -1,5 +1,6 @@
 /**
- * /admin/feedback — the feedback inbox (role = admin; docs/adr/015).
+ * /admin/reviews — the review inbox (role = admin; docs/adr/015). Reviews
+ * are private; /admin/feedback, the first address, redirects here.
  *
  * Newest first, filterable by new / read. Each message shows what the
  * customer chose and wrote, a one-tap way to reply (mailto: for an email,
@@ -71,9 +72,9 @@ export default function AdminFeedbackPage() {
         <div className="fba-head">
           <div>
             <div className="bb-kicker">Admin</div>
-            <h1>Feedback</h1>
+            <h1>Reviews</h1>
             <p>
-              Private messages from the feedback page. <Link href="/admin/orders">Back to orders</Link>
+              Private reviews from the review page. <Link href="/admin/orders">Back to orders</Link>
             </p>
           </div>
           <select className="fba-filter" value={status} onChange={(e) => setStatus(e.target.value as FeedbackStatus | "")} aria-label="Show">
@@ -86,7 +87,7 @@ export default function AdminFeedbackPage() {
         {list.isLoading ? (
           <div className="fba-empty" aria-busy="true">Loading…</div>
         ) : rows.length === 0 ? (
-          <div className="fba-empty">{status === "new" ? "Nothing new. You're all caught up." : "No feedback here yet."}</div>
+          <div className="fba-empty">{status === "new" ? "Nothing new. You're all caught up." : "No reviews here yet."}</div>
         ) : (
           <div className="fba-list">
             {rows.map((f) => {

@@ -1,5 +1,9 @@
 /**
- * /feedback — a private line from customers to the TrueKeeps team.
+ * /review — a private line from customers to the TrueKeeps team.
+ *
+ * Called "Leave a review" for customers (owner, 2026-11-16) but private:
+ * nothing is published, and the page says so. /feedback, its first address,
+ * redirects here (App.tsx). Code and data keep the name "feedback".
  *
  * What: one short form (what it's about, how it went, the message, and an
  * optional way to reply), saved by POST /api/feedback and emailed to the
@@ -75,7 +79,7 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    document.title = "Share feedback | TrueKeeps";
+    document.title = "Leave a review | TrueKeeps";
   }, []);
 
   const showOrder = topic === "order" || topic === "print" || Boolean(orderNumber);
@@ -123,9 +127,9 @@ export default function FeedbackPage() {
       <Nav />
       <main className="lp-wrap fb-wrap">
         <header className="fb-intro">
-          <div className="lp-eyebrow">Feedback</div>
+          <div className="lp-eyebrow">Leave a review</div>
           <h1>Tell us how it went</h1>
-          <p className="fb-lede">Something you loved, something that went wrong, or an idea for us. Every message comes straight to the TrueKeeps team.</p>
+          <p className="fb-lede">Something you loved, something that went wrong, or an idea for us. Every review comes straight to the TrueKeeps team.</p>
           <ul className="fb-promises">
             <li>
               <Check size={16} strokeWidth={2.4} aria-hidden="true" /> It only takes a minute, and only two answers are needed.
@@ -134,7 +138,7 @@ export default function FeedbackPage() {
               <Check size={16} strokeWidth={2.4} aria-hidden="true" /> Leave an email or WhatsApp number if you'd like us to get back to you.
             </li>
             <li>
-              <Check size={16} strokeWidth={2.4} aria-hidden="true" /> We don't publish what you write.
+              <Check size={16} strokeWidth={2.4} aria-hidden="true" /> Your review stays private. We don't publish what you write.
             </li>
           </ul>
         </header>
@@ -144,8 +148,8 @@ export default function FeedbackPage() {
             <span className="fb-thanks-mark" aria-hidden="true">
               <Check size={22} strokeWidth={2.6} />
             </span>
-            <h2>Thank you</h2>
-            <p>Your message reached us.{contact.trim() ? " We'll use the details you left if we need to get back to you." : ""}</p>
+            <h2>Thank you for your review</h2>
+            <p>It reached us.{contact.trim() ? " We'll use the details you left if we need to get back to you." : ""}</p>
             <div className="fb-thanks-actions">
               <Link href={BUILDER_PATH} className="lp-btn lp-btn-main">
                 Make my book <ArrowRight size={17} />
@@ -269,7 +273,7 @@ export default function FeedbackPage() {
 
             <div className="fb-submit">
               <button type="submit" className="lp-btn lp-btn-main lp-btn-lg" disabled={busy}>
-                {busy ? "Sending…" : "Send feedback"}
+                {busy ? "Sending…" : "Send review"}
                 {busy ? null : <ArrowRight size={18} />}
               </button>
             </div>

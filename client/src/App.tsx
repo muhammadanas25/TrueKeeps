@@ -30,6 +30,18 @@ function RouteFallback() {
   return <div style={{ minHeight: "100vh", background: "var(--surface-page)" }} aria-busy="true" />;
 }
 
+/**
+ * Redirect that keeps the query string, so an old /feedback?order=TK-… link
+ * still arrives with its order number (wouter's <Redirect> drops it).
+ */
+function RedirectKeepingQuery({ to }: { to: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation(to + window.location.search, { replace: true });
+  }, [to, setLocation]);
+  return <RouteFallback />;
+}
+
 /** Set or create one <head> tag (prerendered pages start with them all). */
 function setHeadTag(selector: string, attr: string, value: string, create: () => HTMLElement) {
   let el = document.head.querySelector(selector);
@@ -100,9 +112,15 @@ function Router() {
         <Route path="/orders" component={Orders} />
         <Route path="/orders/:id" component={Order} />
         <Route path="/admin/orders" component={AdminOrders} />
-        {/* private customer feedback (docs/adr/015) */}
-        <Route path="/feedback" component={Feedback} />
-        <Route path="/admin/feedback" component={AdminFeedback} />
+        {/* private customer reviews (docs/adr/015); the first addresses redirect */}
+        <Route path="/review" component={Feedback} />
+        <Route path="/admin/reviews" component={AdminFeedback} />
+        <Route path="/feedback">
+          <RedirectKeepingQuery to="/review" />
+        </Route>
+        <Route path="/admin/feedback">
+          <RedirectKeepingQuery to="/admin/reviews" />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Suspense>

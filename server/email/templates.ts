@@ -95,7 +95,7 @@ export function orderConfirmedEmail(params: {
 }
 
 /**
- * New-feedback alert for the team (ADMIN_EMAILS). Everything the customer
+ * New-review alert for the team (ADMIN_EMAILS). Everything the customer
  * typed is escaped: this mail renders their words, so they must never become
  * markup. Line breaks are kept so longer messages stay readable.
  */
@@ -122,17 +122,17 @@ export function feedbackReceivedEmail(params: {
     .join("<br>");
   const body = escapeHtml(message).replace(/\n/g, "<br>");
   return {
-    subject: `New feedback: ${topic}${rating ? ` (${rating})` : ""}`,
+    subject: `New review: ${topic}${rating ? ` (${rating})` : ""}`,
     html: shell(
-      "New feedback",
+      "New review",
       para(facts) +
         `<tr><td style="font-size:16px;line-height:26px;padding:14px 16px;margin-top:8px;background:${BRAND.paper};border-radius:10px">${body}</td></tr>` +
-        button(adminUrl, "Open feedback"),
+        button(adminUrl, "Open reviews"),
     ),
     text:
-      `New feedback\n\n` +
+      `New review\n\n` +
       rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("\n") +
-      `\n\n${message}\n\nOpen feedback: ${adminUrl}`,
+      `\n\n${message}\n\nOpen reviews: ${adminUrl}`,
   };
 }
 

@@ -350,9 +350,9 @@ export const DEFAULT_META: PageMeta = { ...HOME_META, jsonLd: [] };
 const APP_PAGES: PageMeta[] = [
   {
     ...DEFAULT_META,
-    path: "/feedback",
-    title: `Share feedback | ${SITE.name}`,
-    description: `Tell the ${SITE.name} team how making your photo book went: what you loved, what went wrong, or an idea.`,
+    path: "/review",
+    title: `Leave a review | ${SITE.name}`,
+    description: `Tell the ${SITE.name} team how making your photo book went: what you loved, what went wrong, or an idea. Reviews are private.`,
   },
 ];
 
@@ -364,7 +364,7 @@ export const metaForPath = (path: string): PageMeta =>
  * noindex, because they are private or empty without a session. Anything
  * neither public nor listed here is a true 404. Keep in sync with App.tsx.
  */
-const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin\/orders|feedback|admin\/feedback)$/;
+const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin\/orders|review|admin\/reviews|feedback|admin\/feedback)$/;
 export const isAppRoute = (path: string) => APP_ROUTE.test(path);
 
 /* ── Generators ─────────────────────────────────────────────── */
