@@ -4,7 +4,13 @@
  * Ported from the updated prototype shell (`~/Downloads/app.jsx`) and
  * typed. One state object drives the whole flow:
  *
- *   quiz → upload → compose → generating → reveal → preview ↔ (customize | order) → confirm
+ *   quiz → upload → compose → book → preview ↔ (customize | order) → confirm
+ *
+ * which are the owner's seven steps (flow v2, 2026-11-15): 1 occasion
+ * (quiz), 2 photos (upload), 3 the feel and 4 name and lettering (compose,
+ * qstep 0 and 1), 5 pick your book (book), 6 check and approve (preview),
+ * 7 pay (order). "generating" and "reveal" were retired on 2026-11-17; a
+ * draft saved on either resumes at "book".
  *
  * State ownership (per project conventions): this is pure client flow
  * state — server data stays in TanStack Query; ephemeral UI stays in
@@ -22,14 +28,13 @@ import { useEffect, useReducer, useRef } from "react";
 import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
 import { normalizeMediaUrl } from "@shared/media";
 import type { EdgeId, FontId } from "./looks";
-import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageLayoutId } from "./data";
+import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageFrame, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
   | "quiz"
   | "upload"
   | "compose"
-  | "generating"
-  | "reveal"
+  | "book"
   | "preview"
   | "customize"
   | "order"
@@ -37,8 +42,8 @@ export type BuilderScreen =
 
 export interface BuilderState {
   screen: BuilderScreen;
-  /** compose sub-step, while photos upload: 0 cover feel, 1 colours, 2 title */
-  qstep: 0 | 1 | 2;
+  /** compose sub-step, while photos upload: 0 the feel (step 3), 1 name and lettering (step 4) */
+  qstep: 0 | 1;
   occasion: string | null;
   vibe: string | null;
   title: string;
@@ -55,7 +60,21 @@ export interface BuilderState {
    * paper, and multiplying them out would mean 44 themes to maintain.
    */
   pageColor: string;
+  /** the arrangement: minimal = Story, balanced = Classic, collage = Family Album (arrange.ts) */
   density: DensityId;
+  /**
+   * Sheets the customer chose on "Pick your book"; null = the fewest that
+   * hold every photo in the arrangement. Not saved to the server: the pages
+   * themselves are the book, and the price counts them.
+   */
+  sheets: number | null;
+  /**
+   * True once pages were changed by anything other than "Pick your book"
+   * (an editor, a resumed book). That step then keeps the pages as they are
+   * until the customer changes a choice there, instead of laying them out
+   * again and losing the hand edits. Set by the reducer, not by callers.
+   */
+  pagesEdited: boolean;
   coverStyle: CoverStyleId;
   voice: "warm" | "concise";
   /** preview position: 0 = closed cover, k = spread k−1 open */
@@ -88,6 +107,8 @@ export const DEFAULT_STATE: BuilderState = {
   themeId: "ivory",
   pageColor: "theme",
   density: "balanced",
+  sheets: null,
+  pagesEdited: false,
   coverStyle: "full",
   voice: "warm",
   pos: 0,
@@ -105,22 +126,21 @@ export const DEFAULT_STATE: BuilderState = {
 export const BACK_MAP: Partial<Record<BuilderScreen, BuilderScreen>> = {
   upload: "quiz",
   compose: "upload",
-  reveal: "compose",
-  preview: "reveal",
+  book: "compose",
+  preview: "book",
   customize: "preview",
   order: "preview",
 };
 
 /** Header context label per screen. */
 export const SCREEN_CONTEXT: Record<BuilderScreen, string> = {
-  quiz: "Step 1 of 3: the occasion",
-  upload: "Step 2 of 3: your photos",
-  compose: "Step 3 of 3: about your book",
-  generating: "Designing…",
-  reveal: "Your book, three ways",
-  preview: "Your book",
-  customize: "Customizing",
-  order: "Order",
+  quiz: "Step 1 of 7",
+  upload: "Step 2 of 7",
+  compose: "Steps 3 and 4 of 7",
+  book: "Step 5 of 7",
+  preview: "Step 6 of 7",
+  customize: "Making changes",
+  order: "Step 7 of 7",
   confirm: "",
 };
 
@@ -133,6 +153,10 @@ type BuilderAction =
 function reducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
     case "patch":
+      // New pages from anywhere but the layout step count as a hand edit.
+      if (action.patch.pages && action.patch.pages !== state.pages && !("pagesEdited" in action.patch)) {
+        return { ...state, ...action.patch, pagesEdited: true };
+      }
       return { ...state, ...action.patch };
     case "photos":
       return { ...state, photos: action.update(state.photos) };
@@ -146,7 +170,7 @@ const STORAGE_KEY = "tk_builder_v2";
 const STORAGE_KEY_V1 = "tk_builder_v1";
 
 /** The v1 page shape, kept only so the migration can be type-checked. */
-type LegacyPage = Omit<BookPage, "slots"> & { slots?: unknown; photoIds?: unknown };
+type LegacyPage = Omit<BookPage, "slots" | "frames"> & { slots?: unknown; photoIds?: unknown; frames?: unknown };
 
 /**
  * v1 → v2: `page.photoIds: string[]` becomes `page.slots: Placement[]`.
@@ -187,6 +211,18 @@ function safeLayout(raw: unknown, slotCount: number): PageLayoutId {
   return "single";
 }
 
+/** A grid page's rectangles, if every one is a sane fraction of the page and there is one per slot. */
+function validFrames(raw: unknown, count: number): PageFrame[] | null {
+  if (!Array.isArray(raw) || raw.length !== count || count === 0) return null;
+  const ok = (v: unknown, min: number) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= 1;
+  const frames = raw.flatMap((f): PageFrame[] => {
+    if (!f || typeof f !== "object") return [];
+    const { x, y, w, h } = f as Record<string, unknown>;
+    return ok(x, 0) && ok(y, 0) && ok(w, 0.001) && ok(h, 0.001) ? [{ x: x as number, y: y as number, w: w as number, h: h as number }] : [];
+  });
+  return frames.length === count ? frames : null;
+}
+
 /** Exported for tests: this is the one function that parses bytes the
  *  user's browser could have written under any past or future build. */
 export function migratePages(input: unknown): BookPage[] {
@@ -210,10 +246,17 @@ export function migratePages(input: unknown): BookPage[] {
       slots = [];
     }
 
+    // A grid page draws its slots from its own rectangles, one per slot. One
+    // that lost them (a truncated write) is re-labelled by its photo count,
+    // so it still renders, rather than drawing every photo full-bleed.
+    const frames = page.layout === "grid" ? validFrames(page.frames, slots.length) : null;
+    const layout = page.layout === "grid" && !frames ? safeLayout(null, slots.length) : safeLayout(page.layout, slots.length);
+
     return [
       {
         id: typeof page.id === "string" ? page.id : "pg" + Math.random().toString(36).slice(2, 8),
-        layout: safeLayout(page.layout, slots.length),
+        layout,
+        ...(frames ? { frames } : null),
         slots,
         caption: typeof page.caption === "string" ? page.caption : "",
         // spread rather than assigned so the common case stays absent
@@ -225,7 +268,7 @@ export function migratePages(input: unknown): BookPage[] {
 }
 
 /** Restore a persisted draft; sanitizes transient screens (a reload
- *  mid-"generating" resumes at reveal/upload, never a stuck spinner). */
+ *  a draft saved on a retired screen resumes at "book" or "upload"). */
 function loadState(): BuilderState | null {
   try {
     // Prefer v2; fall back to a v1 draft and upgrade it in place.
@@ -236,7 +279,11 @@ function loadState(): BuilderState | null {
     if (!s || typeof s !== "object") return null;
 
     const pages = migratePages(s.pages);
-    if (s.screen === "generating") s.screen = pages.length ? "reveal" : "upload";
+    // Screens retired on 2026-11-17 resume at "Pick your book".
+    const screen = s.screen as string;
+    if (screen === "generating" || screen === "reveal") s.screen = pages.length ? "book" : "upload";
+    if (!s.screen || !(s.screen in SCREEN_CONTEXT)) s.screen = pages.length ? "preview" : "quiz";
+    if ((s.qstep as number) > 1) s.qstep = 1;
     // The occasion was once followed by vibe and title on the same screen; a
     // draft saved there continues at the photos, which come first now.
     if (s.screen === "quiz" && s.occasion) s.screen = "upload";

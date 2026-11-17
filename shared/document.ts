@@ -70,15 +70,29 @@ const placementSchema = z.object({
  * produce but this list omits makes the whole document 400 and the
  * user's draft stop saving.
  */
+/** A slot rectangle on a "grid" page, as fractions of the page. */
+const frameSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().gt(0).max(1),
+  h: z.number().gt(0).max(1),
+});
+
 const pageSchema = z.object({
   id: z.string().min(1).max(64),
-  layout: z.enum(["title", "full", "single", "duo", "duo-side", "collage", "trio-strip"]),
+  layout: z.enum(["title", "full", "single", "duo", "duo-side", "collage", "trio-strip", "grid"]),
   slots: z.array(placementSchema).max(6),
   caption: z.string().max(280),
   /** collage only: flips the tile positions left-to-right */
   mirror: z.boolean().optional(),
   /** per-page colour override (palette id or #RRGGBB); absent = book colour */
   bg: z.string().max(24).nullable().optional(),
+  /**
+   * "grid" pages (the layout engine, 2026-11-17): one rectangle per slot.
+   * Optional so every older page still validates; a grid page without them
+   * would print every slot full-bleed, so the client always sends them.
+   */
+  frames: z.array(frameSchema).max(6).optional(),
 });
 
 export const builderDocumentSchema = z.object({

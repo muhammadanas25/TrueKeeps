@@ -30,7 +30,7 @@ import { hasImage, photoSrc } from "../upload/previews";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { BuilderPhoto, PageLayoutId, Placement } from "../data";
 import { panFrame, panOverflow } from "../reframe";
-import { clampTilt, slotMaxZoom, tiltCover } from "../print";
+import { clampTilt, slotMaxZoom, tiltCover, type SlotSource } from "../print";
 
 export const PHOTO_MIME = "application/x-tk-photo";
 const TAP_SLOP = 8;
@@ -38,7 +38,8 @@ const TAP_SLOP = 8;
 export interface SlotLayerProps {
   photo: BuilderPhoto;
   placement: Placement;
-  layout: PageLayoutId;
+  /** the page (or a named layout id): a grid page's slot sizes live on it */
+  layout: SlotSource;
   slotIdx: number;
   aspect: number;
   selected: boolean;

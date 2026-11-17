@@ -18,7 +18,7 @@
  * server-side print pipeline later.
  */
 
-import type { BookPage, BuilderPhoto, PageLayoutId, Placement } from "./data";
+import type { BookPage, BuilderPhoto, PageFrame, PageLayoutId, Placement } from "./data";
 
 /* ── Resolution thresholds ──────────────────────────────────── */
 
@@ -89,14 +89,28 @@ export const SLOT_FRACTIONS: Record<PageLayoutId, Array<{ w: number; h: number }
     { w: 0.26, h: 0.26 * (4 / 3) },
     { w: 0.26, h: 0.26 * (4 / 3) },
   ],
+  // a grid page carries its own slot rectangles (BookPage.frames)
+  grid: [],
 };
+
+/**
+ * What the slot geometry functions need to find a slot's size: a layout id
+ * for the named layouts, or the page itself, which a "grid" page must be,
+ * because its rectangles are stored on it. Passing a grid page's bare
+ * layout id finds no slot and falls back to full bleed, the pessimistic
+ * answer (warns too early, never too late).
+ */
+export type SlotSource = PageLayoutId | { layout: PageLayoutId; frames?: PageFrame[] };
 
 /** Printed size of one slot, in inches. */
 export function slotInches(
-  layout: PageLayoutId,
+  source: SlotSource,
   slotIndex: number,
   page: { w: number; h: number } = PAGE_INCHES,
 ): { w: number; h: number } {
+  const layout = typeof source === "string" ? source : source.layout;
+  const own = typeof source === "string" ? undefined : source.frames?.[slotIndex];
+  if (layout === "grid" && own) return { w: own.w * page.w, h: own.h * page.h };
   const frac = SLOT_FRACTIONS[layout]?.[slotIndex];
   // Unknown slot → assume full bleed, the most demanding case. Being
   // pessimistic here can only ever make us warn earlier, never later.
@@ -105,7 +119,7 @@ export function slotInches(
 }
 
 /** Aspect ratio (w/h) of a slot — used by orientation-aware layout scoring. */
-export const slotAspect = (layout: PageLayoutId, slotIndex: number, page = PAGE_INCHES): number => {
+export const slotAspect = (layout: SlotSource, slotIndex: number, page = PAGE_INCHES): number => {
   const s = slotInches(layout, slotIndex, page);
   return s.w / s.h;
 };
@@ -133,7 +147,7 @@ export const orientedSlot = (
 
 /** Printed size of a slot in inches, turn included. */
 export const placedInches = (
-  layout: PageLayoutId,
+  layout: SlotSource,
   slotIndex: number,
   turn: Placement["turn"] = 0,
   page = PAGE_INCHES,
@@ -210,7 +224,7 @@ export function tiltCover(tilt: number | undefined | null, aspect: number): numb
  */
 export const framedZoom = (
   pl: Pick<Placement, "zoom" | "tilt">,
-  layout: PageLayoutId,
+  layout: SlotSource,
   slotIndex: number,
   page = PAGE_INCHES,
 ): number => {
@@ -269,7 +283,7 @@ export function maxZoom(px: { w: number; h: number } | null | undefined, inches:
  */
 export function slotMaxZoom(
   photo: BuilderPhoto | undefined | null,
-  layout: PageLayoutId,
+  layout: SlotSource,
   slotIndex: number,
   turn: Placement["turn"] = 0,
   page = PAGE_INCHES,
@@ -338,7 +352,7 @@ export function pageQuality(page: BookPage, photoById: Map<string, BuilderPhoto>
     // framedZoom, not s.zoom — a straightened photo is magnified to hide
     // its corners, and the preflight badge has to see that too or a
     // tilted page passes here and prints soft.
-    const dpi = px ? effectiveDpi(px, placedInches(page.layout, i, s.turn), framedZoom(s, page.layout, i)) : 0;
+    const dpi = px ? effectiveDpi(px, placedInches(page, i, s.turn), framedZoom(s, page, i)) : 0;
     return { slotIndex: i, photoId: s.photoId, dpi, quality: printQuality(dpi) };
   });
 }

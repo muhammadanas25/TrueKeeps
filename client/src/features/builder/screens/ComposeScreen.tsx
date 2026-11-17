@@ -1,5 +1,10 @@
 /**
- * ComposeScreen — "Let's make your book", shown while photos upload.
+ * ComposeScreen — steps 3 and 4 of 7, shown while photos upload:
+ *   step 3 "Pick the feel" (qstep 0): Minimal, Full Picture or Truekeeps Design
+ *   step 4 "Name your book" (qstep 1): title, an optional line under it, and
+ *   the lettering. With Full Picture the title goes on the spine only.
+ * (Until 2026-11-17 there was a colours question between the two; the
+ * owner's flow has none, and colours stay in the editor and on the preview.)
  *
  * Why it exists: an HD upload on mobile data can take many minutes, and there's
  * nothing a progress screen can do about that. So there's no waiting screen.
@@ -18,9 +23,11 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight, Check, Info, X } from "lucide-react";
 import { CoverFace, Ph } from "../book";
-import { generatePages, occasionById, VIBES, themeById, FEEL_CHOICES, isFeelChoice, type CopyVoice } from "../data";
+import { generatePages, occasionById, FEEL_CHOICES, isFeelChoice, type CopyVoice } from "../data";
+import { FONTS } from "../looks";
+import "../flow.css";
 import { bookTheme } from "../palette";
 import type { BuilderState } from "../state";
 import { TKLogo } from "@/features/landing/primitives";
@@ -224,9 +231,10 @@ export function ComposeScreen({
   const stage = STAGE_LINES[state.occasion ?? "mix"] ?? STAGE_LINES.mix;
 
   const next = () => {
-    if (step < 2) set({ qstep: (step + 1) as 1 | 2 });
+    if (step < 1) set({ qstep: 1 });
     else onDone();
   };
+  const subtitle = state.subtitle ?? occ.subtitle;
 
   return (
     <div className="bb-screen ck-compose">
@@ -273,56 +281,63 @@ export function ComposeScreen({
           ) : null}
 
           {step === 1 ? (
-            <div className="bb-qstep" key="colours">
-              <h2>Now, its colours</h2>
-              <div className="bb-vibes">
-                {VIBES.map((v) => {
-                  const t = themeById(v.id);
-                  const on = state.themeId === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      aria-pressed={on}
-                      className={"bb-vibe" + (on ? " sel" : "")}
-                      onClick={() => set({ vibe: v.id, themeId: v.id })}
-                    >
-                      <div className="bb-vibe-swatch" style={{ background: t.page, color: t.ink }}>
-                        <span>{previewTitle}</span>
-                      </div>
-                      <b>{v.name}</b>
-                      <i>{v.blurb}</i>
-                    </button>
-                  );
-                })}
+            <div className="bb-qstep" key="name">
+              <h2>Name your book</h2>
+              <label className="ck-field">
+                <span>Book title</span>
+                <input
+                  className="bb-title-input"
+                  value={title}
+                  maxLength={48}
+                  onChange={(e) => set({ title: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && title.trim()) onDone();
+                  }}
+                  placeholder={occ.suggestedTitle}
+                />
+              </label>
+              <label className="ck-field">
+                <span>
+                  A line under the title <i>(optional)</i>
+                </span>
+                <input
+                  className="bb-title-input"
+                  value={subtitle}
+                  maxLength={60}
+                  onChange={(e) => set({ subtitle: e.target.value })}
+                  placeholder="A date, a place, a name"
+                />
+              </label>
+              <div className="ck-field">
+                <span id="ck-lettering">Lettering</span>
+                <div className="ck-fonts" role="radiogroup" aria-labelledby="ck-lettering">
+                  {FONTS.map((f) => {
+                    const on = state.fontId === f.id;
+                    return (
+                      <button key={f.id} type="button" role="radio" aria-checked={on} className={"ck-font" + (on ? " on" : "")} onClick={() => set({ fontId: f.id })}>
+                        <b style={{ fontFamily: f.display, fontWeight: f.weight }}>{f.name}</b>
+                        <i style={{ fontFamily: f.caption, fontWeight: f.captionWeight, fontStyle: f.captionItalic ? "italic" : "normal" }}>{previewTitle}</i>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : null}
-
-          {step === 2 ? (
-            <div className="bb-qstep" key="title">
-              <h2>{copy.qTitle}</h2>
-              <input
-                className="bb-title-input"
-                value={title}
-                maxLength={48}
-                aria-label={copy.qTitle}
-                onChange={(e) => set({ title: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && title.trim()) onDone();
-                }}
-                placeholder={occ.suggestedTitle}
-              />
-              <p className="bb-hint">{copy.titleHint}</p>
+              {state.coverStyle === "moment" ? (
+                <p className="ck-spine-note">
+                  <Info size={16} /> Your title will appear on the spine. The front cover stays photo only.
+                </p>
+              ) : (
+                <p className="bb-hint">{copy.titleHint}</p>
+              )}
             </div>
           ) : null}
 
           <div className="ck-actions">
-            <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" disabled={step === 0 ? !picked : step === 2 && !title.trim()} onClick={next}>
-              {step === 2 ? "Design my book" : "Next"} <ArrowRight size={18} />
+            <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" disabled={step === 0 ? !picked : !title.trim()} onClick={next}>
+              {step === 1 ? "Pick your book" : "Next"} <ArrowRight size={18} />
             </button>
-            <div className="bb-dots" aria-label={`Question ${step + 1} of 3`}>
-              {([0, 1, 2] as const).map((i) => (
+            <div className="bb-dots" aria-label={`Question ${step + 1} of 2`}>
+              {([0, 1] as const).map((i) => (
                 <button
                   key={i}
                   type="button"

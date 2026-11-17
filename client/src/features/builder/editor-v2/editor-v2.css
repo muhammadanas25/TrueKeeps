@@ -191,6 +191,8 @@
 .tke-wire.on { border-color: var(--cob) !important; background: var(--selected-bg) !important; }
 .tke-wire-pg { display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
 .tke-wire-l { font-size: 12px; font-weight: 500; }
+/* "Auto" before the page has been handed to the engine: a sparkle in a wire-sized tile */
+.tke-wire-auto { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: var(--tk-paper, #FBF6F0); color: var(--cob); }
 .tke-wire.on .tke-wire-l { color: var(--cob); }
 .tke-disclose { width: 100%; display: flex; justify-content: space-between; align-items: center; text-align: left; gap: 8px; }
 .tke-disclose b, .tke-density b { display: block; font-size: 14px; font-weight: 600; }

@@ -126,6 +126,8 @@ export function toDocument(s: BuilderState): BuilderDocument {
       // and the user's edit is gone after one server round-trip.
       mirror: pg.mirror,
       bg: pg.bg ?? undefined,
+      // a grid page's slot rectangles; without them it would print full-bleed
+      frames: pg.frames?.map((f) => ({ x: f.x, y: f.y, w: f.w, h: f.h })),
     })),
     themeId: s.themeId,
     pageColor: s.pageColor,
@@ -156,6 +158,7 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
       caption: pg.caption,
       mirror: pg.mirror,
       bg: pg.bg ?? null,
+      ...(pg.frames ? { frames: pg.frames.map((f) => ({ ...f })) } : null),
     })),
     themeId: d.themeId,
     // A document written before page colours existed has no field here;

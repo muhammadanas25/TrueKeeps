@@ -29,6 +29,7 @@ import {
   type BuilderPhoto,
   type CoverStyleId,
   type Occasion,
+  type PageFrame,
   type PageLayoutId,
   type Placement,
   type Spread,
@@ -405,7 +406,8 @@ function PageFaceImpl({
   // to land back on. Comes from print.ts (which transcribes builder.css)
   // rather than from measuring the DOM, so it is identical in the 72px
   // rail thumbnail and on the press.
-  const aspect = (i: number) => slotAspect(page.layout, i);
+  // The page itself, not its layout id: a grid page's slot sizes live on it.
+  const aspect = (i: number) => slotAspect(page, i);
 
   const slot = (i: number, cls?: string) => {
     const photo = ph(i);
@@ -552,6 +554,31 @@ function PageFaceImpl({
       </div>
     );
   }
+  if (page.layout === "grid") {
+    /*
+     * A page laid out by the engine (arrange.ts): every slot is placed at
+     * the rectangle stored on the page, so the preview, the editors and the
+     * print files all draw the same thing. No caption: the engine fills the
+     * page, and a caption would sit on top of a photo.
+     */
+    const frames = page.frames ?? [];
+    return (
+      <div className={"bb-page bb-page-grid" + lc} style={base}>
+        {frames.map((f, i) => {
+          const bleed = f.w >= 0.999 && f.h >= 0.999;
+          return (
+            <div
+              key={i}
+              className={"bb-grid-cell" + (bleed ? " bleed" : "")}
+              style={{ left: f.x * 100 + "%", top: f.y * 100 + "%", width: f.w * 100 + "%", height: f.h * 100 + "%" }}
+            >
+              {slot(i)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
   if (page.layout === "collage") {
     // `mirror` only flips WHERE the tiles sit (a CSS class, see
     // .bb-mirror). Flipping the page with scaleX would reverse every
@@ -614,6 +641,36 @@ export function LayoutWire({ id, theme, mirror }: { id: PageLayoutId; theme: Boo
     >
       {Array.from({ length: tiles }, (_, i) => (
         <span key={i} className={"bb-ph" + (collage ? " c" + i : "")} />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * The wireframe of a "grid" page (laid out by the engine), for the layout
+ * pickers: the page's own rectangles, drawn with the same wire colours as
+ * LayoutWire so the two sit side by side.
+ */
+export function GridWire({ frames, theme }: { frames: PageFrame[]; theme: BookTheme }) {
+  return (
+    <span
+      className="bb-wire bb-page bb-page-grid"
+      style={
+        {
+          background: theme.page,
+          "--wire-edge": mix(theme.page, theme.ink, 0.1),
+          "--wire-tile": mix(theme.page, theme.ink, 0.24),
+          "--wire-accent": mix(theme.page, theme.accent, 0.45),
+        } as CSSProperties
+      }
+      aria-hidden="true"
+    >
+      {frames.map((f, i) => (
+        <span
+          key={i}
+          className="bb-ph"
+          style={{ position: "absolute", left: f.x * 100 + "%", top: f.y * 100 + "%", width: f.w * 100 + "%", height: f.h * 100 + "%", borderRadius: 1 }}
+        />
       ))}
     </span>
   );

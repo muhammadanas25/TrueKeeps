@@ -25,8 +25,9 @@ import {
   RefreshCw,
   Square,
   SquareDashed,
+  Sparkles,
 } from "lucide-react";
-import { LayoutWire } from "../book";
+import { GridWire, LayoutWire } from "../book";
 import {
   BOOK_THEMES,
   COVER_STYLES,
@@ -152,6 +153,19 @@ export function LayoutPanel({
           {spreadTargets.length > 1 ? (
             <Seg small options={spreadTargets.map((t) => ({ v: t.id, label: t.label }))} value={activePage.id} onChange={onPickPage} />
           ) : null}
+          {/* "Auto" hands the page back to the layout engine (arrange.ts):
+              its shapes fit the photos and never trim more than 18%. */}
+          <div className="tke-wire-group">
+            <div className="tke-wire-n">Best fit for these photos</div>
+            <div className="tke-wire-row">
+              <button className={"tke-wire" + (activePage.layout === "grid" ? " on" : "")} onClick={() => onLayout("grid")} aria-pressed={activePage.layout === "grid"}>
+                <span className="tke-wire-pg">
+                  {activePage.layout === "grid" ? <GridWire frames={activePage.frames ?? []} theme={theme} /> : <span className="tke-wire-auto"><Sparkles size={18} /></span>}
+                </span>
+                <span className="tke-wire-l">Auto</span>
+              </button>
+            </div>
+          </div>
           {[1, 2, 3].map((n) => (
             <div key={n} className="tke-wire-group">
               <div className="tke-wire-n">
@@ -533,7 +547,8 @@ export function TextPanel({
   onFont: (f: FontId) => void;
 }) {
   const titleView = onCover || activePage?.layout === "title";
-  const capable = activePage && activePage.layout !== "title" && activePage.layout !== "collage";
+  // no caption on a collage, or on a grid page (its photos fill the page)
+  const capable = activePage && activePage.layout !== "title" && activePage.layout !== "collage" && activePage.layout !== "grid";
   const fontPairs = (
     <Section label="Font pair" hint="Titles and captions change together. Text turns dark or light by itself to stay readable on your page colour.">
       <div className="tke-pairs" role="radiogroup" aria-label="Font pair">

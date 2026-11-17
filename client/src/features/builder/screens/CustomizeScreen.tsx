@@ -16,12 +16,12 @@
  */
 
 import { useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronDown, FlipHorizontal2, GripHorizontal, ImageOff, Images, Info, Maximize2, Palette, Undo2, Wand2, X } from "lucide-react";
-import { CoverFace, LayoutWire, PageFace, Ph } from "../book";
+import { AlertTriangle, Check, ChevronDown, FlipHorizontal2, GripHorizontal, ImageOff, Images, Info, Maximize2, Palette, Sparkles, Undo2, Wand2, X } from "lucide-react";
+import { CoverFace, GridWire, LayoutWire, PageFace, Ph } from "../book";
 import { ReframeBar } from "../reframe";
 import { indexPhotos, pageHasLowQuality, slotMaxZoom } from "../print";
 import { hasImage } from "../upload/previews";
-import { COVER_STYLES, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, MAX_SLOTS_PER_PAGE, generatePages, isMirrorable, layoutForCount, occasionById, pagePhotoIds, placement, type BookPage, type CopyVoice, type Placement } from "../data";
+import { COVER_STYLES, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, generatePages, isMirrorable, occasionById, pageCapacity, pagePhotoIds, placement, reshapePage, type BookPage, type CopyVoice, type Placement } from "../data";
 import { PAGE_COLOURS, THEME_COLOUR, bookTheme, pageColourById } from "../palette";
 import { themeById } from "../data";
 import type { BuilderState } from "../state";
@@ -127,7 +127,28 @@ export function CustomizeScreen({
   };
 
   const unusedPhotos = () => state.photos.filter((p) => !usedIds.has(p.id));
+  /**
+   * Lay the given grid pages out again after their photos changed (a swap
+   * can bring a portrait into a slot cut for a landscape). Named layouts are
+   * left alone: their slots never depended on the photo's shape.
+   */
+  const refit = (next: BookPage[], idxs: number[]): BookPage[] => {
+    for (const i of Array.from(new Set(idxs))) {
+      const pg = next[i];
+      if (pg?.layout !== "grid") continue;
+      const laid = reshapePage(pg, pg.slots, state.photos, i);
+      if (laid) next[i] = laid;
+    }
+    return next;
+  };
   const changeLayout = (idx: number, layoutId: BookPage["layout"]) => {
+    setFocus(null);
+    // "Auto": hand the page back to the layout engine with the photos it has.
+    if (layoutId === "grid") {
+      const laid = pages[idx].slots.length ? reshapePage({ ...pages[idx], layout: "grid" }, pages[idx].slots, state.photos, idx) : null;
+      if (laid) setPage(idx, laid);
+      return;
+    }
     const want = LAYOUT_SLOTS[layoutId];
     // Keep the placements of the slots that survive: those carry the
     // user's own framing, which is the expensive thing to redo. Slots
@@ -146,8 +167,7 @@ export function CustomizeScreen({
     // Slot 1 of a collage and slot 1 of a stacked pair are different
     // places on the page, so a reframe bar left pointing at "slot 1"
     // would now be aimed somewhere the user never chose.
-    setFocus(null);
-    setPage(idx, { layout: layoutId, slots });
+    setPage(idx, { layout: layoutId, slots, frames: undefined });
   };
   const swapPhoto = (pageIdx: number, slotIdx: number, newPid: string) => {
     const here = pages[pageIdx].slots[slotIdx];
@@ -160,17 +180,21 @@ export function CustomizeScreen({
     // old photo — a true swap. Framing travels WITH the photo, not with
     // the slot: a crop the user tuned for a face should follow the face.
     let incoming = placement(newPid);
-    outer: for (const pg of next) {
+    let otherPage = pageIdx;
+    outer: for (let k = 0; k < next.length; k++) {
+      const pg = next[k];
       for (let i = 0; i < pg.slots.length; i++) {
         if (pg.slots[i].photoId === newPid) {
           incoming = pg.slots[i];
           pg.slots[i] = { ...here };
+          otherPage = k;
           break outer;
         }
       }
     }
     next[pageIdx].slots[slotIdx] = { ...incoming, photoId: newPid };
-    set({ pages: next });
+    setFocus(null);
+    set({ pages: refit(next, [pageIdx, otherPage]) });
     setTray(null);
   };
   const movePage = (from: number, to: number) => {
@@ -200,8 +224,8 @@ export function CustomizeScreen({
     if (!page) return;
     const slots = page.slots.filter((_, i) => i !== slotIdx);
     setFocus(null);
-    const layout = layoutForCount(page.layout, slots.length);
-    if (!layout) {
+    const reshaped = reshapePage(page, slots, state.photos, pageIdx);
+    if (!reshaped) {
       const next = pages.filter((_, i) => i !== pageIdx);
       set({ pages: next });
       // Clamp rather than reset: landing back on the cover after
@@ -209,7 +233,7 @@ export function CustomizeScreen({
       setSel(next.length ? Math.min(pageIdx, next.length - 1) : "cover");
       return;
     }
-    setPage(pageIdx, { layout, slots });
+    setPage(pageIdx, reshaped);
   };
 
   /** Put `pid` into a slot, growing the page if it is being appended. */
@@ -225,12 +249,12 @@ export function CustomizeScreen({
   const appendPhoto = (pageIdx: number, pid: string) => {
     const page = pages[pageIdx];
     if (!page || page.layout === "title") return;
-    if (page.slots.length >= MAX_SLOTS_PER_PAGE) return;
+    if (page.slots.length >= pageCapacity(page)) return;
     if (page.slots.some((s) => s.photoId === pid)) return; // already here; a no-op beats a duplicate
-    const slots = [...page.slots, placement(pid)];
-    const layout = layoutForCount(page.layout, slots.length) ?? page.layout;
+    const reshaped = reshapePage(page, [...page.slots, placement(pid)], state.photos, pageIdx);
+    if (!reshaped) return;
     setFocus(null);
-    setPage(pageIdx, { layout, slots });
+    setPage(pageIdx, reshaped);
   };
 
   /**
@@ -249,13 +273,13 @@ export function CustomizeScreen({
     const pb = next[b.pageIdx]?.slots[b.slotIdx];
     if (!pa || !pb) return;
     const clampTo = (pl: Placement, pageIdx: number, slotIdx: number): Placement => {
-      const lim = slotMaxZoom(photoIndex.get(pl.photoId), next[pageIdx].layout, slotIdx, pl.turn, undefined, pl.tilt);
+      const lim = slotMaxZoom(photoIndex.get(pl.photoId), next[pageIdx], slotIdx, pl.turn, undefined, pl.tilt);
       return pl.zoom > lim ? { ...pl, zoom: lim } : pl;
     };
     next[a.pageIdx].slots[a.slotIdx] = clampTo(pb, a.pageIdx, a.slotIdx);
     next[b.pageIdx].slots[b.slotIdx] = clampTo(pa, b.pageIdx, b.slotIdx);
     setFocus(null);
-    set({ pages: next });
+    set({ pages: refit(next, [a.pageIdx, b.pageIdx]) });
   };
 
   /* ── drag and drop ────────────────────────────────── */
@@ -375,7 +399,7 @@ export function CustomizeScreen({
   const roomOn = (idx: number): number => {
     const pg = pages[idx];
     if (!pg || pg.layout === "title") return 0;
-    return Math.max(0, MAX_SLOTS_PER_PAGE - pg.slots.length);
+    return Math.max(0, pageCapacity(pg) - pg.slots.length);
   };
 
   /**
@@ -449,7 +473,7 @@ export function CustomizeScreen({
             <ReframeBar
               photo={focusPhoto}
               placement={focusPlacement}
-              layout={pages[focus.pageIdx].layout}
+              layout={pages[focus.pageIdx]}
               slotIdx={focus.slotIdx}
               onFrame={(patch) => setFrame(focus.pageIdx, focus.slotIdx, patch)}
               onSwap={() => setTray({ pageIdx: focus.pageIdx, slotIdx: focus.slotIdx })}
@@ -502,6 +526,20 @@ export function CustomizeScreen({
                   arrangement — and splitting them stops a six-item grid
                   from reading as six unrelated choices. */}
               <div className="bb-layouts">
+                {/* "Auto": the layout engine's best fit for the photos on this page */}
+                <div>
+                  <div className="bb-layouts-count">Best fit</div>
+                  <div className="bb-layouts-row">
+                    <button
+                      className={"bb-layout-opt" + (selPage.layout === "grid" ? " on" : "")}
+                      aria-pressed={selPage.layout === "grid"}
+                      onClick={() => changeLayout(sel as number, "grid")}
+                    >
+                      {selPage.layout === "grid" ? <GridWire frames={selPage.frames ?? []} theme={theme} /> : <span className="bb-wire bb-wire-auto"><Sparkles size={18} /></span>}
+                      Auto
+                    </button>
+                  </div>
+                </div>
                 {[1, 2, 3].map((n) => (
                   <div key={n}>
                     <div className="bb-layouts-count">
@@ -532,16 +570,21 @@ export function CustomizeScreen({
                   <FlipHorizontal2 size={15} /> Flip this layout
                 </button>
               ) : null}
-              <div className="bb-panel-label" style={{ marginTop: 8 }}>
-                Caption
-              </div>
-              <input
-                className="bb-caption-input"
-                value={selPage.caption}
-                placeholder="Add a few words…"
-                maxLength={60}
-                onChange={(e) => setPage(sel as number, { caption: e.target.value })}
-              />
+              {/* a grid page is filled edge to edge by its photos; a caption would sit on one */}
+              {selPage.layout !== "grid" ? (
+                <>
+                  <div className="bb-panel-label" style={{ marginTop: 8 }}>
+                    Caption
+                  </div>
+                  <input
+                    className="bb-caption-input"
+                    value={selPage.caption}
+                    placeholder="Add a few words…"
+                    maxLength={60}
+                    onChange={(e) => setPage(sel as number, { caption: e.target.value })}
+                  />
+                </>
+              ) : null}
               <div className="bb-panel-note">
                 <Maximize2 size={14} /> Tap a photo on the page to zoom, straighten, replace or remove it. Adding or
                 removing one re-shapes the page to fit.
@@ -603,20 +646,20 @@ export function CustomizeScreen({
           </div>
 
           <div className="bb-panel-sec">
-            <div className="bb-panel-label">Photos per page</div>
+            <div className="bb-panel-label">Arrangement</div>
             <div className="bb-seg">
               {DENSITIES.map((d) => (
                 <button
                   key={d.id}
                   className={state.density === d.id ? "on" : ""}
-                  onClick={() => set({ density: d.id, pages: generatePages(state.photos, d.id) })}
+                  onClick={() => set({ density: d.id, sheets: null, pages: generatePages(state.photos, d.id), pagesEdited: false })}
                 >
                   {d.name}
                 </button>
               ))}
             </div>
             <div className="bb-panel-note">
-              <Wand2 size={14} /> Changing this re-arranges your pages with the same photos.
+              <Wand2 size={14} /> Changing this lays out your pages again with the same photos, in the fewest sheets that hold them all.
             </div>
           </div>
         </div>

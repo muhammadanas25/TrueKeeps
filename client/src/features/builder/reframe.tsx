@@ -41,6 +41,7 @@ import {
   slotAspect as slotAspectOf,
   slotMaxZoom,
   tiltCover,
+  type SlotSource,
 } from "./print";
 
 const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5);
@@ -312,7 +313,8 @@ export function ReframeBar({
 }: {
   photo: BuilderPhoto | undefined;
   placement: Placement;
-  layout: PageLayoutId;
+  /** the page (or a named layout id): a grid page's slot sizes live on it */
+  layout: SlotSource;
   slotIdx: number;
   onFrame: (patch: Partial<Placement>) => void;
   onSwap: () => void;

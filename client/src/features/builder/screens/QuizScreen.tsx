@@ -11,6 +11,8 @@ import { ArrowRight, Baby, Cake, Heart, Plane, Sparkles } from "lucide-react";
 import { MiniBook } from "../book";
 import { BOOK_IMAGES } from "@/features/landing/book-images";
 import { OCCASIONS, occasionById, themeById, type CopyVoice } from "../data";
+import { INCLUDED_PAGES, STARTING_PRICE_MINOR, formatPKR } from "@shared/pricing";
+import "../flow.css";
 import type { BuilderState } from "../state";
 
 /** lucide components for the occasion icon names in data.ts */
@@ -61,6 +63,9 @@ export function QuizScreen({
         <div className="bb-quiz-inner">
           <h1>{copy.qOccasion}</h1>
           <p className="bb-sub">{copy.occasionSub}</p>
+          <p className="qz-price qz-price-phone">
+            <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12 x 12 in book with {INCLUDED_PAGES} pages inside</span>
+          </p>
 
           <div className="bb-qstep">
             <div className="bb-occasions">
@@ -97,6 +102,10 @@ export function QuizScreen({
         <div className="bb-quiz-stage-cap">
           <Sparkles size={14} /> {stageCaption}
         </div>
+        {/* step 1 of the owner's flow: the price before anything else is asked */}
+        <p className="qz-price">
+          <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12 x 12 in book with {INCLUDED_PAGES} pages inside</span>
+        </p>
       </div>
     </div>
   );

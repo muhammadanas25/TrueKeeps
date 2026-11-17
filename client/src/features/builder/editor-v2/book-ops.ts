@@ -11,8 +11,9 @@
  * pages plus the style fields. Photos are read-only input.
  *
  * Shared rules with the classic editor (data.ts):
- *  - layoutForCount() decides what a page turns into when its photo count
- *    changes (airy stays airy, busy stays busy)
+ *  - reshapePage() decides what a page turns into when its photo set
+ *    changes: a "grid" page (the layout engine, arrange.ts) is laid out
+ *    again; a named layout grows or shrinks by character (airy stays airy)
  *  - the title page is always page 0 and can't be moved or deleted
  *  - new slots are filled from photos not yet in the book first
  */
@@ -21,10 +22,10 @@ import {
   firstMovablePage,
   hasTitlePage,
   LAYOUT_SLOTS,
-  MAX_SLOTS_PER_PAGE,
   generatePages,
-  layoutForCount,
+  pageCapacity,
   placement,
+  reshapePage,
   type BookPage,
   type BuilderPhoto,
   type DensityId,
@@ -88,16 +89,32 @@ export function rotateSlot(b: BookSlice, pageId: string, slot: number, photos: B
   if (!page || !s) return b;
   const turn = ((s.turn + 90) % 360) as Placement["turn"];
   const photo = photos.find((p) => p.id === s.photoId);
-  const lim = slotMaxZoom(photo, page.layout, slot, turn, undefined, s.tilt ?? 0);
+  const lim = slotMaxZoom(photo, page, slot, turn, undefined, s.tilt ?? 0);
   return setFrame(b, pageId, slot, { turn, zoom: Math.min(s.zoom, lim) });
 }
 
 export const resetFrame = (b: BookSlice, pageId: string, slot: number) =>
   setFrame(b, pageId, slot, { fx: 0.5, fy: 0.5, zoom: 1, tilt: 0 });
 
-/** Put a different photo in a slot (framing starts fresh for the new photo). */
-export const replacePhoto = (b: BookSlice, pageId: string, slot: number, photoId: string) =>
-  mapPage(b, pageId, (p) => ({ ...p, slots: p.slots.map((s, j) => (j === slot ? placement(photoId) : s)) }));
+/** Same page, new photo set: a grid page is laid out again, a named one changes shape. */
+function reshape(b: BookSlice, pageId: string, slots: Placement[], photos: BuilderPhoto[]): BookPage | null {
+  const idx = b.pages.findIndex((p) => p.id === pageId);
+  return idx < 0 ? null : reshapePage(b.pages[idx], slots, photos, idx);
+}
+
+/**
+ * Put a different photo in a slot (framing starts fresh for the new photo).
+ * On a grid page the page is laid out again, because the new photo may be
+ * the other way round and the slot was cut to fit the old one.
+ */
+export function replacePhoto(b: BookSlice, pageId: string, slot: number, photoId: string, photos: BuilderPhoto[]): BookSlice {
+  const page = b.pages.find((p) => p.id === pageId);
+  if (!page) return b;
+  const slots = page.slots.map((s, j) => (j === slot ? placement(photoId) : s));
+  if (page.layout !== "grid") return mapPage(b, pageId, (p) => ({ ...p, slots }));
+  const next = reshape(b, pageId, slots, photos);
+  return next ? mapPage(b, pageId, () => next) : b;
+}
 
 /* ── page shape ────────────────────────────────────────────────── */
 
@@ -115,8 +132,22 @@ export function changeLayout(b: BookSlice, pageId: string, layout: PageLayoutId,
     while (slots.length < want && photos.length) {
       slots.push(placement(pool.shift() ?? photos[(slots.length * 5 + 3 + k++) % photos.length].id));
     }
-    return { ...p, layout, slots, mirror: layout === "collage" ? p.mirror : undefined };
+    return { ...p, layout, slots, frames: undefined, mirror: layout === "collage" ? p.mirror : undefined };
   });
+}
+
+/**
+ * Hand a page back to the layout engine ("Auto" in the layout picker): the
+ * same photos, laid out with the engine's templates and rules.
+ */
+export function autoLayout(b: BookSlice, pageId: string, photos: BuilderPhoto[]): BookSlice {
+  const page = b.pages.find((p) => p.id === pageId);
+  if (!page || page.layout === "title" || !page.slots.length) return b;
+  // as a grid page, so the engine lays it out whatever layout it has now
+  const idx = b.pages.indexOf(page);
+  const next = reshapePage({ ...page, layout: "grid" }, page.slots, photos, idx);
+  // relayoutPage keeps the framing of photos already on the page
+  return next ? mapPage(b, pageId, () => next) : b;
 }
 
 /**
@@ -124,25 +155,24 @@ export function changeLayout(b: BookSlice, pageId: string, layout: PageLayoutId,
  * Returns null when the page can't take another (title page, or full) —
  * the caller tells the user why rather than silently doing nothing.
  */
-export function addPhotoToPage(b: BookSlice, pageId: string, photoId: string): BookSlice | null {
+export function addPhotoToPage(b: BookSlice, pageId: string, photoId: string, photos: BuilderPhoto[]): BookSlice | null {
   const page = b.pages.find((p) => p.id === pageId);
-  if (!page || page.layout === "title" || page.slots.length >= MAX_SLOTS_PER_PAGE) return null;
-  const layout = layoutForCount(page.layout, page.slots.length + 1);
-  if (!layout) return null;
-  return mapPage(b, pageId, (p) => ({ ...p, layout, slots: [...p.slots, placement(photoId)] }));
+  if (!page || page.layout === "title" || page.slots.length >= pageCapacity(page)) return null;
+  const next = reshape(b, pageId, [...page.slots, placement(photoId)], photos);
+  return next ? mapPage(b, pageId, () => next) : null;
 }
 
 /**
  * Remove one photo from a page. The page re-shapes to the remaining
  * count; removing the last photo removes the page.
  */
-export function removeSlot(b: BookSlice, pageId: string, slot: number): { book: BookSlice; pageRemoved: boolean } {
+export function removeSlot(b: BookSlice, pageId: string, slot: number, photos: BuilderPhoto[]): { book: BookSlice; pageRemoved: boolean } {
   const page = b.pages.find((p) => p.id === pageId);
   if (!page) return { book: b, pageRemoved: false };
   const left = page.slots.filter((_, j) => j !== slot);
-  const layout = layoutForCount(page.layout, left.length);
-  if (!layout) return { book: { ...b, pages: b.pages.filter((p) => p.id !== pageId) }, pageRemoved: true };
-  return { book: mapPage(b, pageId, (p) => ({ ...p, layout, slots: left })), pageRemoved: false };
+  const next = left.length ? reshape(b, pageId, left, photos) : null;
+  if (!next) return { book: { ...b, pages: b.pages.filter((p) => p.id !== pageId) }, pageRemoved: true };
+  return { book: mapPage(b, pageId, () => next), pageRemoved: false };
 }
 
 /* ── pages ─────────────────────────────────────────────────────── */
@@ -175,8 +205,9 @@ export function addPage(b: BookSlice, afterIdx: number, photos: BuilderPhoto[]):
 }
 
 /**
- * Re-arrange the whole book at a new density, keeping the photos in
- * their current reading order and each photo's framing.
+ * Re-arrange the whole book in a new arrangement (Story, Classic, Family
+ * Album), keeping the photos in their current reading order and each
+ * photo's framing. The book takes the fewest sheets that hold every photo.
  */
 export function reflow(b: BookSlice, density: DensityId, photos: BuilderPhoto[]): BookSlice {
   const seen = new Set<string>();

@@ -5,7 +5,9 @@
  * sticky nav (back + wordmark + step context + start over) over a
  * screen switch driven by one state machine (see state.ts):
  *
- *   quiz → upload → compose → generating → reveal → preview ↔ (customize | order) → confirm
+ *   quiz → upload → compose → book → preview ↔ (customize | order) → confirm
+ *
+ * the owner's seven steps (flow v2, 2026-11-15; see state.ts for the map).
  *
  * App adaptations vs the prototype:
  *  - typed TSX, screens in ./screens/*, data in ./data.ts
@@ -30,7 +32,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
-import { COPY, OCCASIONS, generatePages, occasionById } from "./data";
+import { COPY, OCCASIONS, occasionById } from "./data";
 import { bookTheme } from "./palette";
 import { BACK_MAP, SCREEN_CONTEXT, useBuilderState, type BuilderState } from "./state";
 import { useBuilderSync, type SyncStatus } from "./sync";
@@ -44,8 +46,7 @@ import { uploadEngine } from "./upload/engine";
 import { UploadProvider } from "./upload/UploadContext";
 import { UploadHairline, UploadPill } from "./upload/UploadStatus";
 import "./upload/upload.css";
-import { GeneratingScreen } from "./screens/GeneratingScreen";
-import { RevealScreen } from "./screens/RevealScreen";
+import { BookScreen } from "./screens/BookScreen";
 import { PreviewScreen } from "./screens/PreviewScreen";
 import { CustomizeScreen } from "./screens/CustomizeScreen";
 import { ConfirmScreen, OrderScreen } from "./screens/OrderScreen";
@@ -112,7 +113,8 @@ export default function BookBuilder() {
   const [savePrompt, setSavePrompt] = useState(false);
   useEffect(() => {
     if (sessionLoading || isMember) return;
-    if (state.screen !== "reveal" || !state.projectId) return;
+    // "Pick your book" is where their own book first appears (it replaced the reveal).
+    if (state.screen !== "book" || !state.projectId) return;
     let seen = false;
     try {
       seen = localStorage.getItem(SAVE_PROMPT_KEY) === "1";
@@ -142,13 +144,13 @@ export default function BookBuilder() {
 
   const goBack = () => {
     // Back walks through the three questions before it leaves them.
-    if (state.screen === "compose" && state.qstep > 0) return set({ qstep: (state.qstep - 1) as 0 | 1 });
+    if (state.screen === "compose" && state.qstep > 0) return set({ qstep: 0 });
     const to = BACK_MAP[state.screen];
     // re-entering the questions lands on the last one, not the first
-    if (to) set({ screen: to, ...(to === "compose" ? { qstep: 2 as const } : null) });
+    if (to) set({ screen: to, ...(to === "compose" ? { qstep: 1 as const } : null) });
   };
-  const onGenerated = () =>
-    set({ pages: generatePages(state.photos, state.density), screen: "reveal", pos: 0 });
+  // steps 3 and 4 share a screen, so the header names the one on show
+  const context = state.screen === "compose" ? `Step ${state.qstep + 3} of 7` : SCREEN_CONTEXT[state.screen] || "";
 
   // The v2 editor is a full-screen app of its own (own top bar, no page
   // scroll), so it replaces the shell rather than living inside it.
@@ -191,7 +193,7 @@ export default function BookBuilder() {
           </Link>
         </div>
         <div className="bb-nav-right">
-          <span className="bb-nav-context">{SCREEN_CONTEXT[state.screen] || ""}</span>
+          <span className="bb-nav-context">{context}</span>
           {/* while uploading, the counter says more than "Saved" and phones only fit one */}
           <span className={uploadsBusy ? "ck-save-while-busy" : undefined} style={{ display: "contents" }}>
             <SavePill status={syncStatus} />
@@ -211,9 +213,10 @@ export default function BookBuilder() {
         {state.screen === "upload" ? (
           <UploadScreen key="upload" state={state} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "compose", qstep: 0 })} />
         ) : null}
-        {state.screen === "compose" ? <ComposeScreen key="compose" state={state} set={set} copy={copy} onDone={() => set({ screen: "generating" })} /> : null}
-        {state.screen === "generating" ? <GeneratingScreen key="gen" copy={copy} onDone={onGenerated} /> : null}
-        {state.screen === "reveal" ? <RevealScreen key="reveal" state={state} set={set} copy={copy} onOpen={() => set({ screen: "preview", pos: 0 })} /> : null}
+        {state.screen === "compose" ? <ComposeScreen key="compose" state={state} set={set} copy={copy} onDone={() => set({ screen: "book" })} /> : null}
+        {state.screen === "book" ? (
+          <BookScreen key="book" state={state} set={set} onPreview={() => set({ screen: "preview", pos: 0 })} onPhotos={() => set({ screen: "upload" })} />
+        ) : null}
         {state.screen === "preview" ? (
           <PreviewScreen key="preview" state={state} set={set} copy={copy} onOrder={() => set({ screen: "order" })} onCustomize={() => set({ screen: "customize" })} />
         ) : null}

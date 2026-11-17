@@ -1,5 +1,9 @@
 /**
- * UploadScreen — step 2 of 3: choose photos.
+ * UploadScreen — step 2 of 7: choose photos.
+ *
+ * At least MIN_PHOTOS (10): the smallest book has 10 pages and a page needs a
+ * photo (owner, 2026-11-16: one photo a page is the customer's call). Under
+ * 30 there's a gentle note that 30 to 50 make a fuller book; from 30, a tick.
  *
  * Choosing is the whole job. The moment files are picked they go to the upload
  * engine (see ../upload/engine.ts) and the customer moves straight on to
@@ -13,7 +17,7 @@
  */
 
 import { useRef, useState } from "react";
-import { ArrowRight, CheckCircle2, ImagePlus, Plus, RotateCcw, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, ImagePlus, Info, Lock, Plus, RotateCcw, X } from "lucide-react";
 import { Ph } from "../book";
 import { generatePages, type BookTheme, type CopyVoice } from "../data";
 import type { BuilderState } from "../state";
@@ -21,6 +25,11 @@ import { uploadEngine } from "../upload/engine";
 import { BEFORE_TIPS } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
 import { TipLine } from "../upload/UploadStatus";
+import { MIN_PHOTOS } from "./BookScreen";
+import "../flow.css";
+
+/** From here a book feels full; below it we say so, gently. */
+const FULL_BOOK = 30;
 
 export function UploadScreen({
   state,
@@ -39,12 +48,16 @@ export function UploadScreen({
   const [dragOver, setDragOver] = useState(false);
   const { addFiles, progress, snapshot } = useUploads();
 
-  /** First photos of a book carry straight on; adding more stays here to review. */
+  /**
+   * The first pick of a book carries straight on to the next questions while
+   * it uploads, when it is enough for a book; adding more stays here to review.
+   */
   const take = (files: FileList | File[] | null) => {
     const first = !hasPhotos;
     void addFiles(files);
-    if (first && files && files.length) onContinue();
+    if (first && files && files.length >= MIN_PHOTOS) onContinue();
   };
+  const enough = photos.length >= MIN_PHOTOS;
 
   const openPicker = () => inputRef.current?.click();
   const estPages = photos.length ? generatePages(photos, state.density).length : 0;
@@ -131,6 +144,19 @@ export function UploadScreen({
                 </button>
               </div>
             ) : null}
+            {!enough ? (
+              <p className="up-status lock" role="status">
+                <Lock size={17} /> Add at least {MIN_PHOTOS} photos to make your book. You have {photos.length} so far.
+              </p>
+            ) : photos.length < FULL_BOOK ? (
+              <p className="up-status" role="status">
+                <Info size={17} /> You can go on with {photos.length}. We recommend 30 to 50 photos for a fuller book.
+              </p>
+            ) : (
+              <p className="up-status ok" role="status">
+                <CheckCircle2 size={17} /> {photos.length} photos added. That makes a full book.
+              </p>
+            )}
             <div
               className="bb-photo-grid"
               onDragOver={(e) => e.preventDefault()}
@@ -148,7 +174,8 @@ export function UploadScreen({
             <div className="bb-upload-meta">
               <span className="bb-upload-count">
                 <CheckCircle2 size={17} />
-                {photos.length} {photos.length === 1 ? "photo" : "photos"}, a {estPages}-page book
+                {photos.length} {photos.length === 1 ? "photo" : "photos"}
+                {enough ? `, a ${estPages}-page book` : ""}
               </span>
               <button type="button" className="bb-btn bb-btn-ghost" onClick={openPicker}>
                 <Plus size={16} /> {copy.uploadMore}
@@ -160,7 +187,7 @@ export function UploadScreen({
 
       {hasPhotos ? (
         <div className="bb-actionbar">
-          <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={onContinue}>
+          <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={onContinue} disabled={!enough}>
             Continue <ArrowRight size={18} />
           </button>
         </div>

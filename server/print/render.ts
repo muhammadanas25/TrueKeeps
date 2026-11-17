@@ -173,6 +173,12 @@ export interface PrintManifestItem {
   layout: PageLayoutId;
   /** collage only: tile positions are flipped left to right */
   mirror: boolean;
+  /**
+   * "grid" pages only: where this slot sits on the page, in inches from the
+   * page's top-left corner. The named layouts' positions are fixed by the
+   * layout; a grid page's come from the layout engine and travel with it.
+   */
+  rect?: { x: number; y: number; w: number; h: number };
   slot: number;
   photoId: string;
   key: string;
@@ -243,7 +249,8 @@ export async function renderOrder(orderId: string): Promise<PrintManifest> {
         if (cached.key !== row.storageKey) cached = { key: row.storageKey, bytes: await mediaStore.get(row.storageKey) };
         const layout = page.layout as PageLayoutId;
         const framing: Framing = { fx: placement.fx, fy: placement.fy, zoom: placement.zoom, turn: placement.turn, tilt: placement.tilt };
-        const out = await renderSlot(cached.bytes, slotInches(layout, slotIndex, PAGE_INCHES), framing);
+        const out = await renderSlot(cached.bytes, slotInches(page, slotIndex, PAGE_INCHES), framing);
+        const frame = layout === "grid" ? page.frames?.[slotIndex] : undefined;
         const key = `${prefix}/page-${String(pageIndex).padStart(3, "0")}-slot-${slotIndex}.jpg`;
         await mediaStore.put(key, out.jpeg, "image/jpeg");
         manifest.items.push({
@@ -257,6 +264,9 @@ export async function renderOrder(orderId: string): Promise<PrintManifest> {
           heightPx: out.height,
           dpi: out.dpi,
           framing,
+          ...(frame
+            ? { rect: { x: frame.x * PAGE_INCHES.w, y: frame.y * PAGE_INCHES.h, w: frame.w * PAGE_INCHES.w, h: frame.h * PAGE_INCHES.h } }
+            : null),
         });
       } catch (err) {
         problem(err instanceof Error ? err.message : "render failed");

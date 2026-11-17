@@ -17,6 +17,7 @@
  */
 
 import { PRICE_LIST } from "@shared/pricing";
+import { arrangeBook, arrangementOf, MAX_PER_PAGE, relayoutPage } from "./arrange";
 
 /* ── Book themes ────────────────────────────────────────────── */
 
@@ -136,20 +137,24 @@ export const VIBES: Vibe[] = [
 
 export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" | "moment" | "signature";
 export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
-  { id: "classic", name: "Classic" },
-  { id: "moment", name: "Moment" },
-  { id: "signature", name: "Signature" },
+  { id: "classic", name: "Minimal" },
+  { id: "moment", name: "Full Picture" },
+  { id: "signature", name: "Truekeeps Design" },
   { id: "full", name: "Full photo" },
   { id: "framed", name: "Framed" },
   { id: "minimal", name: "Title only" },
   { id: "split", name: "Split" },
 ];
 
-/** The three covers offered first, while the photos upload. */
+/**
+ * The three covers offered first, while the photos upload ("Pick the feel",
+ * step 3 of the owner's flow). Names are the owner's, from the flow brief of
+ * 2026-11-15; the ids predate them and stay, because saved books carry them.
+ */
 export const FEEL_CHOICES: Array<{ id: CoverStyleId; name: string; line: string }> = [
-  { id: "classic", name: "Classic", line: "A clean cover, one small photo and your names." },
-  { id: "moment", name: "Moment", line: "Your favourite photo fills the whole cover. No text." },
-  { id: "signature", name: "Signature", line: "Our special design." },
+  { id: "classic", name: "Minimal", line: "A clean cover with one small photo and your title." },
+  { id: "moment", name: "Full Picture", line: "Your favourite photo fills the whole cover. No words." },
+  { id: "signature", name: "Truekeeps Design", line: "Our own cover design for your occasion." },
 ];
 
 /** Has the customer made this choice yet? The default cover isn't one of these. */
@@ -208,11 +213,16 @@ export function signatureFor(occasionId: string): SignatureArt {
   return SIGNATURES[occasionId] ?? SIGNATURES.mix;
 }
 
+/**
+ * How full the pages are. Since 2026-11-17 these are the three arrangements of
+ * "Pick your book" (see arrange.ts); the stored ids predate the names and stay,
+ * so every saved book and the server schema still read them.
+ */
 export type DensityId = "minimal" | "balanced" | "collage";
 export const DENSITIES: Array<{ id: DensityId; name: string; blurb: string }> = [
-  { id: "minimal", name: "Airy", blurb: "One photo per page" },
-  { id: "balanced", name: "Balanced", blurb: "A gentle mix" },
-  { id: "collage", name: "Playful", blurb: "More photos, collaged" },
+  { id: "minimal", name: "Story", blurb: "1 to 2 photos a page" },
+  { id: "balanced", name: "Classic", blurb: "2 to 4 photos a page" },
+  { id: "collage", name: "Family Album", blurb: "4 to 6 photos a page" },
 ];
 
 export interface Binding {
@@ -262,7 +272,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
   warm: {
     occasionSub: "Pick one, add your photos, and we do the rest.",
     quizHello: "Let's make your book",
-    quizSub: "Three small questions, then we do the rest.",
+    quizSub: "Two small things while your photos upload. Then you pick your book.",
     qOccasion: "What are we celebrating?",
     qVibe: "Pick a feel for your book",
     qTitle: "What should we call it?",
@@ -290,7 +300,7 @@ export const COPY: Record<"warm" | "concise", CopyVoice> = {
   concise: {
     occasionSub: "Choose one, then add photos.",
     quizHello: "Create your book",
-    quizSub: "Three quick questions.",
+    quizSub: "Two quick questions.",
     qOccasion: "What's the occasion?",
     qVibe: "Choose a cover",
     qTitle: "Name your book",
@@ -369,7 +379,23 @@ export interface BuilderPhoto {
  *   2 photos — duo (stacked)       / duo-side (side by side)
  *   3 photos — collage (scattered) / trio-strip (a row of three)
  */
-export type PageLayoutId = "title" | "full" | "single" | "duo" | "duo-side" | "collage" | "trio-strip";
+export type PageLayoutId = "title" | "full" | "single" | "duo" | "duo-side" | "collage" | "trio-strip" | "grid";
+
+/**
+ * Where one slot sits on a "grid" page, as fractions of the page (0–1).
+ *
+ * The seven named layouts above get their slot positions from builder.css;
+ * a grid page carries its own, because the layout engine (arrange.ts) picks
+ * from 26 templates and reshapes a slot when a photo would otherwise lose
+ * too much of itself or print soft. Storing the result keeps the preview, the
+ * editors and the print files drawing exactly the same rectangles.
+ */
+export interface PageFrame {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 /**
  * How ONE photo sits inside ONE slot.
@@ -464,6 +490,8 @@ export interface BookPage {
    * still flips by contrast on a dark page.
    */
   bg?: string | null;
+  /** "grid" pages only: one rectangle per slot, in slot order */
+  frames?: PageFrame[];
 }
 
 /** Read-only view for the many call sites that only care about identity. */
@@ -483,7 +511,29 @@ export const LAYOUT_SLOTS: Record<PageLayoutId, number> = {
   "duo-side": 2,
   collage: 3,
   "trio-strip": 3,
+  /** a grid page holds as many as it has frames; this is the most it can */
+  grid: MAX_PER_PAGE,
 };
+
+/** The most photos THIS page can take: a grid page up to six, the named layouts three. */
+export const pageCapacity = (page: Pick<BookPage, "layout">): number =>
+  page.layout === "grid" ? MAX_PER_PAGE : MAX_SLOTS_PER_PAGE;
+
+/**
+ * The page with a new set of photos on it (one added, removed or moved in).
+ *
+ * A grid page is laid out again by the engine, so it keeps its promises
+ * (shape match, crop cap, sharpness) with the new photos. A named layout
+ * changes to the layout of the same character for the new count, as before.
+ * Null when the page has no photos left: the caller decides whether that is a
+ * page to delete or a drop to refuse.
+ */
+export function reshapePage(page: BookPage, slots: Placement[], photos: BuilderPhoto[], pageIndex: number): BookPage | null {
+  if (page.layout === "grid") return relayoutPage(page, slots, photos, pageIndex);
+  const layout = layoutForCount(page.layout, slots.length);
+  if (!layout) return null;
+  return { ...page, layout, slots, mirror: isMirrorable(layout) ? page.mirror : undefined };
+}
 
 /**
  * The picker's contents, in picker order.
@@ -494,7 +544,7 @@ export const LAYOUT_SLOTS: Record<PageLayoutId, number> = {
  * exactly that reason — the count is already a group header, so spending
  * the label on it was wasted.
  */
-export const LAYOUTS: Array<{ id: Exclude<PageLayoutId, "title">; name: string; slots: number }> = [
+export const LAYOUTS: Array<{ id: Exclude<PageLayoutId, "title" | "grid">; name: string; slots: number }> = [
   { id: "full", name: "Full page", slots: 1 },
   { id: "single", name: "Framed", slots: 1 },
   { id: "duo", name: "Stacked", slots: 2 },
@@ -523,7 +573,7 @@ export const isMirrorable = (layout: PageLayoutId): boolean => layout === "colla
  * decides whether that is a page to delete or a drop to refuse, which
  * are different questions this function has no business answering.
  */
-const LAYOUT_LADDER: Record<Exclude<PageLayoutId, "title">, Array<Exclude<PageLayoutId, "title">>> = {
+const LAYOUT_LADDER: Record<Exclude<PageLayoutId, "title" | "grid">, Array<Exclude<PageLayoutId, "title" | "grid">>> = {
   //          1 photo    2 photos      3 photos
   full: ["full", "duo", "collage"],
   single: ["single", "duo", "collage"],
@@ -535,7 +585,7 @@ const LAYOUT_LADDER: Record<Exclude<PageLayoutId, "title">, Array<Exclude<PageLa
 
 export function layoutForCount(from: PageLayoutId, count: number): PageLayoutId | null {
   if (count <= 0) return null;
-  const ladder = LAYOUT_LADDER[from as Exclude<PageLayoutId, "title">] ?? LAYOUT_LADDER.single;
+  const ladder = LAYOUT_LADDER[from as Exclude<PageLayoutId, "title" | "grid">] ?? LAYOUT_LADDER.single;
   // Above three there is nothing to grow into; the caller is expected to
   // have refused the drop before getting here, but clamping beats
   // returning undefined and rendering an empty page.
@@ -545,31 +595,10 @@ export function layoutForCount(from: PageLayoutId, count: number): PageLayoutId 
 /** The most photos any one page can hold, i.e. the top of the ladder. */
 export const MAX_SLOTS_PER_PAGE = 3;
 
-/** Repeating layout rhythm per density — tuned in the design prototype. */
-const DENSITY_PATTERNS: Record<DensityId, PageLayoutId[]> = {
-  minimal: ["full", "single", "single", "full"],
-  balanced: ["full", "single", "duo", "single", "full", "duo"],
-  collage: ["collage", "full", "duo", "collage", "single", "duo"],
-};
-
 export function prettyCaption(label: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-/**
- * Deterministic auto-design.
- *
- * Walk the density's layout pattern, dealing photos into slots:
- *  1. The book opens on a photo. There is no words-only title page: the
- *     title lives on the cover (owner, 2026-11-11). Books saved before then
- *     keep their title page at index 0; see hasTitlePage().
- *  2. Each step takes the next pattern layout; if fewer photos remain
- *     than the layout wants, it degrades (duo→single etc.).
- *  3. "single" (framed) pages get the photo's label as a caption —
- *     the quiet pages are where captions read best.
- *  4. Books must have an even page count to bind; an odd book gets a
- *     closing page reprising the first photo ("until next time").
- */
 /**
  * Books made before 2026-11-11 start with a words-only title page, which stays
  * first (it can't be moved or deleted). New books don't have one.
@@ -586,38 +615,22 @@ export const pageNumber = (pages: ReadonlyArray<{ layout: string }>, idx: number
 export const pageLabel = (pages: ReadonlyArray<{ layout: string }>, idx: number): string =>
   idx === 0 && hasTitlePage(pages) ? "Title" : "p." + pageNumber(pages, idx);
 
-export function generatePages(photos: BuilderPhoto[], density: DensityId): BookPage[] {
-  const pattern = DENSITY_PATTERNS[density] ?? DENSITY_PATTERNS.balanced;
-  const pages: BookPage[] = [];
-  let pi = 0;
-  let step = 0;
-  let n = 0;
-  while (pi < photos.length) {
-    const layout = pattern[step % pattern.length];
-    const slots = Math.min(LAYOUT_SLOTS[layout], photos.length - pi);
-    const placed = photos.slice(pi, pi + slots).map((p) => placement(p.id));
-    const caption = layout === "single" ? prettyCaption(photos[pi].label) : "";
-    pages.push({
-      id: "pg" + n,
-      layout: slots < LAYOUT_SLOTS[layout] ? (slots === 1 ? "single" : "duo") : layout,
-      slots: placed,
-      caption,
-    });
-    pi += slots;
-    step++;
-    n++;
-  }
-  if (pages.length % 2 === 1) {
-    // reprise the opening photo, but as its OWN placement — sharing the
-    // object would make reframing the first page silently reframe the last
-    pages.push({
-      id: "pg-end",
-      layout: "single",
-      slots: pages[0].slots[0] ? [{ ...pages[0].slots[0] }] : [],
-      caption: "until next time",
-    });
-  }
-  return pages;
+/**
+ * Auto-design: the whole book, laid out by the engine (arrange.ts).
+ *
+ *  1. The book opens on a photo. There is no words-only title page: the
+ *     title lives on the cover (owner, 2026-11-11). Books saved before then
+ *     keep their title page at index 0; see hasTitlePage().
+ *  2. `density` is the arrangement (Story, Classic or Family Album).
+ *  3. `sheets` is the book size the customer chose; absent or null means the
+ *     fewest sheets that hold every photo in this arrangement.
+ *
+ * Pure ((photos, density, sheets) → pages), so re-running it on a change is
+ * safe. Every page is a "grid" page; the editors can still turn a page into
+ * one of the named layouts.
+ */
+export function generatePages(photos: BuilderPhoto[], density: DensityId, sheets?: number | null): BookPage[] {
+  return arrangeBook(photos, arrangementOf(density), sheets).pages;
 }
 
 /**

@@ -299,7 +299,7 @@ export function EditorV2({
     reset: () => sel && commit((b) => ops.resetFrame(b, sel.pageId, sel.slot)),
     remove: () => {
       if (!sel) return;
-      const r = ops.removeSlot(slice(), sel.pageId, sel.slot);
+      const r = ops.removeSlot(slice(), sel.pageId, sel.slot, photos);
       commit(() => r.book);
       if (r.pageRemoved) say("Page removed", true);
       setSel(null);
@@ -307,7 +307,7 @@ export function EditorV2({
     },
     pickPhoto: (photoId: string) => {
       if (sel) {
-        commit((b) => ops.replacePhoto(b, sel.pageId, sel.slot, photoId));
+        commit((b) => ops.replacePhoto(b, sel.pageId, sel.slot, photoId, photos));
         if (isMobile) setTool(null);
         say("Photo swapped", true);
         return;
@@ -320,19 +320,19 @@ export function EditorV2({
         return say("Cover photo changed");
       }
       if (!activePage || activePage.layout === "title") return say("Go to a photo page first");
-      const next = ops.addPhotoToPage(slice(), activePage.id, photoId);
+      const next = ops.addPhotoToPage(slice(), activePage.id, photoId, photos);
       if (!next) return say("This page is full — select a photo on it to swap instead");
       commit(() => next);
       say("Added to this page", true);
     },
     dropPhoto: (pageId: string, slot: number, photoId: string) => {
-      commit((b) => ops.replacePhoto(b, pageId, slot, photoId));
+      commit((b) => ops.replacePhoto(b, pageId, slot, photoId, photos));
       setSel({ pageId, slot });
       setActiveId(pageId);
     },
     layout: (l: BookPage["layout"]) => {
       if (!activePage) return;
-      commit((b) => ops.changeLayout(b, activePage.id, l, photos));
+      commit((b) => (l === "grid" ? ops.autoLayout(b, activePage.id, photos) : ops.changeLayout(b, activePage.id, l, photos)));
       setSel(null);
       setCrop(false);
     },
@@ -470,14 +470,14 @@ export function EditorV2({
 
   /* ── crop controls ──────────────────────────────────────────── */
   const tilt = clampTilt(selSlot?.tilt);
-  const maxZ = selPage && selSlot && sel ? slotMaxZoom(selPhoto, selPage.layout, sel.slot, selSlot.turn, undefined, tilt) : 1;
+  const maxZ = selPage && selSlot && sel ? slotMaxZoom(selPhoto, selPage, sel.slot, selSlot.turn, undefined, tilt) : 1;
   const zoomPct = selSlot ? (selSlot.zoom - 1) / Math.max(0.001, maxZ - 1) : 0;
   const quality = (() => {
     if (!selPhoto?.w || !selPhoto.h || !selPage || !selSlot || !sel) return "unknown";
     const dpi = effectiveDpi(
       { w: selPhoto.w, h: selPhoto.h },
-      placedInches(selPage.layout, sel.slot, selSlot.turn),
-      framedZoom({ zoom: selSlot.zoom, tilt }, selPage.layout, sel.slot),
+      placedInches(selPage, sel.slot, selSlot.turn),
+      framedZoom({ zoom: selSlot.zoom, tilt }, selPage, sel.slot),
     );
     return printQuality(dpi);
   })();
@@ -513,7 +513,7 @@ export function EditorV2({
           onPointerDown={snapshot}
           onChange={(e) => {
             const deg = clampTilt(Number(e.target.value));
-            const lim = slotMaxZoom(selPhoto, selPage!.layout, sel.slot, selSlot.turn, undefined, deg);
+            const lim = slotMaxZoom(selPhoto, selPage!, sel.slot, selSlot.turn, undefined, deg);
             A.frame(sel.pageId, sel.slot, { tilt: deg, zoom: Math.min(selSlot.zoom, lim) });
           }}
           onDoubleClick={() => A.frame(sel.pageId, sel.slot, { tilt: 0 })}
@@ -618,7 +618,7 @@ export function EditorV2({
               <SlotLayer
                 photo={photo}
                 placement={placement}
-                layout={page.layout}
+                layout={page}
                 slotIdx={slot}
                 aspect={aspect}
                 selected={sel?.pageId === page.id && sel.slot === slot}

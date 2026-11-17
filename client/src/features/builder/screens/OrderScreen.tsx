@@ -22,7 +22,7 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Check, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { MiniBook } from "../book";
-import { BINDINGS, occasionById, type CopyVoice } from "../data";
+import { BINDINGS, DENSITIES, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
 import { lowQualityPageCount, photosAwaitingOriginal } from "../print";
 import { uploadEngine } from "../upload/engine";
@@ -30,7 +30,7 @@ import { formatEta } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
-import { FINISHES, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
+import { finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
 import { PK_PROVINCES, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useSession } from "@/features/auth/useSession";
 
@@ -72,6 +72,7 @@ export function OrderScreen({
   const { user } = useSession();
   const occ = occasionById(state.occasion);
   const theme = bookTheme(state.themeId, state.pageColor);
+  const arrangementName = DENSITIES.find((d) => d.id === state.density)?.name ?? "Classic";
   // Last honest chance to mention print quality before money changes
   // hands. Silent at zero — nobody needs a green tick telling them
   // nothing is wrong.
@@ -197,7 +198,12 @@ export function OrderScreen({
             </div>
             <div className="bb-spec-row">
               <b>Details</b>
-              <span>12×12 in · {state.pages.length} pages · {theme.name}</span>
+              <span>12 x 12 in · {state.pages.length} pages · {arrangementName}</span>
+            </div>
+            {/* chosen with the book on step 5, so here it is a fact, not a question */}
+            <div className="bb-spec-row">
+              <b>Paper</b>
+              <span>{finishName(state.finish)}</span>
             </div>
             {softPages > 0 ? (
               <div className="bb-spec-row bb-spec-warn">
@@ -217,25 +223,6 @@ export function OrderScreen({
                   <button type="button" key={b.id} className={"bb-binding" + (q.binding === b.id ? " on" : "")} onClick={() => set({ binding: b.id })}>
                     <b>{b.name}</b>
                     <i>{b.blurb}</i>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="bb-panel-label" style={{ marginBottom: 8 }}>
-                Finish
-              </div>
-              <div className="bb-bindings">
-                {FINISHES.map((f) => (
-                  <button
-                    type="button"
-                    key={f.id}
-                    className={"bb-binding" + (state.finish === f.id ? " on" : "")}
-                    aria-pressed={state.finish === f.id}
-                    onClick={() => set({ finish: f.id })}
-                  >
-                    <b>{f.name}</b>
-                    <i>{f.blurb}</i>
                   </button>
                 ))}
               </div>
