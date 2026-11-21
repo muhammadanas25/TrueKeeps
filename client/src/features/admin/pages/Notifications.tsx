@@ -10,7 +10,7 @@
  * and Resend.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { NOTIFY_EVENT_INFO, type NotifyEvent } from "@shared/ops";
@@ -80,6 +80,9 @@ function ListEditor({ label, values, onChange, placeholder, type }: { label: str
 function RuleCard({ rule, whatsappConnected }: { rule: NotifyRule; whatsappConnected: boolean }) {
   const info = NOTIFY_EVENT_INFO[rule.event as NotifyEvent];
   const [r, setR] = useState(rule);
+  // take the server's copy after a save or a refetch that changed it (not on every render)
+  const serverCopy = JSON.stringify(rule);
+  useEffect(() => setR(JSON.parse(serverCopy) as NotifyRule), [serverCopy]);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const qc = useQueryClient();
@@ -218,7 +221,7 @@ export function NotificationsPage({ me }: { me: StaffMe }) {
             </p>
           ) : null}
           {rules.error ? <ErrorNote error={rules.error} /> : null}
-          {!rules.data ? <Loading /> : <div className="oc-grid" style={{ ["--min" as string]: "380px" }}>{rules.data.rules.map((r) => <RuleCard key={r.event + String(r.saved)} rule={r} whatsappConnected={rules.data!.whatsappConnected} />)}</div>}
+          {!rules.data ? <Loading /> : <div className="oc-grid" style={{ ["--min" as string]: "380px" }}>{rules.data.rules.map((r) => <RuleCard key={r.event} rule={r} whatsappConnected={rules.data!.whatsappConnected} />)}</div>}
         </>
       ) : null}
 

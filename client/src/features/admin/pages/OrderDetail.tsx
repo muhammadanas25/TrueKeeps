@@ -142,7 +142,18 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
               {job ? <span className="oc-small">version {job.version}</span> : null}
             </div>
             {!job ? (
-              <p className="oc-sub">{["paid", "in_production"].includes(status) ? "Starting shortly. The safety check runs every 10 minutes." : "Made once the order is paid."}</p>
+              ["paid", "in_production", "shipped", "delivered"].includes(status) ? (
+                <div className="oc-row">
+                  <span className="oc-sub" style={{ flex: "1 1 240px" }}>
+                    Not built yet. The safety check starts it within 10 minutes, or start it now.
+                  </span>
+                  <button className="oc-btn primary sm" disabled={busy} onClick={() => act(() => adminFetch(`/api/admin/orders/${o.id}/print-files/render`, { method: "POST", body: {} }), "Building the print file. This page refreshes by itself.")}>
+                    <RefreshCw size={14} aria-hidden /> Build print file now
+                  </button>
+                </div>
+              ) : (
+                <p className="oc-sub">Made once the order is paid.</p>
+              )
             ) : (
               <>
                 {job.state === "failed" ? <p className="oc-note bad">Failed after {job.attempts} tries: {job.lastError}</p> : null}
