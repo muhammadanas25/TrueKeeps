@@ -696,8 +696,12 @@ export function CoverFace({
   editable?: boolean;
   onTitle?: (title: string) => void;
 }) {
-  const photo: BuilderPhoto = photos[0]
-    ? { ...photos[0], label: hasImage(photos[0]) ? photos[0].label : "your cover photo" }
+  // The cover photo comes from the look (the customer's choice or ours); a
+  // renderer outside the builder's provider falls back to the first photo.
+  const coverLook = usePageLook();
+  const chosen = (coverLook.coverPhotoId && photos.find((p) => p.id === coverLook.coverPhotoId)) || photos[0];
+  const photo: BuilderPhoto = chosen
+    ? { ...chosen, label: hasImage(chosen) ? chosen.label : "your cover photo" }
     : { id: "c", label: "your cover photo", shade: 0 };
   const titleEl = editable ? (
     <div

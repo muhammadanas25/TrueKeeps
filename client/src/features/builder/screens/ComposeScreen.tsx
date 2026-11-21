@@ -25,7 +25,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Info, X } from "lucide-react";
 import { CoverFace, Ph } from "../book";
-import { generatePages, occasionById, FEEL_CHOICES, isFeelChoice, type CopyVoice } from "../data";
+import { bookPhotos, coverHasPhoto, coverPhotoIdFor, generatePages, occasionById, FEEL_CHOICES, isFeelChoice, type CopyVoice } from "../data";
+import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
 import { FONTS } from "../looks";
 import "../flow.css";
 import { bookTheme } from "../palette";
@@ -45,15 +46,6 @@ const STAGE_LINES: Record<string, { line: string; small: string }> = {
   baby: { line: "The first year goes by so fast.", small: "Hold on to the tiny days. One book, for them to open when they're grown." },
   wedding: { line: "Someday, someone small will point at a photo and ask, “Who's that?”", small: "Put your day in one place you can open, again and again." },
   mix: { line: "Remember Nani's old albums? You're making the next one.", small: "The stories behind these photos deserve to outlive our phones." },
-};
-
-/** "Our special design, made just for …" */
-const SIGNATURE_FOR: Record<string, string> = {
-  travel: "travel",
-  birthday: "birthdays",
-  baby: "new babies",
-  wedding: "weddings",
-  mix: "all your moments",
 };
 
 /** Thin at the start, approaching the width the finished book's page count gives it. */
@@ -211,11 +203,8 @@ export function ComposeScreen({
   const previewTitle = title.trim() || occ.suggestedTitle;
   const stageRef = useRef<HTMLDivElement>(null);
   const { progress } = useUploads();
-  const [hw, lastWord] = useMemo(() => {
-    const words = copy.quizHello.split(" ");
-    const last = words.pop();
-    return [words.join(" "), last];
-  }, [copy.quizHello]);
+  const [picking, setPicking] = useState(false);
+  const coverId = coverPhotoIdFor(state);
 
   const photosRef = useRef(state.photos);
   photosRef.current = state.photos;
@@ -225,7 +214,7 @@ export function ComposeScreen({
   }).current;
   useArrivals(stageRef, thumbFor, picked);
 
-  const pageCount = useMemo(() => generatePages(state.photos, state.density).length, [state.photos, state.density]);
+  const pageCount = useMemo(() => generatePages(bookPhotos(state), state.density).length, [state.photos, state.removedPhotoIds, state.density]);
   // only photos that are ready: an empty placeholder among them looks broken
   const prints = state.photos.filter(hasImage).slice(0, 4);
   const stage = STAGE_LINES[state.occasion ?? "mix"] ?? STAGE_LINES.mix;
@@ -234,21 +223,25 @@ export function ComposeScreen({
     if (step < 1) set({ qstep: 1 });
     else onDone();
   };
-  const subtitle = state.subtitle ?? occ.subtitle;
+  // The line under the title prints only what the customer types (owner,
+  // 2026-11-21): an example date sitting in the field would print by accident.
+  // A book started before that has null here and keeps its occasion line.
+  const subtitle = state.subtitle ?? (state.pages.length ? occ.subtitle : "");
+  useEffect(() => {
+    if (state.subtitle === null && !state.pages.length) set({ subtitle: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.subtitle, state.pages.length]);
 
   return (
     <div className="bb-screen ck-compose">
       <div className="ck-questions">
         <div className="ck-questions-inner">
-          <h1>
-            {hw} <span className="bb-mark">{lastWord}</span>
-          </h1>
-          <p className="bb-sub">{copy.quizSub}</p>
+          {/* the question is the heading (owner, 2026-11-21) */}
+          <h1>{step === 0 ? "Pick the feel of your book" : "Name your book"}</h1>
+          <p className="bb-sub">{step === 0 ? "This is your cover. You can change it before you pay." : "This goes on your cover and spine."}</p>
 
           {step === 0 ? (
             <div className="bb-qstep" key="feel">
-              <h2>{copy.qVibe}</h2>
-              <p className="ck-note">You can change this later. Your photos go inside every style.</p>
               <div className="ck-feels" role="radiogroup" aria-label="Cover style">
                 {FEEL_CHOICES.map((f) => {
                   const on = state.coverStyle === f.id;
@@ -271,18 +264,27 @@ export function ComposeScreen({
                       </span>
                       <span className="ck-feel-text">
                         <b>{f.name}</b>
-                        <i>{f.id === "signature" ? `Our special design, made just for ${SIGNATURE_FOR[occ.id] ?? SIGNATURE_FOR.mix}.` : f.line}</i>
+                        <i>{f.line}</i>
                       </span>
                     </button>
                   );
                 })}
               </div>
+              {picked && coverHasPhoto(state.coverStyle) ? (
+                <div className="ck-coverphoto">
+                  <CoverPhotoRow
+                    photo={state.photos.find((p) => p.id === coverId)}
+                    chosen={state.coverPhotoId !== null}
+                    theme={theme}
+                    onOpen={() => setPicking(true)}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
 
           {step === 1 ? (
             <div className="bb-qstep" key="name">
-              <h2>Name your book</h2>
               <label className="ck-field">
                 <span>Book title</span>
                 <input
@@ -305,7 +307,7 @@ export function ComposeScreen({
                   value={subtitle}
                   maxLength={60}
                   onChange={(e) => set({ subtitle: e.target.value })}
-                  placeholder="A date, a place, a name"
+                  placeholder="Lahore, March 2026"
                 />
               </label>
               <div className="ck-field">
@@ -376,6 +378,20 @@ export function ComposeScreen({
         )}
         <UploadProgressNote />
       </div>
+      {picking ? (
+        <CoverPhotoPicker
+          photos={state.photos}
+          removedPhotoIds={state.removedPhotoIds}
+          current={state.coverPhotoId}
+          coverStyle={state.coverStyle}
+          theme={theme}
+          onPick={(id) => {
+            set({ coverPhotoId: id });
+            setPicking(false);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
   uploadedPhotos,
   uploadBatches,
   feedback,
+  appSettings,
   users,
   orders,
   orderEvents,
@@ -354,6 +355,18 @@ export class DrizzleStorage implements IStorage {
   async setFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback | undefined> {
     const [row] = await this.db.update(feedback).set({ status }).where(eq(feedback.id, id)).returning();
     return row;
+  }
+
+  async getSetting(key: string): Promise<unknown> {
+    const [row] = await this.db.select().from(appSettings).where(eq(appSettings.key, key));
+    return row?.value;
+  }
+
+  async setSetting(key: string, value: unknown, updatedBy: string | null): Promise<void> {
+    await this.db
+      .insert(appSettings)
+      .values({ key, value, updatedBy })
+      .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedBy, updatedAt: new Date() } });
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

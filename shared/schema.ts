@@ -461,6 +461,19 @@ export const feedback = pgTable(
 );
 
 /**
+ * Small switches the owner changes from the admin, one row per key, e.g.
+ * "payments" → { card, bankTransfer } (shared/payments.ts). A table rather
+ * than environment variables so a switch needs no redeploy.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  /** the admin who last changed it */
+  updatedBy: varchar("updated_by"),
+  updatedAt: updatedAt(),
+});
+
+/**
  * Every confirmed money movement we learn about, for audit and
  * idempotency. `provider_event_id` (the webhook's own id) is unique, so a
  * re-delivered webhook can't record twice.
@@ -580,3 +593,4 @@ export type Payment = typeof payments.$inferSelect;
 export type NewPayment = typeof payments.$inferInsert;
 export type Feedback = typeof feedback.$inferSelect;
 export type NewFeedback = typeof feedback.$inferInsert;
+export type AppSetting = typeof appSettings.$inferSelect;

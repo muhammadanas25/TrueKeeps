@@ -376,12 +376,13 @@ export function lowQualityPageCount(pages: BookPage[], photos: BuilderPhoto[]): 
 
 /**
  * Photos that would print but whose HD original isn't on the server yet:
- * everything placed on a page, plus the first photo, which is what covers
- * show. Mirrors `photosWithoutOriginals` on the server, which has the final
+ * everything placed on a page, plus the cover photo (the first photo for a
+ * book from before the cover choice). Mirrors `photosWithoutOriginals` on the server, which has the final
  * say; this one is here so the customer hears about it before filling in a form.
  */
-export function photosAwaitingOriginal(pages: BookPage[], photos: BuilderPhoto[]): BuilderPhoto[] {
+export function photosAwaitingOriginal(pages: BookPage[], photos: BuilderPhoto[], coverPhotoId?: string | null): BuilderPhoto[] {
   const printed = new Set(pages.flatMap((pg) => pg.slots.map((s) => s.photoId)));
-  if (photos[0]) printed.add(photos[0].id);
+  const cover = coverPhotoId ?? photos[0]?.id;
+  if (cover) printed.add(cover);
   return photos.filter((p) => printed.has(p.id) && (p.hd === false || !p.url));
 }

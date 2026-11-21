@@ -27,15 +27,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ImagePlus, Info, Minus, Plus } from "lucide-react";
 import { FINISHES, PRICE_LIST, formatPKR, quote } from "@shared/pricing";
-import { Book3D, shiftColor, type Book3DApi } from "../book";
+import { Book3D, GridWire, Ph, shiftColor, type Book3DApi } from "../book";
 import { ARRANGEMENTS, MAX_SHEETS, arrangeBook, arrangementOf, arrangementThatFits, densityOf, sheetRange, type ArrangementId } from "../arrange";
-import { occasionById, toSpreads } from "../data";
+import { bookPhotos, occasionById, toSpreads, type PageFrame } from "../data";
 import { fontById } from "../looks";
 import { bookTheme } from "../palette";
 import { PageRibbon } from "../PageRibbon";
 import type { BuilderState } from "../state";
 import { useNarrow } from "../useNarrow";
 import "../flow.css";
+
+/** A typical spread of each arrangement (engine templates L1+P1, L1S3+PLL3, P6+L6), as page fractions. */
+const f = (x: number, y: number, w: number, h: number): PageFrame => ({ x, y, w, h });
+const SAMPLE_SPREADS: Record<ArrangementId, [PageFrame[], PageFrame[]]> = {
+  story: [[f(0.042, 0.195, 0.917, 0.611)], [f(0.208, 0.063, 0.583, 0.875)]],
+  classic: [
+    [f(0.042, 0.042, 0.917, 0.611), f(0.042, 0.673, 0.292, 0.285), f(0.354, 0.673, 0.292, 0.285), f(0.667, 0.673, 0.292, 0.285)],
+    [f(0.042, 0.178, 0.429, 0.643), f(0.491, 0.178, 0.467, 0.311), f(0.491, 0.51, 0.467, 0.311)],
+  ],
+  family: [
+    [0.042, 0.354, 0.667].flatMap((x) => [f(x, 0.042, 0.292, 0.448), f(x, 0.51, 0.292, 0.448)]),
+    [0.042, 0.354, 0.667].flatMap((y) => [f(0.042, y, 0.448, 0.292), f(0.51, y, 0.448, 0.292)]),
+  ],
+};
 
 /** Fewest photos that make a book: the smallest book has 10 pages, one photo each at least. */
 export const MIN_PHOTOS = PRICE_LIST.includedSheets * 2;
@@ -47,17 +61,22 @@ export function BookScreen({
   set,
   onPreview,
   onPhotos,
+  onSave,
 }: {
   state: BuilderState;
   set: (patch: Partial<BuilderState>) => void;
   onPreview: () => void;
   onPhotos: () => void;
+  /** guests only: opens "Save this book to your account" */
+  onSave?: () => void;
 }) {
   const narrow = useNarrow();
   const occ = occasionById(state.occasion);
   const theme = bookTheme(state.themeId, state.pageColor);
-  const photos = state.photos;
+  // The book's photos: the ones taken out in an editor stay out (bookPhotos).
+  const photos = useMemo(() => bookPhotos(state), [state.photos, state.removedPhotoIds]);
   const n = photos.length;
+  const takenOut = state.photos.filter((p) => state.removedPhotoIds.includes(p.id));
   const style = arrangementOf(state.density);
   const range = sheetRange(n, style);
   const [open, setOpen] = useState(false);
@@ -100,6 +119,12 @@ export function BookScreen({
   const finish = FINISHES.find((f) => f.id === state.finish) ?? FINISHES[0];
   const price = formatPKR(unitPrice(sheets));
 
+  const putBack = () => {
+    setTouched(true);
+    set({ removedPhotoIds: [] });
+    setPos(1);
+  };
+
   const commit = () => {
     if (!keepHandEdits) set({ pages: plan.pages, pagesEdited: false, sheets: plan.sheets });
     onPreview();
@@ -138,6 +163,33 @@ export function BookScreen({
   const handNote = keepHandEdits ? (
     <p className="bk-note">
       <Info size={16} /> You changed some pages by hand, so this shows your pages. Picking an option here lays the book out again.
+    </p>
+  ) : null;
+  // Photos taken out in an editor stay out; this says so, with the way back.
+  const outNote = takenOut.length ? (
+    <div className="bk-out" role="status">
+      <span className="bk-out-thumbs" aria-hidden="true">
+        {takenOut.slice(0, 3).map((p) => (
+          <span key={p.id}>
+            <Ph photo={p} theme={theme} showLabel={false} variant="thumb" />
+          </span>
+        ))}
+      </span>
+      <span className="bk-out-text">
+        You took {takenOut.length === 1 ? "1 photo" : `${takenOut.length} photos`} out of the book. {takenOut.length === 1 ? "It stays" : "They stay"} out, whatever you pick here.
+      </span>
+      <button type="button" className="bb-btn bb-btn-secondary" onClick={putBack}>
+        Put {takenOut.length === 1 ? "it" : "them"} back
+      </button>
+    </div>
+  ) : null;
+  // Guests can save the book to an account from here; it never pops up by itself.
+  const saveLink = onSave ? (
+    <p className="bk-save">
+      Save this book to come back later.{" "}
+      <button type="button" onClick={onSave}>
+        Sign in
+      </button>
     </p>
   ) : null;
   const leftoverNote = leftover ? (
@@ -206,6 +258,7 @@ export function BookScreen({
             ))}
           </div>
           {handNote}
+          {outNote}
           {!keepHandEdits ? (
             <div className="bk-fit">
               <span className={"bk-fit-line" + (fitLine(style).warn ? " warn" : "")}>
@@ -241,6 +294,7 @@ export function BookScreen({
           <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={commit}>
             Preview my book <ArrowRight size={18} />
           </button>
+          {saveLink}
         </div>
       </div>
     );
@@ -255,6 +309,7 @@ export function BookScreen({
           <h1>Pick your book</h1>
           <p className="bb-sub">Every book is 12 x 12 in. Choose how full the pages feel. You can add pages after.</p>
           {handNote}
+          {outNote}
           <div className="bk-cards" role="radiogroup" aria-label="How full the pages feel">
             {ARRANGEMENTS.map((a) => {
               const on = style === a.id && !keepHandEdits;
@@ -263,6 +318,11 @@ export function BookScreen({
               return (
                 <button key={a.id} type="button" role="radio" aria-checked={on} className={"bk-card" + (on ? " on" : "")} onClick={() => pick(a.id)}>
                   <span className="bk-card-top">
+                    {/* a typical spread of this arrangement, so the difference shows before the click */}
+                    <span className="bk-card-art" aria-hidden="true">
+                      <GridWire frames={SAMPLE_SPREADS[a.id][0]} theme={theme} />
+                      <GridWire frames={SAMPLE_SPREADS[a.id][1]} theme={theme} />
+                    </span>
                     <b>{a.name}</b>
                     {a.id === "classic" ? <i className="bk-pick">Our pick</i> : null}
                     <span className="bk-card-price">{formatPKR(unitPrice(sh))}</span>
@@ -288,6 +348,7 @@ export function BookScreen({
             <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={commit}>
               Preview my book <ArrowRight size={18} />
             </button>
+            {saveLink}
           </div>
         </div>
       </div>

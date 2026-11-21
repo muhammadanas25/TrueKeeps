@@ -32,7 +32,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
-import { COPY, OCCASIONS, occasionById } from "./data";
+import { COPY, OCCASIONS, coverPhotoIdFor, occasionById } from "./data";
 import { bookTheme } from "./palette";
 import { BACK_MAP, SCREEN_CONTEXT, useBuilderState, type BuilderState } from "./state";
 import { useBuilderSync, type SyncStatus } from "./sync";
@@ -54,6 +54,7 @@ import { EditorV2 } from "./editor-v2/EditorV2";
 import { useEditorVersion } from "./editor-v2/pref";
 import { PageLookContext, type PageLook } from "./looks";
 import { TKLogo } from "@/features/landing/primitives";
+import { WhatsAppHelpButton, useSupportContext } from "@/features/support/WhatsAppHelp";
 
 /** Seed builder state from URL params (?occasion=wedding from landing). */
 function seedFromUrl(): Partial<BuilderState> {
@@ -102,27 +103,19 @@ export default function BookBuilder() {
 
   // Typeface, edges, subtitle and caption visibility reach every page
   // renderer (preview, order, both editors) through this context.
+  // resolved once here; every cover in the builder reads it from the look
+  const coverPhotoId = coverPhotoIdFor(state);
   const look = useMemo<PageLook>(
-    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden }),
-    [state.fontId, state.edge, state.subtitle, state.captionsHidden],
+    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden, coverPhotoId }),
+    [state.fontId, state.edge, state.subtitle, state.captionsHidden, coverPhotoId],
   );
   const v2Customize = state.screen === "customize" && editorVersion === "v2";
 
-  // Soft prompt: once per browser, the first time a guest reaches a
-  // finished book. Dismissible — the book keeps working without it.
+  // "Save this book" for guests. It used to open by itself the moment their
+  // book first appeared, which covered the book (owner, 2026-11-21); now it
+  // opens only from the quiet "Sign in" link on "Pick your book".
   const [savePrompt, setSavePrompt] = useState(false);
-  useEffect(() => {
-    if (sessionLoading || isMember) return;
-    // "Pick your book" is where their own book first appears (it replaced the reveal).
-    if (state.screen !== "book" || !state.projectId) return;
-    let seen = false;
-    try {
-      seen = localStorage.getItem(SAVE_PROMPT_KEY) === "1";
-    } catch {
-      /* ignore */
-    }
-    if (!seen) setSavePrompt(true);
-  }, [state.screen, state.projectId, sessionLoading, isMember]);
+  const offerSave = !sessionLoading && !isMember && Boolean(state.projectId);
   const dismissSavePrompt = () => {
     setSavePrompt(false);
     try {
@@ -151,6 +144,11 @@ export default function BookBuilder() {
   };
   // steps 3 and 4 share a screen, so the header names the one on show
   const context = state.screen === "compose" ? `Step ${state.qstep + 3} of 7` : SCREEN_CONTEXT[state.screen] || "";
+  // Phones hide the header's step label for room, so they get a thin bar of
+  // seven under the header instead (owner, 2026-11-21).
+  const stepNo = ({ quiz: 1, upload: 2, compose: 3 + state.qstep, book: 5, preview: 6, order: 7 } as Partial<Record<string, number>>)[state.screen] ?? 0;
+  // the help button carries the book and the step, so the team can find it
+  useSupportContext({ bookId: state.projectId, where: state.screen === "customize" ? "Making changes" : stepNo ? `Step ${stepNo} of 7` : state.screen });
 
   // The v2 editor is a full-screen app of its own (own top bar, no page
   // scroll), so it replaces the shell rather than living inside it.
@@ -179,7 +177,7 @@ export default function BookBuilder() {
   return (
     <PageLookContext.Provider value={look}>
     <UploadProvider state={state} set={set} updatePhotos={updatePhotos}>
-    <div className="bb-shell">
+    <div className={"bb-shell" + (stepNo ? " has-steps" : "")}>
       <UploadHairline />
       <header className="bb-nav">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -194,6 +192,7 @@ export default function BookBuilder() {
         </div>
         <div className="bb-nav-right">
           <span className="bb-nav-context">{context}</span>
+          <WhatsAppHelpButton />
           {/* while uploading, the counter says more than "Saved" and phones only fit one */}
           <span className={uploadsBusy ? "ck-save-while-busy" : undefined} style={{ display: "contents" }}>
             <SavePill status={syncStatus} />
@@ -207,6 +206,16 @@ export default function BookBuilder() {
           <AccountMenu />
         </div>
       </header>
+      {stepNo ? (
+        <div className="bb-steps" role="progressbar" aria-valuemin={1} aria-valuemax={7} aria-valuenow={stepNo} aria-label={`Step ${stepNo} of 7`}>
+          <span className="bb-steps-bars" aria-hidden="true">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <i key={i} className={i <= stepNo ? "on" : ""} />
+            ))}
+          </span>
+          <span className="bb-steps-label">Step {stepNo} of 7</span>
+        </div>
+      ) : null}
 
       <main className="bb-main">
         {state.screen === "quiz" ? <QuizScreen key="quiz" state={state} set={set} copy={copy} onDone={() => set({ screen: "upload" })} /> : null}
@@ -215,7 +224,14 @@ export default function BookBuilder() {
         ) : null}
         {state.screen === "compose" ? <ComposeScreen key="compose" state={state} set={set} copy={copy} onDone={() => set({ screen: "book" })} /> : null}
         {state.screen === "book" ? (
-          <BookScreen key="book" state={state} set={set} onPreview={() => set({ screen: "preview", pos: 0 })} onPhotos={() => set({ screen: "upload" })} />
+          <BookScreen
+            key="book"
+            state={state}
+            set={set}
+            onPreview={() => set({ screen: "preview", pos: 0 })}
+            onPhotos={() => set({ screen: "upload" })}
+            onSave={offerSave ? () => setSavePrompt(true) : undefined}
+          />
         ) : null}
         {state.screen === "preview" ? (
           <PreviewScreen key="preview" state={state} set={set} copy={copy} onOrder={() => set({ screen: "order" })} onCustomize={() => set({ screen: "customize" })} />

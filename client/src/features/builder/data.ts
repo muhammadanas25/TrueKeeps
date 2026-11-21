@@ -139,12 +139,21 @@ export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" |
 export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
   { id: "classic", name: "Minimal" },
   { id: "moment", name: "Full Picture" },
-  { id: "signature", name: "Truekeeps Design" },
+  { id: "minimal", name: "Just text" },
   { id: "full", name: "Full photo" },
   { id: "framed", name: "Framed" },
-  { id: "minimal", name: "Title only" },
   { id: "split", name: "Split" },
+  { id: "signature", name: "Truekeeps Design" },
 ];
+
+/**
+ * "Truekeeps Design" (signature) was replaced by "Just text" on 2026-11-21
+ * (owner). It still draws, so books saved with it print as they were, and a
+ * picker shows it only to a book that already uses it.
+ */
+const RETIRED_COVERS = new Set<CoverStyleId>(["signature"]);
+export const pickableCoverStyles = (current?: CoverStyleId | null) =>
+  COVER_STYLES.filter((c) => !RETIRED_COVERS.has(c.id) || c.id === current);
 
 /**
  * The three covers offered first, while the photos upload ("Pick the feel",
@@ -152,10 +161,13 @@ export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
  * 2026-11-15; the ids predate them and stay, because saved books carry them.
  */
 export const FEEL_CHOICES: Array<{ id: CoverStyleId; name: string; line: string }> = [
-  { id: "classic", name: "Minimal", line: "A clean cover with one small photo and your title." },
-  { id: "moment", name: "Full Picture", line: "Your favourite photo fills the whole cover. No words." },
-  { id: "signature", name: "Truekeeps Design", line: "Our own cover design for your occasion." },
+  { id: "classic", name: "Minimal", line: "A small photo and your title." },
+  { id: "moment", name: "Full Picture", line: "One photo fills the cover. Title on the spine." },
+  { id: "minimal", name: "Just text", line: "Your title and a line. No photo." },
 ];
+
+/** The cover styles that show a photo (the cover photo choice applies to these). */
+export const coverHasPhoto = (id: CoverStyleId): boolean => id !== "minimal";
 
 /** Has the customer made this choice yet? The default cover isn't one of these. */
 export function isFeelChoice(id: CoverStyleId): boolean {
@@ -631,6 +643,42 @@ export const pageLabel = (pages: ReadonlyArray<{ layout: string }>, idx: number)
  */
 export function generatePages(photos: BuilderPhoto[], density: DensityId, sheets?: number | null): BookPage[] {
   return arrangeBook(photos, arrangementOf(density), sheets).pages;
+}
+
+/**
+ * The photos that belong in the book: every photo except the ones the
+ * customer took out in an editor (BuilderState.removedPhotoIds). Every
+ * "lay the book out again" starts from this list, so a photo taken out stays
+ * out and a photo added later goes in.
+ */
+export function bookPhotos(s: { photos: BuilderPhoto[]; removedPhotoIds?: string[] | null }): BuilderPhoto[] {
+  const out = new Set(s.removedPhotoIds ?? []);
+  return out.size ? s.photos.filter((p) => !out.has(p.id)) : s.photos;
+}
+
+/**
+ * Our cover photo when the customer leaves it to us: of the first twelve
+ * photos in the book, the one that loses least when cut to a square (the
+ * cover is square), the earliest on a tie. Photos of unknown size wait their
+ * turn behind measured ones.
+ */
+export function autoCoverPhotoId(photos: BuilderPhoto[]): string | null {
+  let best: BuilderPhoto | null = null;
+  let bestLoss = Infinity;
+  for (const p of photos.slice(0, 12)) {
+    const loss = p.w && p.h ? 1 - Math.min(p.w, p.h) / Math.max(p.w, p.h) : 0.99;
+    if (loss < bestLoss - 1e-9) {
+      best = p;
+      bestLoss = loss;
+    }
+  }
+  return best?.id ?? photos[0]?.id ?? null;
+}
+
+/** The photo on the front cover: the customer's choice while it still exists, else ours. */
+export function coverPhotoIdFor(s: { photos: BuilderPhoto[]; removedPhotoIds?: string[] | null; coverPhotoId?: string | null }): string | null {
+  if (s.coverPhotoId && s.photos.some((p) => p.id === s.coverPhotoId)) return s.coverPhotoId;
+  return autoCoverPhotoId(bookPhotos(s));
 }
 
 /**

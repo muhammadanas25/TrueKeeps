@@ -95,6 +95,52 @@ export function orderConfirmedEmail(params: {
 }
 
 /**
+ * "Your order is received, make the payment to confirm it": a bank transfer
+ * order's instructions, so the customer has them after closing the page.
+ */
+export function bankTransferEmail(params: {
+  orderNumber: string;
+  title: string;
+  totalMinor: number;
+  orderUrl: string;
+  bank: { bankName: string; accountTitle: string; accountNumber: string; iban: string };
+  whatsappDisplay: string;
+  whatsappUrl: string;
+  holdDays: number;
+}) {
+  const { orderNumber, title, totalMinor, orderUrl, bank, whatsappDisplay, whatsappUrl, holdDays } = params;
+  const total = formatPKR(totalMinor);
+  const rows: Array<[string, string]> = [
+    ["Bank", bank.bankName],
+    ["Account title", bank.accountTitle],
+    ["Account number", bank.accountNumber],
+    ["IBAN", bank.iban],
+    ["Amount", total],
+    ["Reference", orderNumber],
+  ];
+  const table = rows.map(([k, v]) => `<b>${k}:</b> ${escapeHtml(v)}`).join("<br>");
+  return {
+    subject: `Order ${orderNumber} received: make the payment to confirm it`,
+    html: shell(
+      "Your order is received",
+      para(`Make the payment to confirm it. We start printing <b>${escapeHtml(title)}</b> once it is in.`) +
+        para(`<b>1. Transfer ${total}</b> from your bank app:`) +
+        `<tr><td style="font-size:15px;line-height:24px;padding:12px 16px;background:${BRAND.paper};border-radius:10px">${table}</td></tr>` +
+        para(`<b>2. Send us the payment screenshot</b> on WhatsApp at <b>${whatsappDisplay}</b>, with your order number ${orderNumber}.`) +
+        button(whatsappUrl, "Send screenshot on WhatsApp") +
+        para(`3. We check it and email you when your order is confirmed. We hold your order for ${holdDays} days.`) +
+        para(`<a href="${orderUrl}" style="color:${BRAND.indigo}">View your order</a>`),
+    ),
+    text:
+      `Your order is received. Make the payment to confirm it.\n\n` +
+      `1. Transfer ${total}:\n` +
+      rows.map(([k, v]) => `${k}: ${v}`).join("\n") +
+      `\n\n2. Send the payment screenshot on WhatsApp to ${whatsappDisplay} with your order number ${orderNumber}.\n` +
+      `3. We check it and email you when your order is confirmed. We hold your order for ${holdDays} days.\n\nView your order: ${orderUrl}`,
+  };
+}
+
+/**
  * New-review alert for the team (ADMIN_EMAILS). Everything the customer
  * typed is escaped: this mail renders their words, so they must never become
  * markup. Line breaks are kept so longer messages stay readable.

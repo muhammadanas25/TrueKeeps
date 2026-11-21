@@ -75,6 +75,18 @@ export interface BuilderState {
    * again and losing the hand edits. Set by the reducer, not by callers.
    */
   pagesEdited: boolean;
+  /**
+   * The front cover's photo: a photo id the customer chose, or null for
+   * "let us pick" (coverPhotoIdFor in data.ts). Picking it never reorders the
+   * photos, because photo order is the book's reading order.
+   */
+  coverPhotoId: string | null;
+  /**
+   * Photos the customer took out of the book in an editor. Laying the book
+   * out again (step 5, an arrangement in the editor) leaves them out until
+   * they are put back. Maintained by the reducer from page edits.
+   */
+  removedPhotoIds: string[];
   coverStyle: CoverStyleId;
   voice: "warm" | "concise";
   /** preview position: 0 = closed cover, k = spread k−1 open */
@@ -109,6 +121,8 @@ export const DEFAULT_STATE: BuilderState = {
   density: "balanced",
   sheets: null,
   pagesEdited: false,
+  coverPhotoId: null,
+  removedPhotoIds: [],
   coverStyle: "full",
   voice: "warm",
   pos: 0,
@@ -150,12 +164,29 @@ type BuilderAction =
   | { type: "photos"; update: (photos: BuilderPhoto[]) => BuilderPhoto[] }
   | { type: "reset" };
 
+/**
+ * The taken-out list after a hand edit: photos that were in the book and no
+ * longer are join it; photos that are in the book now leave it. A photo moved
+ * from one page to another is in both lists of pages, so it is never counted.
+ */
+export function trackRemovals(before: BookPage[], after: BookPage[], removed: string[]): string[] {
+  const was = new Set(before.flatMap((p) => p.slots.map((s) => s.photoId)));
+  const now = new Set(after.flatMap((p) => p.slots.map((s) => s.photoId)));
+  const out = removed.filter((id) => !now.has(id));
+  was.forEach((id) => {
+    if (!now.has(id) && !out.includes(id)) out.push(id);
+  });
+  return out;
+}
+
 function reducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
     case "patch":
-      // New pages from anywhere but the layout step count as a hand edit.
+      // New pages from anywhere but the layout step count as a hand edit, and
+      // a hand edit is where photos leave or rejoin the book.
       if (action.patch.pages && action.patch.pages !== state.pages && !("pagesEdited" in action.patch)) {
-        return { ...state, ...action.patch, pagesEdited: true };
+        const removed = "removedPhotoIds" in action.patch ? action.patch.removedPhotoIds! : trackRemovals(state.pages, action.patch.pages, state.removedPhotoIds);
+        return { ...state, ...action.patch, pagesEdited: true, removedPhotoIds: removed };
       }
       return { ...state, ...action.patch };
     case "photos":
@@ -301,6 +332,9 @@ function loadState(): BuilderState | null {
         /* ignore */
       }
     }
+    // A draft from before the cover choice keeps the cover it had: its first photo.
+    if (s.coverPhotoId === undefined) s.coverPhotoId = pages.length ? (s.photos?.[0]?.id ?? null) : null;
+    if (!Array.isArray(s.removedPhotoIds)) s.removedPhotoIds = [];
     return { ...DEFAULT_STATE, ...s, pages };
   } catch {
     return null;

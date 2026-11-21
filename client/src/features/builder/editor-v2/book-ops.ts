@@ -207,7 +207,9 @@ export function addPage(b: BookSlice, afterIdx: number, photos: BuilderPhoto[]):
 /**
  * Re-arrange the whole book in a new arrangement (Story, Classic, Family
  * Album), keeping the photos in their current reading order and each
- * photo's framing. The book takes the fewest sheets that hold every photo.
+ * photo's framing. `photos` is the book's photos (bookPhotos: the ones taken
+ * out are not in it); any not on a page yet are added at the end. The book
+ * takes the fewest sheets that hold every photo.
  */
 export function reflow(b: BookSlice, density: DensityId, photos: BuilderPhoto[]): BookSlice {
   const seen = new Set<string>();
@@ -222,6 +224,9 @@ export function reflow(b: BookSlice, density: DensityId, photos: BuilderPhoto[])
       framing.set(s.photoId, s);
       order.push(ph);
     }
+  // Photos not on any page yet (added since the book was laid out) go in after,
+  // in the order they were added. `photos` leaves out the ones taken out.
+  for (const ph of photos) if (!seen.has(ph.id)) order.push(ph);
   const fresh = generatePages(order, density);
   // an older book keeps its title page (it may carry their own colour);
   // generatePages no longer makes one

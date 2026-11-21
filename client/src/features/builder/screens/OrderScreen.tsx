@@ -22,7 +22,7 @@ import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Check, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { MiniBook } from "../book";
-import { BINDINGS, DENSITIES, occasionById, type CopyVoice } from "../data";
+import { BINDINGS, DENSITIES, coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
 import { lowQualityPageCount, photosAwaitingOriginal } from "../print";
 import { uploadEngine } from "../upload/engine";
@@ -32,10 +32,12 @@ import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
 import { finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
 import { PK_PROVINCES, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
+import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
+import "../flow.css";
 import { useSession } from "@/features/auth/useSession";
 
 interface PricingResponse {
-  checkout: { enabled: boolean; livemode: boolean; provider: string | null };
+  checkout: { enabled: boolean; livemode: boolean; provider: string | null; methods?: { card: boolean; bankTransfer: boolean } };
 }
 
 const ADDRESS_KEY = "tk_ship_addr_v1";
@@ -79,7 +81,7 @@ export function OrderScreen({
   const softPages = lowQualityPageCount(state.pages, state.photos);
   // We print from the HD originals, so payment waits for all of them. The
   // form stays usable: filling in an address is a good use of the wait.
-  const awaiting = photosAwaitingOriginal(state.pages, state.photos);
+  const awaiting = photosAwaitingOriginal(state.pages, state.photos, coverPhotoIdFor(state));
   const { addFiles, snapshot } = useUploads();
   const repickRef = useRef<HTMLInputElement>(null);
   const stillSending = awaiting.filter((p) => uploadEngine.holdsFile(p.id)).length;
@@ -87,6 +89,13 @@ export function OrderScreen({
 
   const pricing = useQuery<PricingResponse>({ queryKey: ["/api/pricing"], staleTime: 5 * 60_000 });
   const checkout = pricing.data?.checkout;
+  // How to pay (shared/payments.ts). The owner switches each method on in the
+  // admin; while Safepay is being set up only bank transfer is offered, and
+  // the choice appears once both are on.
+  const methods = checkout?.methods ?? { card: Boolean(checkout?.enabled), bankTransfer: false };
+  const [picked, setPicked] = useState<PaymentMethod | null>(null);
+  const method: PaymentMethod = picked ?? (methods.card ? "card" : "bank_transfer");
+  const bank = method === "bank_transfer";
 
   const [addr, setAddr] = useState<AddressForm>(
     () => loadAddress() ?? { ...EMPTY_ADDRESS, fullName: user?.name ?? "", phone: user?.phone ?? "" },
@@ -147,10 +156,16 @@ export function OrderScreen({
           qty: q.qty,
           address: parsed.data,
           document: toDocument(state),
-          idempotencyKey,
+          idempotencyKey: `${idempotencyKey}-${method}`,
+          method,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string; error?: string; fields?: Record<string, string> };
+      const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string | null; order?: { id: string }; error?: string; fields?: Record<string, string> };
+      // bank transfer: no payment page; the order page shows how to pay
+      if (res.ok && bank && data.order) {
+        window.location.assign(`/orders/${data.order.id}?placed=1`);
+        return;
+      }
       if (!res.ok || !data.checkoutUrl) {
         setError(data.error ?? "Something went wrong. Please try again.");
         if (data.fields) setFieldErrors(Object.fromEntries(Object.entries(data.fields).map(([k, v]) => [k.replace(/^address\./, ""), v])));
@@ -176,7 +191,7 @@ export function OrderScreen({
           <p className="bb-sub">{copy.orderSub}</p>
         </div>
 
-        {checkout && !checkout.livemode ? (
+        {checkout && !checkout.livemode && !bank ? (
           <div className="bb-testmode" role="note">
             <b>Test mode.</b> Payments go to Safepay's sandbox — use test card 4456 5300 0000 1005, any future expiry, CVC 111.
             No money moves and nothing will be printed.
@@ -361,13 +376,48 @@ export function OrderScreen({
             ) : null}
             {checkout && !checkout.enabled ? (
               <p className="bb-pay-error" role="alert">
-                Online payment is temporarily unavailable. Your book is saved — please try again soon.
+                Ordering is paused for a moment. Your book is saved, so please try again soon.
               </p>
             ) : null}
 
+            <fieldset className="pay-methods" disabled={busy}>
+              <legend className="bb-panel-label">How would you like to pay?</legend>
+              <p className="pay-note">Each book is printed just for you, so we print once your payment is in. No cash on delivery.</p>
+              {methods.card && methods.bankTransfer ? (
+                <div className="pay-choices" role="radiogroup" aria-label="How to pay">
+                  {(
+                    [
+                      ["card", "Card or Google Pay", "Pay now on Safepay's secure page. Your order is confirmed straight away."],
+                      ["bank_transfer", "Bank transfer", "Transfer from your bank app and send us the screenshot. We confirm once we see the payment."],
+                    ] as const
+                  ).map(([id, name, line]) => (
+                    <button key={id} type="button" role="radio" aria-checked={method === id} className={"pay-choice" + (method === id ? " on" : "")} onClick={() => setPicked(id)}>
+                      <span className="pay-dot" aria-hidden="true" />
+                      <span>
+                        <b>{name}</b>
+                        <i>{line}</i>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {bank ? (
+                <ol className="pay-steps">
+                  <li>Place your order. We save it and show you our bank details.</li>
+                  <li>Transfer {formatPKR(q.totalMinor)} from your bank app.</li>
+                  <li>Send us the payment screenshot on WhatsApp.</li>
+                  <li>We check it and email you that your order is confirmed. Then we print.</li>
+                </ol>
+              ) : null}
+            </fieldset>
+
             <button type="submit" className="bb-btn bb-btn-primary bb-btn-lg" disabled={disabled}>
               {busy ? (
-                "Opening secure payment…"
+                bank ? "Placing your order…" : "Opening secure payment…"
+              ) : bank ? (
+                <>
+                  Place order, pay by bank transfer <ArrowRight size={17} />
+                </>
               ) : (
                 <>
                   <Lock size={16} /> Pay {formatPKR(q.totalMinor)} <ArrowRight size={17} />
@@ -375,7 +425,13 @@ export function OrderScreen({
               )}
             </button>
             <p className="bb-pay-trust">
-              <ShieldCheck size={14} /> Secure checkout by Safepay — your card details never touch our servers
+              {bank ? (
+                <>Nothing is charged now. We hold your order for {BANK_TRANSFER_WINDOW_DAYS} days while you pay.</>
+              ) : (
+                <>
+                  <ShieldCheck size={14} /> Secure checkout by Safepay. Your card details never touch our servers.
+                </>
+              )}
             </p>
           </div>
         </form>

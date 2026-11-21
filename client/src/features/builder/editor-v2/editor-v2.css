@@ -310,3 +310,6 @@ textarea.tke-input { height: auto; padding: 10px 12px; resize: vertical; line-he
 /* one row of colours: 6 swatches + the "+" for the full grid */
 .tke-swrow { flex-wrap: nowrap; gap: 8px; }
 .tke-swrow .tke-sw { width: 32px; height: 32px; }
+
+/* odd page count: the last page would print blank (EditorV2 page counter) */
+.tke-odd { padding: 3px 10px; border-radius: 999px; background: var(--offer-bg) !important; color: var(--error-fg) !important; font-size: 12px; font-weight: 600; white-space: nowrap; }

@@ -151,6 +151,11 @@ export interface IStorage {
   /** Returns the updated row, or undefined when the id doesn't exist. */
   setFeedbackStatus(id: string, status: FeedbackStatus): Promise<Feedback | undefined>;
 
+  /* ── owner switches (app_settings), e.g. payment methods ── */
+  /** The stored value, or undefined when it was never set. */
+  getSetting(key: string): Promise<unknown>;
+  setSetting(key: string, value: unknown, updatedBy: string | null): Promise<void>;
+
   /* ── orders (Phase 2B) ── */
   /** Insert an order and its `created` event together. */
   createOrder(order: NewOrder, event: Omit<NewOrderEvent, "orderId">): Promise<Order>;
@@ -208,6 +213,7 @@ export class MemStorage implements IStorage {
   private uploadedPhotos: Map<string, UploadedPhoto>;
   private uploadBatches = new Map<string, UploadBatch>();
   private feedbackRows = new Map<string, Feedback>();
+  private settings = new Map<string, unknown>();
 
   constructor() {
     this.themes = new Map();
@@ -585,6 +591,14 @@ export class MemStorage implements IStorage {
     const next = { ...row, status };
     this.feedbackRows.set(id, next);
     return next;
+  }
+
+  async getSetting(key: string): Promise<unknown> {
+    return this.settings.get(key);
+  }
+
+  async setSetting(key: string, value: unknown): Promise<void> {
+    this.settings.set(key, value);
   }
 
   async deleteUploadedPhoto(id: string): Promise<boolean> {

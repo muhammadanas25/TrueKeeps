@@ -18,6 +18,9 @@ import { STATUS_LABEL } from "@shared/orders";
 import { AppShell } from "@/features/account/AppShell";
 import { bindingName, formatDate, getJSON, postJSON, type OrderEvent, type PublicOrder } from "@/features/orders/api";
 import "@/features/orders/orders.css";
+import { BankTransferSteps } from "@/features/orders/BankTransfer";
+import { useSupportContext } from "@/features/support/WhatsAppHelp";
+import { BANK_TRANSFER_WINDOW_DAYS, SUPPORT_WHATSAPP } from "@shared/payments";
 
 const POLL_MS = 3000;
 const POLL_FOR_MS = 90_000;
@@ -36,6 +39,8 @@ export default function OrderPage() {
     retry: false,
   });
   const order = q.data?.order;
+  // the help button names this order
+  useSupportContext(order ? { orderNumber: order.orderNumber, bookId: order.projectId, where: `Order page (${order.status.replace(/_/g, " ")})` } : null);
 
   // poll while pending, but only right after checkout and only for a while
   const [polling, setPolling] = useState(fromCheckout);
@@ -104,13 +109,15 @@ export default function OrderPage() {
   }
 
   const pending = order.status === "pending_payment";
+  // a bank transfer waits for the team to see the money, not for a gateway
+  const bank = order.paymentMethod === "bank_transfer";
   const paidish = !["pending_payment", "expired", "cancelled"].includes(order.status);
   const a = order.shippingAddress;
 
   return (
     <AppShell>
       <div className="au-page or-page">
-        {!order.livemode ? (
+        {!order.livemode && !bank ? (
           <div className="or-test">
             <b>Test order.</b> Paid through Safepay's sandbox — no money moved and it will not be printed.
           </div>
@@ -125,7 +132,9 @@ export default function OrderPage() {
             <h1>
               {paidish
                 ? "Thank you — your order is confirmed"
-                : pending
+                : pending && bank
+                  ? "Your order is received"
+                  : pending
                   ? polling
                     ? "Confirming your payment…"
                     : cancelled
@@ -136,7 +145,11 @@ export default function OrderPage() {
             <p className="au-page-sub">
               {paidish
                 ? `We emailed a receipt to ${order.contactEmail}. We'll email again when it ships.`
-                : pending
+                : pending && bank
+                  ? `Make the payment to confirm it. We start printing once it is in, and hold your order for ${BANK_TRANSFER_WINDOW_DAYS} days.`
+                  : order.status === "expired" && bank
+                    ? `We didn't see a transfer in time. If you paid, send the screenshot on WhatsApp to ${SUPPORT_WHATSAPP.display} with this order number.`
+                  : pending
                   ? polling
                     ? "This usually takes a few seconds. Please keep this page open."
                     : `Your order is saved. You can complete payment until ${formatDate(order.expiresAt)}.`
@@ -147,7 +160,9 @@ export default function OrderPage() {
           </div>
         </header>
 
-        {pending && !polling ? (
+        {pending && bank ? <BankTransferSteps orderNumber={order.orderNumber} totalMinor={order.totalMinor} /> : null}
+
+        {pending && !polling && !bank ? (
           <div className="or-actions">
             <button className="bb-btn bb-btn-primary" onClick={payNow} disabled={busy}>
               <CreditCard size={16} /> Pay {formatPKR(order.totalMinor)}

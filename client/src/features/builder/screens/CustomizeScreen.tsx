@@ -21,7 +21,7 @@ import { CoverFace, GridWire, LayoutWire, PageFace, Ph } from "../book";
 import { ReframeBar } from "../reframe";
 import { indexPhotos, pageHasLowQuality, slotMaxZoom } from "../print";
 import { hasImage } from "../upload/previews";
-import { COVER_STYLES, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, generatePages, isMirrorable, occasionById, pageCapacity, pagePhotoIds, placement, reshapePage, type BookPage, type CopyVoice, type Placement } from "../data";
+import { bookPhotos, pickableCoverStyles, pickableThemes, DENSITIES, LAYOUTS, LAYOUT_SLOTS, generatePages, isMirrorable, occasionById, pageCapacity, pagePhotoIds, placement, reshapePage, type BookPage, type CopyVoice, type Placement } from "../data";
 import { PAGE_COLOURS, THEME_COLOUR, bookTheme, pageColourById } from "../palette";
 import { themeById } from "../data";
 import type { BuilderState } from "../state";
@@ -497,7 +497,7 @@ export function CustomizeScreen({
             <div className="bb-panel-sec">
               <div className="bb-panel-label">Cover style</div>
               <div className="bb-seg">
-                {COVER_STYLES.map((c) => (
+                {pickableCoverStyles(state.coverStyle).map((c) => (
                   <button key={c.id} className={state.coverStyle === c.id ? "on" : ""} onClick={() => set({ coverStyle: c.id })}>
                     {c.name}
                   </button>
@@ -652,7 +652,7 @@ export function CustomizeScreen({
                 <button
                   key={d.id}
                   className={state.density === d.id ? "on" : ""}
-                  onClick={() => set({ density: d.id, sheets: null, pages: generatePages(state.photos, d.id), pagesEdited: false })}
+                  onClick={() => set({ density: d.id, sheets: null, pages: generatePages(bookPhotos(state), d.id), pagesEdited: false })}
                 >
                   {d.name}
                 </button>

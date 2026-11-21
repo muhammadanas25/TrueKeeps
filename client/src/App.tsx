@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { bookTypeBySlug, metaForPath, SITE } from "@shared/site";
 import { BookTypePage, PhotoBooksPage } from "@/features/landing/pages";
+import { WhatsAppHelpFloating } from "@/features/support/WhatsAppHelp";
 
 /*
  * Route-level code splitting: each page loads its own chunk so the
@@ -133,6 +134,8 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        {/* help on WhatsApp with the customer's context (not on the builder or admin) */}
+        <WhatsAppHelpFloating />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -1,0 +1,22 @@
+/* WhatsApp help (WhatsAppHelp.tsx). Brand colours, not WhatsApp green: the
+   kit keeps Rose for the one main action, so help is a quiet Indigo. */
+.wa-help-float {
+  position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 45;
+  display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 18px 0 14px;
+  border-radius: 999px; background: var(--tk-indigo-500, #2A1E5C); color: #fff; text-decoration: none;
+  font-family: var(--font-body); font-weight: 700; font-size: 15px;
+  box-shadow: 0 8px 24px rgba(42, 30, 92, 0.3);
+}
+.wa-help-float:hover { background: var(--tk-indigo-600, #251C4F); }
+.wa-help-float:focus-visible, .wa-help-inline:focus-visible { outline: 2px solid var(--tk-rose-500, #EE4266); outline-offset: 3px; }
+.wa-help-inline {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px;
+  border-radius: 999px; color: var(--heading, #2A1E5C); text-decoration: none; font-weight: 600; font-size: 14px;
+}
+.wa-help-inline:hover { background: var(--tk-mist-200, #EAECEC); }
+@media (max-width: 760px) {
+  .wa-help-inline { padding: 0 10px; }
+  .wa-help-inline .wa-help-label { display: none; }
+  .wa-help-float { height: 52px; width: 52px; padding: 0; justify-content: center; }
+  .wa-help-float span { display: none; }
+}

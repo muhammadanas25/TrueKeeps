@@ -125,9 +125,34 @@ export const builderDocumentSchema = z.object({
   voice: z.enum(["warm", "concise"]),
   qty: z.number().int().min(1).max(20),
   binding: z.string().max(40),
+  /**
+   * The photo on the front cover (2026-11-21). Always the photo that prints:
+   * the client resolves "let us pick" before saving. Optional because older
+   * documents lack it; for those the cover is the first photo, as it always was.
+   */
+  coverPhotoId: z.string().max(64).nullable().optional(),
+  /** true when the customer left the cover photo to us ("Let us pick") */
+  coverAuto: z.boolean().optional(),
+  /**
+   * Photos the customer took out of the book in an editor. They stay out
+   * when the book is laid out again, until put back (2026-11-21).
+   */
+  removedPhotoIds: z.array(z.string().max(64)).max(400).optional(),
 });
 
 export type BuilderDocument = z.infer<typeof builderDocumentSchema>;
+
+/**
+ * The photo that prints on the front cover: the chosen one while it is still
+ * among the book's photos, else the first photo (how every book worked before
+ * the choice existed). Shared so the order check and the print files agree
+ * with what the customer saw.
+ */
+export function coverPhotoIdOf(doc: Pick<BuilderDocument, "photos" | "coverPhotoId">): string | null {
+  const chosen = doc.coverPhotoId;
+  if (chosen && doc.photos.some((p) => p.id === chosen)) return chosen;
+  return doc.photos[0]?.id ?? null;
+}
 
 /** Body of PATCH /api/projects/:id/document */
 export const saveDocumentSchema = z.object({

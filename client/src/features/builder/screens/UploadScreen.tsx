@@ -114,6 +114,8 @@ export function UploadScreen({
               >
                 {copy.uploadCta}
               </button>
+              {/* the minimum, before they pick rather than after (owner, 2026-11-21) */}
+              <span className="up-need">Pick at least {MIN_PHOTOS}. 30 to 50 make a fuller book.</span>
               <span className="bb-formats">JPG, PNG, and HEIC. We handle the rest.</span>
             </div>
             <TipLine className="ck-before" lineFor={(n) => BEFORE_TIPS[n % BEFORE_TIPS.length]} />

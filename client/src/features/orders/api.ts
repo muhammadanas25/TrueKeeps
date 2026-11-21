@@ -27,6 +27,8 @@ export interface PublicOrder {
   contactEmail: string;
   contactPhone: string;
   livemode: boolean;
+  /** how it is paid; absent on responses from before bank transfer existed */
+  paymentMethod?: "card" | "bank_transfer";
   courier: string | null;
   trackingNumber: string | null;
   paidAt: string | null;

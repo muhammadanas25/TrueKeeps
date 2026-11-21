@@ -11,6 +11,8 @@
  *   GET  /api/payments/cancel/:id        Safepay cancel target   → /orders/:id
  *   POST /api/payments/webhook/safepay   signed webhook (raw body, no cookies)
  *   GET  /api/admin/orders[/:id], PATCH /api/admin/orders/:id   (admin)
+ *   POST /api/admin/orders/:id/mark-paid  bank transfer received      (admin)
+ *   GET/PUT /api/admin/settings/payments  which methods checkout offers (admin)
  *   GET/POST /api/payments/fake/*        dev-only fake gateway
  *
  * None of the return/cancel/webhook endpoints can mark an order paid by
@@ -26,8 +28,9 @@ import { storage } from "../storage";
 import { config } from "../config";
 import { log } from "../logger";
 import { paymentProvider, FakeProvider } from "../payments";
-import { checkoutUrlFor, confirmPayment, createOrder, OrderError } from "../orders/service";
-import type { BuilderDocument } from "@shared/document";
+import { availableMethods, checkoutUrlFor, confirmPayment, createOrder, getPaymentSettings, isBankTransfer, markBankTransferPaid, OrderError } from "../orders/service";
+import { BANK_DETAILS, BANK_TRANSFER_WINDOW_DAYS, SUPPORT_WHATSAPP, markPaidSchema, paymentSettingsSchema } from "@shared/payments";
+import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { mediaStore } from "../media";
 import { queuePrintRender, readManifest } from "../print/render";
 import { requireAdmin, requireMember, requireUser, currentUser } from "../middleware/auth";
@@ -42,8 +45,12 @@ export const ordersRouter = Router();
 /** What a customer may see. Internal keys and the full book snapshot stay server-side. */
 function publicOrder(o: Order) {
   const { idempotencyKey: _k, documentSnapshot: _d, paymentProvider: _p, providerRef: _r, userId: _u, ...rest } = o;
-  return rest;
+  // how it is paid, so the order page can show bank details for a transfer
+  return { ...rest, paymentMethod: isBankTransfer(o) ? ("bank_transfer" as const) : ("card" as const) };
 }
+
+/** The full order for the admin, plus how it is paid (the admin's buttons depend on it). */
+const adminOrder = (o: Order) => ({ ...o, paymentMethod: isBankTransfer(o) ? ("bank_transfer" as const) : ("card" as const) });
 
 function isAdmin(user: unknown) {
   return (user as { role?: string } | undefined)?.role === "admin";
@@ -65,16 +72,24 @@ function sendOrderError(res: Response, err: unknown) {
 
 /* ── pricing ───────────────────────────────────────────────────── */
 
-ordersRouter.get("/api/pricing", (_req, res) => {
-  res.json({
-    priceList: PRICE_LIST,
-    checkout: {
-      enabled: Boolean(paymentProvider),
-      livemode: paymentProvider?.livemode ?? false,
-      provider: paymentProvider?.name ?? null,
-    },
-  });
-});
+ordersRouter.get(
+  "/api/pricing",
+  asyncHandler(async (_req, res) => {
+    const methods = await availableMethods();
+    res.json({
+      priceList: PRICE_LIST,
+      checkout: {
+        enabled: methods.card || methods.bankTransfer,
+        livemode: paymentProvider?.livemode ?? false,
+        provider: paymentProvider?.name ?? null,
+        // which ways to pay checkout offers (owner switch, shared/payments.ts)
+        methods,
+      },
+      bankTransfer: { bank: BANK_DETAILS, holdDays: BANK_TRANSFER_WINDOW_DAYS },
+      support: { whatsapp: SUPPORT_WHATSAPP },
+    });
+  }),
+);
 
 /* ── customer endpoints ────────────────────────────────────────── */
 
@@ -239,7 +254,49 @@ ordersRouter.get(
   asyncHandler(async (req, res) => {
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
-    res.json({ order, events: await storage.listOrderEvents(order.id) });
+    res.json({ order: adminOrder(order), events: await storage.listOrderEvents(order.id) });
+  }),
+);
+
+/** Bank transfer arrived: confirm the order, email the customer, start the print files. */
+ordersRouter.post(
+  "/api/admin/orders/:id/mark-paid",
+  requireAdmin,
+  writeLimiter,
+  asyncHandler(async (req, res) => {
+    const body = parse(markPaidSchema, req.body ?? {}, res);
+    if (!body) return;
+    try {
+      const order = await markBankTransferPaid(req.params.id, currentUser(req).id, body.reference);
+      res.json({ order: adminOrder(order), events: await storage.listOrderEvents(order.id) });
+    } catch (err) {
+      sendOrderError(res, err);
+    }
+  }),
+);
+
+/** Which ways to pay checkout offers. Card also needs Safepay configured (`gatewayReady`). */
+ordersRouter.get(
+  "/api/admin/settings/payments",
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    res.json({ settings: await getPaymentSettings(), gatewayReady: Boolean(paymentProvider), provider: paymentProvider?.name ?? null, livemode: paymentProvider?.livemode ?? false });
+  }),
+);
+
+ordersRouter.put(
+  "/api/admin/settings/payments",
+  requireAdmin,
+  writeLimiter,
+  asyncHandler(async (req, res) => {
+    const body = parse(paymentSettingsSchema, req.body, res);
+    if (!body) return;
+    if (body.card && !paymentProvider) {
+      return res.status(409).json({ error: "Card payments need Safepay set up on the server first" });
+    }
+    await storage.setSetting("payments", body, currentUser(req).id);
+    log.info({ settings: body, by: currentUser(req).id }, "[admin] payment methods changed");
+    res.json({ settings: body, gatewayReady: Boolean(paymentProvider) });
   }),
 );
 
@@ -259,7 +316,8 @@ ordersRouter.get(
     if (!order) return res.status(404).json({ error: "Order not found" });
     const doc = order.documentSnapshot as BuilderDocument;
     const printed = new Set(doc.pages.flatMap((pg) => pg.slots.map((s) => s.photoId)));
-    if (doc.photos[0]) printed.add(doc.photos[0].id);
+    const cover = coverPhotoIdOf(doc);
+    if (cover) printed.add(cover);
     const rows = await storage.getUploadedPhotos(order.projectId);
     const sign = async (key: string) => (await mediaStore.signedRead(key)).url;
     const originals = await Promise.all(
@@ -309,6 +367,13 @@ ordersRouter.patch(
     };
     let updated: Order | undefined = order;
     if (body.status && body.status !== order.status) {
+      // "paid" must come with a recorded payment, the confirmation email and
+      // the print files: the gateway (cards) or mark-paid (bank transfer)
+      if (body.status === "paid") {
+        return res.status(409).json({
+          error: isBankTransfer(order) ? "Use Payment received to confirm a bank transfer" : "Card payments are confirmed by Safepay, not by hand",
+        });
+      }
       if (!canTransition(order.status as OrderStatus, body.status)) {
         return res.status(409).json({ error: `Can't move an order from ${order.status} to ${body.status}` });
       }
@@ -327,7 +392,7 @@ ordersRouter.patch(
       if (Object.keys(fields).length) updated = await storage.updateOrder(order.id, fields);
       if (body.note) await storage.addOrderEvent({ orderId: order.id, kind: "note", actor: "admin", note: body.note });
     }
-    res.json({ order: updated, events: await storage.listOrderEvents(order.id) });
+    res.json({ order: updated ? adminOrder(updated) : updated, events: await storage.listOrderEvents(order.id) });
   }),
 );
 

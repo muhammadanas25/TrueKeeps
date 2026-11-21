@@ -91,3 +91,27 @@ before. "Auto" in an editor is the only way an old page becomes a grid page.
 - Open owner decisions (not blocking): "Our pick" on Classic is a
   recommendation, not a sales claim; binding stays on the order step; the PDF
   asks for 4 to 6 letterings and there are 4.
+
+## Revision 2026-11-21 (owner-approved designs, canvas "Round 2")
+
+- **Cover photo is its own choice.** `BuilderState.coverPhotoId` (null = "let
+  us pick": of the first twelve photos, the one that loses least on a square
+  cover). Picking never reorders photos, which are the book's reading order.
+  Every cover reads it through the page look; the saved document stores the
+  resolved id plus `coverAuto`, and the server's `coverPhotoIdOf` (orders,
+  print files) falls back to the first photo for books saved before.
+- **Taken-out photos stay out.** The reducer keeps `removedPhotoIds` from hand
+  edits (`trackRemovals`); every re-arrangement uses `bookPhotos()`, so step 5
+  and the editors' arrangement controls no longer bring them back, and photos
+  added later go in. Step 5 says so, with "Put them back".
+- **"Just text" replaces "Truekeeps Design"** as the third cover (the existing
+  `minimal` style). `signature` still draws for saved books and is offered
+  only to a book that uses it.
+- **Flow fixes:** the question is the heading on steps 3 and 4; the line under
+  the title starts empty with a grey example; no sign-in pop-up on step 5
+  (a quiet link instead); step 6 puts the book left and everything to check
+  and approve right, all on one screen (page colours move to the editor);
+  phones get a seven-part step bar; step 2 states the 10-photo minimum up
+  front; an odd page count warns that the last page prints blank, with
+  "Add a page"; step 5 cards show a small drawing of each arrangement.
+- Tests: `npx tsx client/src/features/builder/book-rules.test.ts`.

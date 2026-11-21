@@ -109,6 +109,8 @@ export const createOrderSchema = z.object({
   document: builderDocumentSchema,
   /** client-generated per checkout attempt; double-clicks return one order */
   idempotencyKey: z.string().min(8).max(80),
+  /** how they pay (shared/payments.ts); older clients sent nothing and paid by card */
+  method: z.enum(["card", "bank_transfer"]).default("card"),
 });
 export type CreateOrderBody = z.infer<typeof createOrderSchema>;
 

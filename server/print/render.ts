@@ -41,7 +41,7 @@
  */
 
 import sharp from "sharp";
-import type { BuilderDocument } from "@shared/document";
+import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { PAGE_INCHES, clampTilt, slotInches, tiltCover } from "../../client/src/features/builder/print";
 import type { PageLayoutId } from "../../client/src/features/builder/data";
 import { mediaStore, mediaUrl } from "../media";
@@ -226,7 +226,9 @@ export async function renderOrder(orderId: string): Promise<PrintManifest> {
     problems: [],
   };
 
-  const first = doc.photos[0] && rows.get(doc.photos[0].id);
+  // the customer's chosen cover photo; older books: the first photo
+  const coverId = coverPhotoIdOf(doc);
+  const first = coverId ? rows.get(coverId) : undefined;
   if (first?.storageKey) manifest.cover = { photoId: first.id, originalKey: first.storageKey, coverStyle: doc.coverStyle };
 
   // One original in memory at a time is plenty: a photo placed twice is rare.

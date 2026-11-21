@@ -30,7 +30,7 @@ import {
 import { GridWire, LayoutWire } from "../book";
 import {
   BOOK_THEMES,
-  COVER_STYLES,
+  pickableCoverStyles,
   DENSITIES,
   LAYOUTS,
   isMirrorable,
@@ -130,9 +130,9 @@ export function LayoutPanel({
   if (cover) {
     return (
       <div>
-        <Section label="Cover style" hint="The cover uses your first photo. To change it, open Photos and tap another.">
+        <Section label="Cover style" hint="To change the cover photo, open Photos and tap the one you want.">
           <div className="tke-coverstyles" role="radiogroup" aria-label="Cover style">
-            {COVER_STYLES.map((c) => (
+            {pickableCoverStyles(cover.style).map((c) => (
               <button key={c.id} role="radio" aria-checked={cover.style === c.id} className={cover.style === c.id ? "on" : ""} onClick={() => cover.onStyle(c.id)}>
                 {c.name}
               </button>

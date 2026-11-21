@@ -22,6 +22,14 @@
  *  3. compare-and-set pending/expired → paid; only the winner of a race
  *     records the payment row and sends the confirmation email
  *
+ * Bank transfer (2026-11-21, shared/payments.ts): an order can also be
+ * placed with no gateway at all. It waits as pending_payment for
+ * BANK_TRANSFER_WINDOW_DAYS while the customer transfers the money and sends
+ * the screenshot on WhatsApp; an admin then marks it paid
+ * (markBankTransferPaid), which is the same transition, email and print
+ * render as a card payment. Which methods checkout offers is an owner switch
+ * (getPaymentSettings).
+ *
  * Sweeps (startOrderJobs): every few minutes, re-check pending orders
  * (catches payments whose webhook AND redirect were both lost) and expire
  * ones older than 24h. In-process timer — fine at one replica; transitions
@@ -30,7 +38,7 @@
 
 import { randomInt } from "crypto";
 import type { Order } from "@shared/schema";
-import type { BuilderDocument } from "@shared/document";
+import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { printedPageCount, quote } from "@shared/pricing";
 import { PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
@@ -39,7 +47,17 @@ import { config } from "../config";
 import { log } from "../logger";
 import { paymentProvider } from "../payments";
 import { emailProvider } from "../email";
-import { orderConfirmedEmail } from "../email/templates";
+import { bankTransferEmail, orderConfirmedEmail } from "../email/templates";
+import {
+  BANK_DETAILS,
+  BANK_TRANSFER_PROVIDER,
+  BANK_TRANSFER_WINDOW_DAYS,
+  DEFAULT_PAYMENT_SETTINGS,
+  SUPPORT_WHATSAPP,
+  paymentSettingsSchema,
+  whatsappLink,
+  type PaymentSettings,
+} from "@shared/payments";
 
 /** How long a customer has to pay before the order is expired. */
 export const PAYMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -66,6 +84,22 @@ function newOrderNumber(): string {
 
 const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === "23505";
 
+/* ── payment methods (owner switch) ────────────────────────────── */
+
+/** What the owner has switched on (admin "Payment methods"); the default until then. */
+export async function getPaymentSettings(): Promise<PaymentSettings> {
+  const parsed = paymentSettingsSchema.safeParse(await storage.getSetting("payments"));
+  return parsed.success ? parsed.data : DEFAULT_PAYMENT_SETTINGS;
+}
+
+/** The methods checkout can offer right now: card also needs a configured gateway. */
+export async function availableMethods(): Promise<{ card: boolean; bankTransfer: boolean }> {
+  const s = await getPaymentSettings();
+  return { card: s.card && Boolean(paymentProvider), bankTransfer: s.bankTransfer };
+}
+
+export const isBankTransfer = (o: Pick<Order, "paymentProvider">) => o.paymentProvider === BANK_TRANSFER_PROVIDER;
+
 /* ── checkout URLs ─────────────────────────────────────────────── */
 
 /**
@@ -82,6 +116,7 @@ function returnUrls(order: Order) {
 
 /** Fresh hosted-checkout URL for a payable order (opens a session if missing). */
 export async function checkoutUrlFor(order: Order): Promise<{ order: Order; checkoutUrl: string }> {
+  if (isBankTransfer(order)) throw new OrderError("This order is paid by bank transfer", 409, "BANK_TRANSFER");
   if (!paymentProvider) throw new OrderError("Payments are not available right now", 503, "PAYMENTS_DISABLED");
   if (!PAYABLE.includes(order.status as OrderStatus)) {
     throw new OrderError("This order can't be paid any more", 409, "NOT_PAYABLE");
@@ -103,13 +138,14 @@ export async function checkoutUrlFor(order: Order): Promise<{ order: Order; chec
 
 /**
  * Photo ids the book prints whose original isn't in the media store: everything
- * placed on a page, plus the first photo, which is what covers show. Photos
+ * placed on a page, plus the cover photo (coverPhotoIdOf). Photos
  * sitting unused in the library don't hold an order up.
  */
 export async function photosWithoutOriginals(projectId: string, doc: BuilderDocument): Promise<string[]> {
   const known = new Set(doc.photos.map((p) => p.id));
   const printed = new Set(doc.pages.flatMap((pg) => pg.slots.map((s) => s.photoId)).filter((id) => known.has(id)));
-  if (doc.photos[0]) printed.add(doc.photos[0].id);
+  const cover = coverPhotoIdOf(doc);
+  if (cover) printed.add(cover);
   const rows = await storage.getUploadedPhotos(projectId);
   const ready = new Set(rows.filter((r) => r.originalUploadedAt).map((r) => r.id));
   return Array.from(printed).filter((id) => !ready.has(id));
@@ -118,12 +154,16 @@ export async function photosWithoutOriginals(projectId: string, doc: BuilderDocu
 export async function createOrder(
   user: { id: string; email: string; phone?: string | null },
   body: CreateOrderBody,
-): Promise<{ order: Order; checkoutUrl: string }> {
-  if (!paymentProvider) throw new OrderError("Payments are not available right now", 503, "PAYMENTS_DISABLED");
+): Promise<{ order: Order; checkoutUrl: string | null }> {
+  const methods = await availableMethods();
+  const bank = body.method === "bank_transfer";
+  if (bank ? !methods.bankTransfer : !methods.card) {
+    throw new OrderError(bank ? "Bank transfer isn't available right now" : "Card payments aren't available right now", 503, "PAYMENTS_DISABLED");
+  }
 
   // 1. idempotency
   const existing = await storage.getOrderByIdempotencyKey(user.id, body.idempotencyKey);
-  if (existing) return checkoutUrlFor(existing);
+  if (existing) return isBankTransfer(existing) ? { order: existing, checkoutUrl: null } : checkoutUrlFor(existing);
 
   // the book must actually be designed: title page + at least one photo page
   const doc = body.document;
@@ -172,10 +212,11 @@ export async function createOrder(
           shippingAddress: body.address,
           contactEmail: user.email,
           contactPhone: body.address.phone,
-          paymentProvider: paymentProvider.name,
-          livemode: paymentProvider.livemode,
+          // a bank transfer is real money wherever the live site runs
+          paymentProvider: bank ? BANK_TRANSFER_PROVIDER : paymentProvider!.name,
+          livemode: bank ? config.isProd : paymentProvider!.livemode,
           idempotencyKey: body.idempotencyKey,
-          expiresAt: new Date(Date.now() + PAYMENT_WINDOW_MS),
+          expiresAt: new Date(Date.now() + (bank ? BANK_TRANSFER_WINDOW_DAYS * 24 * 60 * 60 * 1000 : PAYMENT_WINDOW_MS)),
         },
         { kind: "created", actor: "user", toStatus: "pending_payment", note: null },
       );
@@ -183,7 +224,7 @@ export async function createOrder(
       if (!isUniqueViolation(err)) throw err;
       // same idempotency key racing in from a second tab → return that one
       const raced = await storage.getOrderByIdempotencyKey(user.id, body.idempotencyKey);
-      if (raced) return checkoutUrlFor(raced);
+      if (raced) return isBankTransfer(raced) ? { order: raced, checkoutUrl: null } : checkoutUrlFor(raced);
     }
   }
   if (!order) throw new OrderError("Could not create the order, please try again", 500, "ORDER_CREATE_FAILED");
@@ -191,7 +232,13 @@ export async function createOrder(
   // remember the phone for next time (profile convenience, not required)
   if (!user.phone) void storage.updateUser(user.id, { phone: body.address.phone }).catch(() => undefined);
 
-  // 4. gateway session + checkout URL
+  // 4a. bank transfer: no gateway; the customer gets the instructions by email too
+  if (bank) {
+    void sendBankTransferInstructions(order);
+    return { order, checkoutUrl: null };
+  }
+
+  // 4b. gateway session + checkout URL
   try {
     return await checkoutUrlFor(order);
   } catch (err) {
@@ -263,6 +310,62 @@ export async function confirmPayment(orderId: string, actor: ConfirmActor, provi
   return paid;
 }
 
+/**
+ * An admin saw the transfer arrive: mark the bank transfer order paid. The
+ * same compare-and-set transition as a card payment, so a double click is
+ * one payment, one email and one print render.
+ */
+export async function markBankTransferPaid(orderId: string, adminId: string, reference?: string): Promise<Order> {
+  const order = await storage.getOrder(orderId);
+  if (!order) throw new OrderError("Order not found", 404, "NOT_FOUND");
+  if (!isBankTransfer(order)) throw new OrderError("This order is paid by card; its payment is confirmed by the gateway", 409, "NOT_BANK_TRANSFER");
+  if (order.status !== "pending_payment" && order.status !== "expired") {
+    throw new OrderError(`This order is already ${order.status.replace(/_/g, " ")}`, 409, "NOT_PAYABLE");
+  }
+  const paid = await storage.transitionOrder(
+    orderId,
+    ["pending_payment", "expired"],
+    "paid",
+    { kind: "status", actor: "admin", note: `Bank transfer received${reference ? ` (ref ${reference})` : ""}` },
+    { paidAt: new Date() },
+  );
+  if (!paid) throw new OrderError("The order changed meanwhile. Reload and try again.", 409, "CHANGED");
+  await storage.recordPayment({
+    orderId,
+    provider: BANK_TRANSFER_PROVIDER,
+    // the bank's reference when noted, else our order number (the column is required)
+    providerRef: reference || order.orderNumber,
+    providerEventId: `${orderId}:bank_transfer`,
+    amountMinor: order.totalMinor,
+    currency: order.currency,
+    status: "succeeded",
+    source: "admin",
+    raw: { reference: reference ?? null, by: adminId },
+  });
+  log.info({ orderId, orderNumber: order.orderNumber, adminId }, "[orders] bank transfer marked paid");
+  void sendConfirmation(paid);
+  queuePrintRender(paid.id);
+  return paid;
+}
+
+async function sendBankTransferInstructions(order: Order) {
+  try {
+    const tpl = bankTransferEmail({
+      orderNumber: order.orderNumber,
+      title: order.title,
+      totalMinor: order.totalMinor,
+      orderUrl: `${config.appUrl}/orders/${order.id}`,
+      bank: BANK_DETAILS,
+      whatsappDisplay: SUPPORT_WHATSAPP.display,
+      whatsappUrl: whatsappLink(`Payment for order ${order.orderNumber}`),
+      holdDays: BANK_TRANSFER_WINDOW_DAYS,
+    });
+    await emailProvider.send({ to: order.contactEmail, ...tpl, idempotencyKey: `order-bank-${order.id}` });
+  } catch (err) {
+    log.error({ err, orderId: order.id }, "[orders] bank transfer email failed");
+  }
+}
+
 async function sendConfirmation(order: Order) {
   try {
     const tpl = orderConfirmedEmail({
@@ -307,7 +410,7 @@ export async function sweepOrders(now = new Date()): Promise<{ checked: number; 
           const ex = await storage.transitionOrder(o.id, ["pending_payment"], "expired", {
             kind: "status",
             actor: "system",
-            note: "No payment within 24 hours",
+            note: isBankTransfer(o) ? `No bank transfer within ${BANK_TRANSFER_WINDOW_DAYS} days` : "No payment within 24 hours",
           });
           if (ex) expired++;
         }

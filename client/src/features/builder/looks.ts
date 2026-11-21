@@ -80,6 +80,12 @@ export interface PageLook {
   /** line under the title on the title page; null = the occasion's default */
   subtitle: string | null;
   captionsHidden: boolean;
+  /**
+   * The photo on the front cover, already resolved (the customer's choice or
+   * ours, see coverPhotoIdFor in data.ts). Absent = the first photo, which is
+   * what every cover showed before the choice existed.
+   */
+  coverPhotoId?: string | null;
   /** editor-only: inline editing of text printed on the page */
   onEditTitle?: (v: string) => void;
   onEditSubtitle?: (v: string) => void;

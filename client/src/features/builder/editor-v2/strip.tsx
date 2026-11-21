@@ -143,9 +143,9 @@ export interface ThumbCtx {
 function PageThumb({ page, size, ctx }: { page: BookPage; size: number; ctx: ThumbCtx }) {
   // Thumbnails show the look but must never be editable: drop the
   // editor's inline-edit callbacks for this subtree.
-  const { fontId, edge, subtitle, captionsHidden } = usePageLook();
+  const { fontId, edge, subtitle, captionsHidden, coverPhotoId } = usePageLook();
   return (
-    <PageLookContext.Provider value={{ fontId, edge, subtitle, captionsHidden }}>
+    <PageLookContext.Provider value={{ fontId, edge, subtitle, captionsHidden, coverPhotoId }}>
       <div className="tke-th-pg" style={{ width: size, height: size, "--pw": size + "px" } as CSSProperties} aria-hidden="true">
         <PageFace page={page} photos={ctx.photos} theme={ctx.theme} title={ctx.title} occasion={ctx.occasion} />
       </div>
@@ -155,11 +155,11 @@ function PageThumb({ page, size, ctx }: { page: BookPage; size: number; ctx: Thu
 
 /** The front cover at thumbnail size, first in the filmstrip. */
 function CoverThumb({ size, ctx, active, onJump }: { size: number; ctx: ThumbCtx; active: boolean; onJump: () => void }) {
-  const { fontId, edge, subtitle, captionsHidden } = usePageLook();
+  const { fontId, edge, subtitle, captionsHidden, coverPhotoId } = usePageLook();
   return (
     <div className={"tke-fs-spread tke-fs-cover" + (active ? " on" : "")} data-spread="cover">
       <button type="button" className="tke-th fixed" style={{ width: size }} onClick={onJump} aria-label="Front cover" aria-current={active || undefined}>
-        <PageLookContext.Provider value={{ fontId, edge, subtitle, captionsHidden }}>
+        <PageLookContext.Provider value={{ fontId, edge, subtitle, captionsHidden, coverPhotoId }}>
           <div className="tke-th-pg" style={{ width: size, height: size, "--pw": size + "px" } as CSSProperties} aria-hidden="true">
             <CoverFace theme={ctx.theme} coverStyle={ctx.coverStyle} title={ctx.title} occasion={ctx.occasion} photos={ctx.photos} />
           </div>

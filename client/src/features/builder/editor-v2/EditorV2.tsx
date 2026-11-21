@@ -62,7 +62,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { CoverFace, PageFace } from "../book";
-import { firstMovablePage, hasTitlePage, occasionById, pageNumber, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
+import { bookPhotos, firstMovablePage, hasTitlePage, occasionById, pageNumber, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
 import { PageLookContext, usePageLook, type EdgeId, type FontId } from "../looks";
 import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
@@ -313,9 +313,8 @@ export function EditorV2({
         return;
       }
       if (onCover) {
-        // the cover shows the book's first photo, so the pick moves to the front
-        const chosen = photos.find((p) => p.id === photoId);
-        if (chosen) set({ photos: [chosen, ...photos.filter((p) => p.id !== photoId)] });
+        // the cover photo is its own choice; the photos keep their order (it is the book's reading order)
+        set({ coverPhotoId: photoId });
         if (isMobile) setTool(null);
         return say("Cover photo changed");
       }
@@ -338,7 +337,8 @@ export function EditorV2({
     },
     mirror: () => activePage && commit((b) => ({ ...b, pages: b.pages.map((p) => (p.id === activePage.id ? { ...p, mirror: !p.mirror } : p)) })),
     reflow: (d: BuilderState["density"]) => {
-      commit((b) => ops.reflow(b, d, photos));
+      // only the photos still in the book; photos added since go in too (bookPhotos)
+      commit((b) => ops.reflow(b, d, bookPhotos(stateRef.current)));
       jumpTo(firstMovablePage(stateRef.current.pages));
       say("Re-arranged the whole book", true);
     },
@@ -826,6 +826,16 @@ export function EditorV2({
                   </button>
                 ) : null}
                 <span>{pageLabel}</span>
+                {/* sheets hold two pages: an odd count prints a blank last page (owner, 2026-11-21) */}
+                {printedPageCount(pages) % 2 === 1 ? (
+                  <button
+                    type="button"
+                    className="tke-odd"
+                    onClick={() => commit((b) => ops.addPage(b, b.pages.length - 1, bookPhotos(stateRef.current))?.book ?? b)}
+                  >
+                    Last page prints blank · Add a page
+                  </button>
+                ) : null}
                 {isMobile ? (
                   <button className="tke-iconbtn sm" onClick={() => go(1)} disabled={onCover ? !pages.length : idx >= last} aria-label="Next page">
                     <ChevronRight size={18} />

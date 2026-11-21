@@ -33,6 +33,7 @@ import { getClaim, forgetClaim } from "@/lib/claims";
 import { THEME_COLOUR } from "./palette";
 import { useToast } from "@/hooks/use-toast";
 import type { BuilderState } from "./state";
+import { coverPhotoIdFor } from "./data";
 
 /* ── sync metadata (localStorage) ─────────────────────────────── */
 
@@ -141,6 +142,10 @@ export function toDocument(s: BuilderState): BuilderDocument {
     qty: s.qty,
     binding: s.binding,
     finish: s.finish,
+    // the photo that prints, resolved here so the server needn't guess
+    coverPhotoId: coverPhotoIdFor(s),
+    coverAuto: s.coverPhotoId === null,
+    removedPhotoIds: s.removedPhotoIds.length ? s.removedPhotoIds : undefined,
   };
 }
 
@@ -176,6 +181,9 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
     qty: d.qty,
     binding: d.binding,
     finish: d.finish ?? DEFAULT_FINISH,
+    // "let us pick" stays ours; a book saved before the choice keeps its first photo
+    coverPhotoId: d.coverAuto ? null : (d.coverPhotoId ?? d.photos[0]?.id ?? null),
+    removedPhotoIds: d.removedPhotoIds ?? [],
   };
 }
 

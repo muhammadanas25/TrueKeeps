@@ -39,12 +39,35 @@
 .pr-arrow:focus-visible { outline: 2px solid var(--tk-rose-400, #F26C88); outline-offset: 2px; }
 .pr-where { min-width: 160px; text-align: center; font-size: 14px; line-height: 20px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
 
+/* ── Phone step bar (index.tsx): seven parts under the header ── */
+.bb-steps { display: none; }
+@media (max-width: 760px) {
+  .bb-steps { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 16px; background: var(--surface-page); border-bottom: 1px solid var(--color-border); }
+  .bb-steps-bars { flex: 1; display: flex; gap: 3px; }
+  .bb-steps-bars i { flex: 1; height: 3px; border-radius: 2px; background: var(--tk-mist-400); }
+  .bb-steps-bars i.on { background: var(--heading); }
+  .bb-steps-label { flex: none; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--heading); font-variant-numeric: tabular-nums; }
+}
+
 /* ── Shared bits ──────────────────────────────────────────── */
 .bk-pick { font-style: normal; display: inline-block; padding: 1px 9px; border-radius: 999px; background: var(--offer-bg); color: var(--tk-rose-700, #A5324A); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; }
 .bk-fit-line { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--success-text); }
 .bk-fit-line.warn { color: var(--error-fg); }
 .bk-note { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--selected-bg); color: var(--heading); font-size: 14px; line-height: 20px; }
 .bk-note svg { flex: none; margin-top: 2px; }
+.bk-out { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--selected-bg); color: var(--heading); font-size: 14px; line-height: 20px; }
+.bk-out-thumbs { flex: none; display: flex; }
+.bk-out-thumbs > span { width: 34px; height: 34px; border-radius: 5px; overflow: hidden; display: flex; border: 2px solid #fff; }
+.bk-out-thumbs > span + span { margin-left: -10px; }
+.bk-out-thumbs .bb-ph { flex: 1; border-radius: 0; }
+.bk-out-text { flex: 1; min-width: 0; }
+.bk-out .bb-btn { flex: none; padding: 8px 14px; font-size: 13px; background: #fff; }
+.bk-save { margin: 0; font-size: 13px; line-height: 19px; color: var(--color-fg3); }
+.bk-sheet .bk-save { text-align: center; }
+.bk-save button { padding: 0; color: var(--heading); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.bk-card-art { display: inline-flex; margin-right: 4px; box-shadow: 0 1px 3px rgba(42, 30, 92, 0.18); }
+.bk-card-art .bb-wire { --pw: 36px; width: 36px; height: 36px; border-radius: 0; }
+.bk-card.on .bk-card-art .bb-wire .bb-ph { background: var(--wire-accent); }
 .bk-warn { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--offer-bg); color: var(--error-fg); font-size: 14px; line-height: 20px; }
 .bk-warn p { margin: 0; display: flex; gap: 8px; align-items: flex-start; }
 .bk-warn svg { flex: none; margin-top: 2px; }
@@ -64,7 +87,7 @@
 
 /* ── Step 5 on a phone: dark stage + white sheet ──────────── */
 .bb-screen.bk-phone, .bb-screen.pv-phone {
-  flex: none; height: calc(100dvh - 64px); min-height: 520px; display: flex; flex-direction: column;
+  flex: none; height: calc(100dvh - 64px - 28px); min-height: 520px; display: flex; flex-direction: column;
   background: var(--tk-indigo-700); overflow: hidden;
 }
 .bk-sheet {
@@ -132,35 +155,116 @@
 .pv-approve.on { border-color: var(--selected); background: var(--selected-bg); }
 .pv-cover { display: flex; flex-direction: column; gap: 8px; }
 .pv-cover-label { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--heading); }
-.pv-cover-note { font-size: 13px; line-height: 19px; color: var(--color-fg3); }
 .pv-checks { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: 14px; line-height: 20px; color: var(--color-fg2); }
 .pv-checks b { color: var(--heading); font-weight: 600; }
 .pv-links { display: flex; justify-content: center; gap: 4px; }
 .pv-links .bb-btn { padding: 10px 12px; font-size: 14px; }
 
-/* wide: the approve panel sits under the book */
-.bb-preview .pv-panel { width: min(100%, 640px); margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
-.bb-preview .pv-panel .bk-seg { align-self: flex-start; }
-.bb-preview .pv-panel .bk-seg > button { flex: 0 0 auto; padding: 0 16px; white-space: nowrap; }
+/* wide: the book left, everything to check and approve right, all on one screen */
+.bb-screen.pv-wide { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.7fr); min-height: calc(100vh - 64px); background: var(--surface-page); }
+.pv-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; background: radial-gradient(60% 50% at 50% 42%, #F0E6D9 0%, transparent 72%), #E8DCCD; }
+.bb-preview-stage.pv-book { margin-top: 0; }
+.pv-book .bb-book { --pw: min(calc((65vw - 260px) / 2), 52vh, 330px); }
+.pv-stage .bb-page-indicator { margin-top: 28px; color: var(--heading); font-weight: 600; }
+.pv-panel { display: flex; flex-direction: column; gap: 14px; padding: 28px 36px 32px; overflow-y: auto; max-height: calc(100vh - 64px); box-sizing: border-box; position: sticky; top: 64px; }
+.pv-head h1 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: 32px; line-height: 1.2; color: var(--heading); }
+.pv-head p { margin: 4px 0 0; color: var(--color-fg2); }
+.pv-rows { margin: 0; display: flex; flex-direction: column; padding: 2px 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--surface-card); }
+.pv-rows > div { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; font-size: 14px; line-height: 20px; }
+.pv-rows > div + div { border-top: 1px solid var(--color-border); }
+.pv-rows dt { color: var(--color-fg2); }
+.pv-rows dd { margin: 0; font-weight: 600; color: var(--heading); text-align: right; }
+.pv-odd { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--offer-bg); color: var(--error-fg); font-size: 14px; line-height: 20px; }
+.pv-odd p { margin: 0; display: flex; gap: 8px; align-items: flex-start; }
+.pv-odd svg { flex: none; margin-top: 2px; }
+.pv-odd .bb-btn { padding: 8px 14px; font-size: 13px; background: #fff; }
+.pv-actions { display: flex; flex-direction: column; gap: 8px; }
+.pv-actions .bb-btn-primary { justify-content: center; width: 100%; }
+.pv-hint { font-size: 13px; line-height: 18px; color: var(--color-fg2); text-align: center; }
+.pv-link { align-self: center; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 8px; color: var(--heading); font-weight: 600; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.pv-panel .bk-seg > button { flex: 1 1 auto; padding: 0 12px; white-space: nowrap; }
 
 /* phone: same dark stage and sheet as step 5 */
-.pv-phone .bk-sheet { gap: 10px; }
+.pv-phone .bk-sheet { gap: 8px; }
+.pv-title { margin: 0; font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: 22px; line-height: 28px; color: var(--heading); }
+.pv-line { margin: 0; font-size: 13px; line-height: 18px; color: var(--color-fg2); }
+.pv-phone .pv-cover { gap: 4px; }
+.pv-phone .pv-cover-label { display: none; }
 .pv-phone .pv-approve { padding: 10px 12px; }
 /* the longest name gets the most room, so "Truekeeps Design" stays on one line */
 .pv-phone .pv-cover .bk-seg-wide > button { flex: 1 1 auto; padding: 0 8px; white-space: nowrap; font-size: 13.5px; }
 /* step 1 on phones: the side panel with the price is hidden there */
 .qz-price.qz-price-phone { display: none; margin: 8px 0 0; justify-content: flex-start; text-align: left; }
-.pv-phone .pv-approve span { font-size: 14px; line-height: 20px; }
+.pv-phone .pv-approve span { font-size: 13px; line-height: 18px; }
 
 /* ── Step 1: the price under the sample book (QuizScreen) ── */
 .qz-price { margin: 14px 0 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 10px; text-align: center; }
 .qz-price b { font-size: 18px; line-height: 26px; color: var(--heading); }
 .qz-price span { font-size: 14px; line-height: 20px; color: var(--color-fg2); }
 
+/* ── Cover photo: the row and the picker (CoverPhotoPicker) ── */
+.cp-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-border); background: var(--surface-card); text-align: left; }
+.cp-row.compact { gap: 10px; padding: 4px; border: 0 !important; background: transparent; width: 100%; min-height: 48px; }
+.cp-thumb { position: relative; flex: none; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; display: flex; }
+.cp-row.compact .cp-thumb { width: 40px; height: 40px; }
+.cp-thumb > .bb-ph { flex: 1; border-radius: 0; }
+.cp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; line-height: 20px; color: var(--color-fg2); }
+.cp-text b { color: var(--heading); font-size: 15px; }
+.cp-row.compact .cp-text { display: block; }
+.cp-row.compact .cp-text b { font-size: 14px; }
+.cp-change { flex: none; font-size: 14px; font-weight: 700; color: var(--heading); text-decoration: underline; text-underline-offset: 3px; }
+.bb-btn.cp-btn { flex: none; padding: 10px 18px; font-size: 14px; }
+
+.cp-veil { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(22, 20, 41, 0.45); }
+.cp-dialog { width: min(760px, 100%); max-height: min(760px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 22px 24px; border-radius: 16px; background: #fff; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3); outline: none; }
+.cp-grip { display: none; }
+.cp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.cp-head h2 { margin: 0; font-size: 22px; line-height: 28px; color: var(--heading); }
+.cp-head p { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--color-fg2); }
+.cp-close { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; background: var(--tk-mist-200) !important; color: var(--heading); }
+.cp-filter { align-self: flex-start; }
+.cp-filter > button { min-height: 38px; font-size: 13px; }
+.cp-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: max-content; gap: 8px; align-content: start; padding: 3px; }
+/* block + aspect-ratio + an absolutely placed photo: a flex tile let the photo's
+   own height leak into the grid row, and the rows overlapped */
+.cp-tile { position: relative; display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; min-width: 0; padding: 0; border-radius: 6px; overflow: hidden; }
+.cp-tile > .bb-ph { position: absolute; inset: 0; border-radius: 0; }
+.cp-tile.on { box-shadow: 0 0 0 3px var(--selected); }
+.cp-tile:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
+.cp-tick { position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--selected); color: #fff; }
+.cp-ours { position: absolute; left: 5px; bottom: 5px; padding: 0 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: var(--heading); font-size: 11px; line-height: 18px; font-weight: 600; }
+.cp-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.cp-auto { min-height: 44px; padding: 0 4px; color: var(--heading); font-weight: 600; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .cp-veil { align-items: flex-end; padding: 0; }
+  .cp-dialog { width: 100%; height: 80dvh; max-height: none; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0; gap: 10px; }
+  .cp-grip { display: block; }
+  .cp-head h2 { font-size: 19px; line-height: 26px; }
+  .cp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .cp-foot .bb-btn-primary { flex: 1; justify-content: center; }
+}
+
+/* ── Step 7: how to pay (OrderScreen) ─────────────────────── */
+.pay-methods { border: 0; margin: 0; padding: 16px 0 0; border-top: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pay-methods legend { padding: 0; margin-bottom: 4px; float: left; width: 100%; }
+.pay-note { margin: 0; font-size: 13px; line-height: 19px; color: var(--color-fg2); }
+.pay-choices { display: flex; flex-direction: column; gap: 8px; }
+.pay-choice { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--color-border) !important; background: var(--surface-card) !important; text-align: left; }
+.pay-choice.on { border-color: var(--selected) !important; background: var(--selected-bg) !important; box-shadow: 0 0 0 1px var(--selected); }
+.pay-choice b { display: block; font-size: 15px; line-height: 22px; color: var(--heading); }
+.pay-choice i { display: block; font-style: normal; font-size: 13px; line-height: 19px; color: var(--color-fg2); }
+.pay-dot { flex: none; margin-top: 3px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--heading); display: grid; place-items: center; }
+.pay-choice.on .pay-dot::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--heading); }
+.pay-steps { margin: 0; padding: 12px 14px 12px 32px; border-radius: 12px; background: var(--selected-bg); color: var(--heading); font-size: 14px; line-height: 22px; }
+
 /* ── Step 2: how many photos (UploadScreen) ───────────────── */
 .up-status { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--selected-bg); color: var(--heading); font-size: 15px; line-height: 22px; font-weight: 600; }
 .up-status svg { flex: none; margin-top: 2px; }
+.up-need { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--heading); }
 .up-status.ok { background: var(--success-bg); color: var(--success-fg); }
+
+/* ── Step 3: the cover photo row under the three covers ──── */
+.ck-coverphoto { margin-top: 14px; }
 
 /* ── Step 4: name and lettering (ComposeScreen) ───────────── */
 .ck-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
@@ -178,6 +282,10 @@
 
 @media (max-width: 880px) {
   .qz-price.qz-price-phone { display: flex; }
+}
+@media (max-width: 1000px) {
+  .bb-screen.pv-wide { grid-template-columns: 1fr; }
+  .pv-panel { position: static; max-height: none; }
 }
 @media (max-width: 900px) {
   .bb-screen.bk-wide { display: flex; flex-direction: column; }
