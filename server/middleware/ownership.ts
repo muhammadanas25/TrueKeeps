@@ -5,7 +5,7 @@
  * Every project, page, placed photo and upload resolves to an owning
  * user through `projects.user_id`. Handlers call the matching loader,
  * which returns the row when it belongs to the requester (or the
- * requester is admin) and otherwise sends the response itself and
+ * requester is staff past the second sign-in step) and otherwise sends the response itself and
  * returns null. 404 — not 403 — for someone else's row: an ID is not a
  * secret, but we still don't confirm existence to strangers.
  *
@@ -17,10 +17,14 @@
 import type { Request, Response } from "express";
 import { storage } from "../storage";
 import type { PagePhoto, Project, ProjectPage, UploadedPhoto } from "@shared/schema";
+import { isElevatedStaff } from "./staff";
 
-function isAdmin(req: Request): boolean {
-  return (req.user as { role?: string } | undefined)?.role === "admin";
-}
+/**
+ * Staff may open any customer's book, but only with the admin's second
+ * sign-in step passed for this session (docs/adr/018). A staff session
+ * without it is treated as an ordinary customer here.
+ */
+const isAdmin = (req: Request): Promise<boolean> => isElevatedStaff(req);
 
 function notFound(res: Response, what: string) {
   res.status(404).json({ error: `${what} not found` });
@@ -30,7 +34,7 @@ function notFound(res: Response, what: string) {
 export async function loadOwnedProject(req: Request, res: Response, projectId: string): Promise<Project | null> {
   const project = await storage.getProject(projectId);
   if (!project || project.deletedAt) return notFound(res, "Project");
-  if (project.userId !== req.user!.id && !isAdmin(req)) return notFound(res, "Project");
+  if (project.userId !== req.user!.id && !(await isAdmin(req))) return notFound(res, "Project");
   return project;
 }
 
@@ -51,6 +55,6 @@ export async function loadOwnedPagePhoto(req: Request, res: Response, photoId: s
 export async function loadOwnedUpload(req: Request, res: Response, uploadId: string): Promise<UploadedPhoto | null> {
   const upload = await storage.getUploadedPhoto(uploadId);
   if (!upload) return notFound(res, "Upload");
-  if (upload.userId !== req.user!.id && !isAdmin(req)) return notFound(res, "Upload");
+  if (upload.userId !== req.user!.id && !(await isAdmin(req))) return notFound(res, "Upload");
   return upload;
 }

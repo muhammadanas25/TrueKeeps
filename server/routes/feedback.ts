@@ -25,7 +25,8 @@ import { config } from "../config";
 import { log } from "../logger";
 import { emailProvider } from "../email";
 import { feedbackReceivedEmail } from "../email/templates";
-import { optionalUser, requireAdmin } from "../middleware/auth";
+import { optionalUser } from "../middleware/auth";
+import { requireStaff } from "../middleware/staff";
 import { feedbackLimiter, writeLimiter } from "../middleware/rate-limit";
 import { asyncHandler, parse } from "./helpers";
 
@@ -82,7 +83,7 @@ feedbackRouter.post(
 
 feedbackRouter.get(
   "/api/admin/feedback",
-  requireAdmin,
+  requireStaff(),
   asyncHandler(async (req, res) => {
     const status = FEEDBACK_STATUSES.includes(req.query.status as FeedbackStatus) ? (req.query.status as FeedbackStatus) : undefined;
     res.json(await storage.listFeedback({ status, limit: 300 }));
@@ -91,7 +92,7 @@ feedbackRouter.get(
 
 feedbackRouter.patch(
   "/api/admin/feedback/:id",
-  requireAdmin,
+  requireStaff(),
   writeLimiter,
   asyncHandler(async (req, res) => {
     const body = parse(updateFeedbackSchema, req.body, res);

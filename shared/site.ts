@@ -364,7 +364,7 @@ export const metaForPath = (path: string): PageMeta =>
  * noindex, because they are private or empty without a session. Anything
  * neither public nor listed here is a true 404. Keep in sync with App.tsx.
  */
-const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin\/orders|review|admin\/reviews|feedback|admin\/feedback)$/;
+const APP_ROUTE = /^\/(templates|create|wizard|wizard-classic|books|account|orders(\/[^/]+)?|admin(\/[a-z0-9-]+){0,3}|review|feedback)$/;
 export const isAppRoute = (path: string) => APP_ROUTE.test(path);
 
 /* ── Generators ─────────────────────────────────────────────── */

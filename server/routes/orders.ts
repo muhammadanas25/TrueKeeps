@@ -32,8 +32,12 @@ import { availableMethods, checkoutUrlFor, confirmPayment, createOrder, getPayme
 import { BANK_DETAILS, BANK_TRANSFER_WINDOW_DAYS, SUPPORT_WHATSAPP, markPaidSchema, paymentSettingsSchema } from "@shared/payments";
 import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { mediaStore } from "../media";
-import { queuePrintRender, readManifest } from "../print/render";
-import { requireAdmin, requireMember, requireUser, currentUser } from "../middleware/auth";
+import { readManifest } from "../print/render";
+import { startPrintJob } from "../print/pipeline";
+import { notifyOrder } from "../notify/outbox";
+import { audit } from "../ops/audit";
+import { requireMember, requireUser, currentUser } from "../middleware/auth";
+import { isElevatedStaff, requireStaff } from "../middleware/staff";
 import { loadOwnedProject } from "../middleware/ownership";
 import { orderLimiter, writeLimiter } from "../middleware/rate-limit";
 import { asyncHandler, parse } from "./helpers";
@@ -52,13 +56,10 @@ function publicOrder(o: Order) {
 /** The full order for the admin, plus how it is paid (the admin's buttons depend on it). */
 const adminOrder = (o: Order) => ({ ...o, paymentMethod: isBankTransfer(o) ? ("bank_transfer" as const) : ("card" as const) });
 
-function isAdmin(user: unknown) {
-  return (user as { role?: string } | undefined)?.role === "admin";
-}
-
 async function loadOwnedOrder(req: express.Request, res: Response): Promise<Order | null> {
   const order = await storage.getOrder(req.params.id);
-  if (!order || (order.userId !== req.user!.id && !isAdmin(req.user))) {
+  // staff see any order only past the admin's second sign-in step
+  if (!order || (order.userId !== req.user!.id && !(await isElevatedStaff(req)))) {
     res.status(404).json({ error: "Order not found" });
     return null;
   }
@@ -240,7 +241,7 @@ ordersRouter.post(
 
 ordersRouter.get(
   "/api/admin/orders",
-  requireAdmin,
+  requireStaff(),
   asyncHandler(async (req, res) => {
     const status = ORDER_STATUSES.includes(req.query.status as OrderStatus) ? (req.query.status as OrderStatus) : undefined;
     const list = await storage.listOrdersAdmin({ status, limit: 200 });
@@ -250,7 +251,7 @@ ordersRouter.get(
 
 ordersRouter.get(
   "/api/admin/orders/:id",
-  requireAdmin,
+  requireStaff(),
   asyncHandler(async (req, res) => {
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -261,13 +262,14 @@ ordersRouter.get(
 /** Bank transfer arrived: confirm the order, email the customer, start the print files. */
 ordersRouter.post(
   "/api/admin/orders/:id/mark-paid",
-  requireAdmin,
+  requireStaff(),
   writeLimiter,
   asyncHandler(async (req, res) => {
     const body = parse(markPaidSchema, req.body ?? {}, res);
     if (!body) return;
     try {
       const order = await markBankTransferPaid(req.params.id, currentUser(req).id, body.reference);
+      void audit(req, "order.bank_transfer_paid", { type: "order", id: order.id }, { reference: body.reference ?? null });
       res.json({ order: adminOrder(order), events: await storage.listOrderEvents(order.id) });
     } catch (err) {
       sendOrderError(res, err);
@@ -278,7 +280,7 @@ ordersRouter.post(
 /** Which ways to pay checkout offers. Card also needs Safepay configured (`gatewayReady`). */
 ordersRouter.get(
   "/api/admin/settings/payments",
-  requireAdmin,
+  requireStaff(["admin"]),
   asyncHandler(async (_req, res) => {
     res.json({ settings: await getPaymentSettings(), gatewayReady: Boolean(paymentProvider), provider: paymentProvider?.name ?? null, livemode: paymentProvider?.livemode ?? false });
   }),
@@ -286,7 +288,7 @@ ordersRouter.get(
 
 ordersRouter.put(
   "/api/admin/settings/payments",
-  requireAdmin,
+  requireStaff(["admin"]),
   writeLimiter,
   asyncHandler(async (req, res) => {
     const body = parse(paymentSettingsSchema, req.body, res);
@@ -296,6 +298,7 @@ ordersRouter.put(
     }
     await storage.setSetting("payments", body, currentUser(req).id);
     log.info({ settings: body, by: currentUser(req).id }, "[admin] payment methods changed");
+    void audit(req, "settings.payments", null, body as unknown as Record<string, unknown>);
     res.json({ settings: body, gatewayReady: Boolean(paymentProvider) });
   }),
 );
@@ -310,7 +313,7 @@ ordersRouter.put(
  */
 ordersRouter.get(
   "/api/admin/orders/:id/print-files",
-  requireAdmin,
+  requireStaff(),
   asyncHandler(async (req, res) => {
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
@@ -339,22 +342,23 @@ ordersRouter.get(
   }),
 );
 
-/** Re-cut an order's print files, e.g. after the renderer is improved. */
+/** Rebuild an order's print file as a new version (the old one is kept). */
 ordersRouter.post(
   "/api/admin/orders/:id/print-files/render",
-  requireAdmin,
+  requireStaff(),
   writeLimiter,
   asyncHandler(async (req, res) => {
     const order = await storage.getOrder(req.params.id);
     if (!order) return res.status(404).json({ error: "Order not found" });
-    queuePrintRender(order.id);
-    res.status(202).json({ queued: true });
+    const job = await startPrintJob(order.id, { force: true, requestedBy: req.staff?.email ?? "admin" });
+    void audit(req, "print.rebuild", { type: "order", id: order.id }, { version: job?.version });
+    res.status(202).json({ queued: true, version: job?.version ?? null });
   }),
 );
 
 ordersRouter.patch(
   "/api/admin/orders/:id",
-  requireAdmin,
+  requireStaff(),
   writeLimiter,
   asyncHandler(async (req, res) => {
     const body = parse(adminUpdateOrderSchema, req.body, res);
@@ -388,8 +392,15 @@ ordersRouter.patch(
         fields,
       );
       if (!updated) return res.status(409).json({ error: "The order changed meanwhile — reload and try again" });
+      void audit(req, "order.status", { type: "order", id: order.id }, { from: order.status, to: body.status });
+      const event =
+        body.status === "shipped" ? "order_shipped" : body.status === "delivered" ? "order_delivered" : body.status === "cancelled" || body.status === "refunded" ? "order_cancelled" : null;
+      if (event) void notifyOrder(event, updated);
     } else {
-      if (Object.keys(fields).length) updated = await storage.updateOrder(order.id, fields);
+      if (Object.keys(fields).length) {
+        updated = await storage.updateOrder(order.id, fields);
+        void audit(req, "order.update", { type: "order", id: order.id }, fields);
+      }
       if (body.note) await storage.addOrderEvent({ orderId: order.id, kind: "note", actor: "admin", note: body.note });
     }
     res.json({ order: updated ? adminOrder(updated) : updated, events: await storage.listOrderEvents(order.id) });

@@ -46,7 +46,6 @@ import { PAGE_INCHES, clampTilt, slotInches, tiltCover } from "../../client/src/
 import type { PageLayoutId } from "../../client/src/features/builder/data";
 import { mediaStore, mediaUrl } from "../media";
 import { storage } from "../storage";
-import { enqueue, register } from "../jobs";
 import { log } from "../logger";
 
 export const PRINT_DPI = 300;
@@ -284,14 +283,8 @@ export async function renderOrder(orderId: string): Promise<PrintManifest> {
   return manifest;
 }
 
-register("print.render", async (payload) => {
-  await renderOrder((payload as { orderId: string }).orderId);
-});
-
-/** Queue an order's print files. Safe to call again: files are overwritten. */
-export function queuePrintRender(orderId: string): void {
-  enqueue("print.render", { orderId });
-}
+// Queuing lives in server/print/pipeline.ts now: renderOrder is its first
+// stage, followed by the PDFs, their checks and the backup copy (docs/adr/018).
 
 /** The public URL of a print file, for links. */
 export const printFileUrl = (key: string) => mediaUrl(key);

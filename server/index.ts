@@ -26,12 +26,15 @@ import { applySecurity } from "./middleware/security";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic } from "./vite";
 import { corsConfig } from "./cors";
-import { startOrderJobs } from "./orders/service";
+import { startJobs, stopJobs } from "./jobs";
+import { latencyRecorder } from "./analytics/latency";
 
 const app = express();
 
 applySecurity(app);
 app.use(httpLogger);
+// p50/p90/p95/p99 per route for Admin → Analytics → Speed (server/analytics/latency.ts)
+app.use(latencyRecorder);
 app.use(cors(corsConfig));
 
 // better-auth owns everything under /api/auth — sign-in, OAuth callback,
@@ -48,11 +51,13 @@ app.all("/api/auth/*", (req, _res, next) => {
 }, toNodeHandler(auth));
 
 // Webhooks are authenticated by an HMAC over their exact bytes, so their
-// body must reach the route unparsed (it uses express.raw itself).
+// body must reach the route unparsed (it uses express.raw itself). Analytics
+// beacons parse their own body with a much smaller limit.
 const jsonParser = express.json({ limit: "1mb" });
 const formParser = express.urlencoded({ extended: false, limit: "1mb" });
-app.use((req, res, next) => (req.path.startsWith("/api/payments/webhook/") ? next() : jsonParser(req, res, next)));
-app.use((req, res, next) => (req.path.startsWith("/api/payments/webhook/") ? next() : formParser(req, res, next)));
+const ownBody = (p: string) => p.startsWith("/api/payments/webhook/") || p.startsWith("/api/webhooks/") || p === "/api/events";
+app.use((req, res, next) => (ownBody(req.path) ? next() : jsonParser(req, res, next)));
+app.use((req, res, next) => (ownBody(req.path) ? next() : formParser(req, res, next)));
 
 (async () => {
   const server = await registerRoutes(app);
@@ -74,10 +79,25 @@ app.use((req, res, next) => (req.path.startsWith("/api/payments/webhook/") ? nex
   }
 
   // Railway injects PORT; serves API + client on the one open port.
-  // payment reconciliation + expiry sweep (see server/orders/service.ts)
-  startOrderJobs();
-
   server.listen({ port: config.port, host: "0.0.0.0", reusePort: true }, () => {
     log.info({ port: config.port, env: config.nodeEnv, appUrl: config.appUrl }, "serving");
+    // Durable jobs (docs/adr/018): payment sweep, print pipeline, notifications,
+    // analytics flushes. Started after listen so the healthcheck never waits on it.
+    startJobs().catch((err) => log.error({ err }, "[jobs] failed to start — background work is paused"));
   });
+
+  // A stray promise rejection in background work (a PDF stream, a provider
+  // call) must not take the whole site down: log it loudly and keep serving.
+  // Jobs that were running retry through the queue.
+  process.on("unhandledRejection", (err) => log.error({ err }, "unhandled promise rejection"));
+
+  // Railway sends SIGTERM on every deploy: let running jobs finish first
+  // (pg-boss puts unfinished ones back on the queue anyway).
+  for (const sig of ["SIGTERM", "SIGINT"] as const) {
+    process.once(sig, () => {
+      log.info({ sig }, "shutting down");
+      server.close();
+      void stopJobs().finally(() => process.exit(0));
+    });
+  }
 })();

@@ -21,7 +21,7 @@ import { config } from "../config";
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** Paths that authenticate by signature instead of cookie+origin. */
-const ORIGIN_CHECK_EXEMPT = [/^\/api\/payments\/webhook\//];
+const ORIGIN_CHECK_EXEMPT = [/^\/api\/payments\/webhook\//, /^\/api\/webhooks\//];
 
 /**
  * Reject cross-origin state changes. Browsers always send `Origin` on

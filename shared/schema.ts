@@ -44,6 +44,7 @@ import {
   decimal,
   integer,
   bigint,
+  bigserial,
   real,
   boolean,
   jsonb,
@@ -78,7 +79,10 @@ export const users = pgTable(
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
     isAnonymous: boolean("is_anonymous").notNull().default(false),
-    /** `customer` | `admin` — admin unlocks /admin routes and theme editing */
+    /**
+     * `customer` | `admin` (the owner: everything) | `ops` (orders and print,
+     * no money totals or settings) — see STAFF_ROLES in shared/ops.ts
+     */
     role: text("role").notNull().default("customer"),
     /** reminder / lifecycle emails suppressed when true (transactional still sent) */
     marketingOptOut: boolean("marketing_opt_out").notNull().default(false),
@@ -502,6 +506,250 @@ export const payments = pgTable(
     uniqueIndex("payments_event_unique").on(t.providerEventId),
   ],
 );
+
+/* ── Ops console (docs/adr/018) ─────────────────────────────────── */
+
+/**
+ * A staff member's authenticator-app secret (TOTP, RFC 6238). Staff sign in
+ * with a magic link or Google like everyone else; this second factor is asked
+ * for before any admin data is served (server/middleware/staff.ts), because a
+ * stolen mailbox must not be a stolen admin.
+ *
+ * `secret_enc` is AES-256-GCM ciphertext (server/security/totp.ts), so a
+ * database dump alone can't mint codes. Backup codes are stored as SHA-256
+ * hashes and removed as they're used. `enrolled_at` stays null until the
+ * first code proves the app was set up. `last_step` blocks replaying a code
+ * inside its own 30-second window.
+ */
+export const staffFactors = pgTable("staff_factors", {
+  userId: varchar("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secretEnc: text("secret_enc").notNull(),
+  backupCodes: jsonb("backup_codes").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  enrolledAt: ts("enrolled_at"),
+  failedCount: integer("failed_count").notNull().default(0),
+  lockedUntil: ts("locked_until"),
+  lastStep: bigint("last_step", { mode: "number" }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * One row per signed-in session that has passed the second factor, valid
+ * until `expires_at` (12 hours). Tied to the session row, so signing out or
+ * revoking the session ends it too.
+ */
+export const staffElevations = pgTable(
+  "staff_elevations",
+  {
+    sessionId: varchar("session_id")
+      .primaryKey()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: ts("expires_at").notNull(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("staff_elevations_user_idx").on(t.userId)],
+);
+
+/** A role waiting for someone who hasn't signed in yet; applied at their first sign-in. */
+export const staffInvites = pgTable("staff_invites", {
+  email: text("email").primaryKey(),
+  role: text("role").notNull(),
+  invitedBy: varchar("invited_by"),
+  createdAt: createdAt(),
+});
+
+/**
+ * Who did what in the admin, append-only: every staff change, every print
+ * file download, sign-in step-ups and failures. Never shown to customers.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuidPk(),
+    actorId: varchar("actor_id"),
+    actorEmail: text("actor_email"),
+    actorRole: text("actor_role"),
+    /** dotted verb, e.g. `order.status`, `print.download`, `staff.step_up_failed` */
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    detail: jsonb("detail"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("audit_log_created_idx").on(t.createdAt), index("audit_log_target_idx").on(t.targetType, t.targetId)],
+);
+
+/** One stored, checked file of a print job (see `print_jobs.files`). */
+export interface PrintJobFile {
+  /** `interior` | `cover` */
+  kind: string;
+  key: string;
+  bytes: number;
+  sha256: string;
+  pages: number;
+  /** a second copy, in the backup bucket, checked the same way */
+  backupKey?: string | null;
+}
+
+/**
+ * The print PDF of an order, built and checked in stages (server/print/
+ * pipeline.ts). A paid order always gets a row, and the reconciler finishes
+ * any row left behind by a crash or an outage. Versions are immutable: a
+ * rebuild makes version n+1 under a new key, so the file a printer
+ * downloaded can always be proven by its checksum.
+ *
+ * `state`: queued → rendering → composing → verifying → checked (→
+ * backed_up when a backup bucket is configured), or failed after the
+ * retries run out.
+ */
+export const printJobs = pgTable(
+  "print_jobs",
+  {
+    id: uuidPk(),
+    orderId: varchar("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    version: integer("version").notNull(),
+    state: text("state").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    files: jsonb("files").$type<PrintJobFile[]>(),
+    pageCount: integer("page_count"),
+    lowDpiCount: integer("low_dpi_count").notNull().default(0),
+    /** placed photos the renderer couldn't use, with why */
+    problems: jsonb("problems"),
+    stateChangedAt: ts("state_changed_at").defaultNow().notNull(),
+    checkedAt: ts("checked_at"),
+    /** `system`, or the staff email that asked for a rebuild */
+    requestedBy: text("requested_by").notNull().default("system"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("print_jobs_order_version_unique").on(t.orderId, t.version),
+    index("print_jobs_state_idx").on(t.state, t.stateChangedAt),
+  ],
+);
+
+/**
+ * Who hears about what (one row per event id in shared/ops.ts), edited from
+ * Admin → Notifications. Staff recipients are typed in (emails and WhatsApp
+ * numbers); customers are switched on or off per channel. WhatsApp needs a
+ * template Meta has approved, named here.
+ */
+export const notifyRules = pgTable("notify_rules", {
+  event: text("event").primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  staffEmails: jsonb("staff_emails").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  staffWhatsapp: jsonb("staff_whatsapp").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  customerEmail: boolean("customer_email").notNull().default(false),
+  customerWhatsapp: boolean("customer_whatsapp").notNull().default(false),
+  /** Meta-approved template names, one for staff and one for customers */
+  staffTemplate: text("staff_template"),
+  customerTemplate: text("customer_template"),
+  templateLang: text("template_lang").notNull().default("en"),
+  updatedBy: varchar("updated_by"),
+  updatedAt: updatedAt(),
+});
+
+/**
+ * The outbox: one row per message to one recipient. Written before anything
+ * is sent; a worker sends it with retries, and provider callbacks move it to
+ * delivered/read. `dedupe_key` is unique, so the same event can never message
+ * the same person twice however many times it fires.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuidPk(),
+    event: text("event").notNull(),
+    /** `email` | `whatsapp` */
+    channel: text("channel").notNull(),
+    /** `staff` | `customer` */
+    audience: text("audience").notNull(),
+    recipient: text("recipient").notNull(),
+    orderId: varchar("order_id").references(() => orders.id, { onDelete: "set null" }),
+    payload: jsonb("payload").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    /** `queued` | `sent` | `delivered` | `read` | `failed` | `skipped` */
+    status: text("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    providerId: text("provider_id"),
+    error: text("error"),
+    sentAt: ts("sent_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("notifications_dedupe_unique").on(t.dedupeKey),
+    index("notifications_created_idx").on(t.createdAt),
+    index("notifications_order_idx").on(t.orderId),
+    index("notifications_provider_idx").on(t.providerId),
+  ],
+);
+
+/**
+ * First-party analytics: page views, active time, builder steps, speed
+ * readings, errors and frustrated taps, sent by the browser to
+ * POST /api/events. No names, emails, photos or typed text: `anon_id` is a
+ * random id kept in the browser, `user_id` only links a signed-in visitor so
+ * the funnel can follow them to a paid order.
+ */
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: text("name").notNull(),
+    anonId: text("anon_id"),
+    userId: varchar("user_id"),
+    /** one browser tab visit; groups page views into a session */
+    visitId: text("visit_id"),
+    path: text("path"),
+    props: jsonb("props"),
+    /** `phone` | `tablet` | `computer` */
+    device: text("device"),
+    os: text("os"),
+    browser: text("browser"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("analytics_events_name_created_idx").on(t.name, t.createdAt), index("analytics_events_anon_idx").on(t.anonId)],
+);
+
+/**
+ * Server response times, one row per route per minute per server process.
+ * `buckets` is a histogram over fixed bounds (server/analytics/latency.ts),
+ * so any time range can be merged exactly and read as p50/p90/p95/p99.
+ */
+export const requestMetrics = pgTable(
+  "request_metrics",
+  {
+    minute: ts("minute").notNull(),
+    route: text("route").notNull(),
+    instance: text("instance").notNull(),
+    count: integer("count").notNull(),
+    errors: integer("errors").notNull().default(0),
+    sumMs: bigint("sum_ms", { mode: "number" }).notNull(),
+    maxMs: integer("max_ms").notNull(),
+    buckets: jsonb("buckets").$type<number[]>().notNull(),
+  },
+  (t) => [uniqueIndex("request_metrics_unique").on(t.minute, t.route, t.instance), index("request_metrics_minute_idx").on(t.minute)],
+);
+
+export type StaffFactor = typeof staffFactors.$inferSelect;
+export type AuditEntry = typeof auditLog.$inferSelect;
+export type PrintJob = typeof printJobs.$inferSelect;
+export type NotifyRule = typeof notifyRules.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 
 /* ── Zod insert schemas (API validation) ────────────────────────── */
 

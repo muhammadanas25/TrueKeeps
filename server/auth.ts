@@ -38,6 +38,7 @@ import { magicLinkEmail } from "./email/templates";
 import { log } from "./logger";
 import { memDb } from "./mem-db";
 import { storage } from "./storage";
+import { applyStaffRoleOnSignIn } from "./ops/roles";
 import * as schema from "@shared/schema";
 
 const MAGIC_LINK_MINUTES = 15;
@@ -121,6 +122,15 @@ export const auth = betterAuth({
   },
 
   databaseHooks: {
+    session: {
+      create: {
+        // ADMIN_EMAILS and Team invites apply at every sign-in (server/ops/roles.ts),
+        // not only when the account is first created
+        after: async (session) => {
+          await applyStaffRoleOnSignIn(session.userId).catch((err) => log.error({ err }, "[auth] staff role check failed"));
+        },
+      },
+    },
     user: {
       create: {
         before: async (user) => {

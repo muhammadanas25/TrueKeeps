@@ -30,10 +30,10 @@
  * render as a card payment. Which methods checkout offers is an owner switch
  * (getPaymentSettings).
  *
- * Sweeps (startOrderJobs): every few minutes, re-check pending orders
+ * Sweeps ("orders.sweep" job): every 5 minutes, re-check pending orders
  * (catches payments whose webhook AND redirect were both lost) and expire
- * ones older than 24h. In-process timer — fine at one replica; transitions
- * are compare-and-set so overlapping runs are harmless.
+ * ones older than 24h. Scheduled through the job queue; transitions are
+ * compare-and-set, so an overlapping run would be harmless anyway.
  */
 
 import { randomInt } from "crypto";
@@ -42,12 +42,14 @@ import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { printedPageCount, quote } from "@shared/pricing";
 import { PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
-import { queuePrintRender } from "../print/render";
+import { startPrintJob } from "../print/pipeline";
+import { notifyOrder } from "../notify/outbox";
 import { config } from "../config";
 import { log } from "../logger";
+import { register, schedule } from "../jobs";
 import { paymentProvider } from "../payments";
 import { emailProvider } from "../email";
-import { bankTransferEmail, orderConfirmedEmail } from "../email/templates";
+import { bankTransferEmail } from "../email/templates";
 import {
   BANK_DETAILS,
   BANK_TRANSFER_PROVIDER,
@@ -277,6 +279,7 @@ export async function confirmPayment(orderId: string, actor: ConfirmActor, provi
       actor,
       note: `Gateway reported ${status.amountMinor} ${status.currency} for ${status.orderNumber}; expected ${order.totalMinor} ${order.currency}`,
     });
+    void notifyOrder("payment_mismatch", order, { reported: `${status.amountMinor ?? "?"} ${status.currency ?? ""} (${status.orderNumber ?? "no number"})` });
     return order;
   }
 
@@ -303,10 +306,12 @@ export async function confirmPayment(orderId: string, actor: ConfirmActor, provi
   });
 
   log.info({ orderId, orderNumber: order.orderNumber, actor, livemode: order.livemode }, "[orders] paid");
-  void sendConfirmation(paid);
-  // Paid means it will be printed: cut the print files from the HD originals now,
-  // in the background, so they're ready before anyone opens the order.
-  queuePrintRender(paid.id);
+  // The customer's confirmation and the staff alert go through the outbox
+  // (stored, retried, routed by Admin → Notifications).
+  void notifyOrder("order_paid", paid);
+  // Paid means it will be printed: start the print job now. It is a database
+  // row, so the reconciler finishes it even if this process dies right here.
+  void startPrintJob(paid.id).catch((err) => log.error({ err, orderId: paid.id }, "[orders] print job not started; the reconciler will"));
   return paid;
 }
 
@@ -343,8 +348,9 @@ export async function markBankTransferPaid(orderId: string, adminId: string, ref
     raw: { reference: reference ?? null, by: adminId },
   });
   log.info({ orderId, orderNumber: order.orderNumber, adminId }, "[orders] bank transfer marked paid");
-  void sendConfirmation(paid);
-  queuePrintRender(paid.id);
+  // same as a card payment: confirmation + staff alert via the outbox, then the print job
+  void notifyOrder("order_paid", paid);
+  void startPrintJob(paid.id).catch((err) => log.error({ err, orderId: paid.id }, "[orders] print job not started; the reconciler will"));
   return paid;
 }
 
@@ -363,24 +369,6 @@ async function sendBankTransferInstructions(order: Order) {
     await emailProvider.send({ to: order.contactEmail, ...tpl, idempotencyKey: `order-bank-${order.id}` });
   } catch (err) {
     log.error({ err, orderId: order.id }, "[orders] bank transfer email failed");
-  }
-}
-
-async function sendConfirmation(order: Order) {
-  try {
-    const tpl = orderConfirmedEmail({
-      orderNumber: order.orderNumber,
-      title: order.title,
-      totalMinor: order.totalMinor,
-      qty: order.qty,
-      binding: order.binding,
-      finish: order.finish,
-      orderUrl: `${config.appUrl}/orders/${order.id}`,
-      testMode: !order.livemode,
-    });
-    await emailProvider.send({ to: order.contactEmail, ...tpl, idempotencyKey: `order-confirmed-${order.id}` });
-  } catch (err) {
-    log.error({ err, orderId: order.id }, "[orders] confirmation email failed");
   }
 }
 
@@ -425,7 +413,7 @@ export async function sweepOrders(now = new Date()): Promise<{ checked: number; 
   return { checked, paid, expired };
 }
 
-export function startOrderJobs(intervalMs = 5 * 60 * 1000) {
-  const t = setInterval(() => void sweepOrders().catch((err) => log.error({ err }, "[orders] sweep crashed")), intervalMs);
-  t.unref();
-}
+// Every 5 minutes through the job queue: with pg-boss, one server runs each
+// tick even if several are up (it used to be a timer in every process).
+register("orders.sweep", async () => void (await sweepOrders()), { retryLimit: 0, expireInSeconds: 4 * 60 });
+schedule("orders.sweep", "*/5 * * * *", 5 * 60 * 1000);

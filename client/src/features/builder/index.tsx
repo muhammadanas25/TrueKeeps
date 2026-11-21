@@ -36,6 +36,7 @@ import { COPY, OCCASIONS, coverPhotoIdFor, occasionById } from "./data";
 import { bookTheme } from "./palette";
 import { BACK_MAP, SCREEN_CONTEXT, useBuilderState, type BuilderState } from "./state";
 import { useBuilderSync, type SyncStatus } from "./sync";
+import { trackStep } from "@/lib/track";
 import { useSession } from "@/features/auth/useSession";
 import { SignInSheet } from "@/features/auth/SignInSheet";
 import { AccountMenu } from "@/features/auth/AccountMenu";
@@ -97,6 +98,8 @@ export default function BookBuilder() {
   };
   const copy = COPY[state.voice] ?? COPY.warm;
   const { status: syncStatus } = useBuilderSync(state, set);
+  // funnel analytics: which step people reach and how long they spend there (docs/adr/018)
+  useEffect(() => trackStep(state.screen === "compose" ? `compose-${state.qstep ?? 0}` : state.screen), [state.screen, state.qstep]);
   const uploadsBusy = useSyncExternalStore(uploadEngine.subscribe, () => uploadEngine.getSnapshot().active);
   const { loading: sessionLoading, isMember } = useSession();
   const [editorVersion, setEditorVersion] = useEditorVersion();

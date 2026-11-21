@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { bookTypeBySlug, metaForPath, SITE } from "@shared/site";
 import { BookTypePage, PhotoBooksPage } from "@/features/landing/pages";
 import { WhatsAppHelpFloating } from "@/features/support/WhatsAppHelp";
+import { startTracking, trackPage } from "@/lib/track";
 
 /*
  * Route-level code splitting: each page loads its own chunk so the
@@ -22,6 +23,7 @@ const Account = lazy(() => import("@/pages/account"));
 const Orders = lazy(() => import("@/pages/orders"));
 const Order = lazy(() => import("@/pages/order"));
 const AdminOrders = lazy(() => import("@/pages/admin-orders"));
+const AdminConsole = lazy(() => import("@/features/admin"));
 const Feedback = lazy(() => import("@/features/feedback"));
 const AdminFeedback = lazy(() => import("@/pages/admin-feedback"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -79,8 +81,16 @@ function useRouteMeta() {
   }, [path]);
 }
 
+/** Page views and active time for Admin → Analytics (client/src/lib/track.ts). */
+function useTracking() {
+  const [path] = useLocation();
+  useEffect(() => startTracking(), []);
+  useEffect(() => trackPage(path), [path]);
+}
+
 function Router() {
   useRouteMeta();
+  useTracking();
   return (
     <Suspense fallback={<RouteFallback />}>
       <Switch>
@@ -112,7 +122,8 @@ function Router() {
         {/* commerce (Phase 2B) */}
         <Route path="/orders" component={Orders} />
         <Route path="/orders/:id" component={Order} />
-        <Route path="/admin/orders" component={AdminOrders} />
+        {/* the previous single-page orders console, kept while its tools move into the new admin */}
+        <Route path="/admin/legacy-orders" component={AdminOrders} />
         {/* private customer reviews (docs/adr/015); the first addresses redirect */}
         <Route path="/review" component={Feedback} />
         <Route path="/admin/reviews" component={AdminFeedback} />
@@ -122,6 +133,8 @@ function Router() {
         <Route path="/admin/feedback">
           <RedirectKeepingQuery to="/admin/reviews" />
         </Route>
+        {/* the ops console (docs/adr/018): its own shell, staff only, second sign-in step */}
+        <Route path="/admin" nest component={AdminConsole} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>

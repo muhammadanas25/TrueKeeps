@@ -24,6 +24,12 @@ import { uploadsRouter } from "./routes/uploads";
 import { uploadMetricsRouter } from "./routes/upload-metrics";
 import { ordersRouter } from "./routes/orders";
 import { feedbackRouter } from "./routes/feedback";
+import { staffAuthRouter } from "./routes/staff-auth";
+import { adminConsoleRouter } from "./routes/admin-console";
+import { whatsappWebhookRouter } from "./routes/webhooks-whatsapp";
+import { collectRouter } from "./analytics/collect";
+import { requireStaff } from "./middleware/staff";
+import rateLimit from "express-rate-limit";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Liveness probe — used by the hosting platform (Railway healthcheck)
@@ -33,6 +39,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok", uptime: process.uptime() });
   });
 
+  // The staff gate (docs/adr/018): every /api/admin/* request, including any
+  // added later, must be staff with the second sign-in step passed. Mounted
+  // before the routers so no admin route can be reached around it.
+  app.use(
+    "/api/admin",
+    rateLimit({ windowMs: 60_000, limit: 600, standardHeaders: "draft-7", legacyHeaders: false, message: { error: "Too many requests" } }),
+    requireStaff(),
+  );
+
+  app.use(staffAuthRouter);
+  app.use(adminConsoleRouter);
+  app.use(collectRouter);
+  app.use(whatsappWebhookRouter);
   app.use(meRouter);
   app.use(themesRouter);
   app.use(projectsRouter);

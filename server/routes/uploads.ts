@@ -32,6 +32,7 @@ import { insertUploadedPhotoSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { allDerivativeKeys, buildPhotoKey, derivativeKey, isSafeKey, LocalDiskMediaStore, mediaStore, mediaUrl, projectIdOfKey } from "../media";
 import { enqueue } from "../jobs";
+import { isElevatedStaff } from "../middleware/staff";
 import { currentUser, optionalUser, requireUser } from "../middleware/auth";
 import { loadOwnedProject, loadOwnedUpload } from "../middleware/ownership";
 import { uploadLimiter, writeLimiter } from "../middleware/rate-limit";
@@ -295,8 +296,8 @@ async function authorizedKey(req: Request, res: Response): Promise<string | null
   // is nobody else's business.
   await new Promise<void>((resolve, reject) => void optionalUser(req, res, (err?: unknown) => (err ? reject(err) : resolve())));
   const project = req.user ? await storage.getProject(projectId) : undefined;
-  const isAdmin = (req.user as { role?: string } | undefined)?.role === "admin";
-  if (!project || project.deletedAt || (project.userId !== req.user!.id && !isAdmin)) {
+  // staff see any book's photos only past the admin's second sign-in step
+  if (!project || project.deletedAt || (project.userId !== req.user!.id && !(await isElevatedStaff(req)))) {
     res.status(404).end();
     return null;
   }

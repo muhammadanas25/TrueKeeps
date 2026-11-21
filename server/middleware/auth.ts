@@ -10,7 +10,8 @@
  *  - requireMember: like requireUser but rejects anonymous users with
  *    403 `{code:"SIGN_IN_REQUIRED"}` — used where a verified email is a
  *    hard requirement (placing an order, /books listing is fine either way).
- *  - requireAdmin: role === "admin".
+ *  - requireAdmin: the owner, with the second sign-in step passed (see
+ *    staff.ts; `requireStaff` there also admits the ops role).
  *
  * The session lookup is cached on the request so a route that stacks
  * guards never hits the DB twice.
@@ -18,6 +19,7 @@
 
 import type { NextFunction, Request, Response } from "express";
 import { getSessionFromHeaders, type AuthUser } from "../auth";
+import { requireStaff } from "./staff";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -25,18 +27,24 @@ declare global {
     interface Request {
       /** Resolved session user (guest or member); set by the guards below. */
       user?: AuthUser;
+      /** The session row's id, so staff step-up can be tied to this one session. */
+      authSessionId?: string;
       /** Marks that a session lookup already happened for this request. */
       sessionChecked?: boolean;
     }
   }
 }
 
-async function resolve(req: Request): Promise<AuthUser | undefined> {
+/** Resolve (once per request) the session user; exported for the staff gate. */
+export async function resolve(req: Request): Promise<AuthUser | undefined> {
   if (req.sessionChecked) return req.user;
   req.sessionChecked = true;
   if (!req.headers.cookie) return undefined;
   const session = await getSessionFromHeaders(req.headers);
-  if (session) req.user = session.user;
+  if (session) {
+    req.user = session.user;
+    req.authSessionId = session.session.id;
+  }
   return req.user;
 }
 
@@ -72,15 +80,13 @@ export async function requireMember(req: Request, res: Response, next: NextFunct
   }
 }
 
-export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  try {
-    const user = await resolve(req);
-    if (!user) return res.status(401).json({ error: "Sign-in required", code: "UNAUTHENTICATED" });
-    if ((user as { role?: string }).role !== "admin") return res.status(403).json({ error: "Admin only" });
-    next();
-  } catch (err) {
-    next(err);
-  }
+/**
+ * Owner-only routes. Delegates to the staff gate (server/middleware/staff.ts):
+ * fresh role from the database, the second sign-in step passed for THIS
+ * session, the optional IP allow-list, and an audit entry on refusal.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  return requireStaff(["admin"])(req, res, next);
 }
 
 /** Typed accessor for handlers behind requireUser (never undefined there). */

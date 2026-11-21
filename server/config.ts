@@ -68,6 +68,30 @@ const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
 
+  /** Second copy of every print PDF (optional; any S3-compatible bucket) */
+  S3_BACKUP_ENDPOINT: z.string().optional(),
+  S3_BACKUP_REGION: z.string().optional(),
+  S3_BACKUP_BUCKET: z.string().optional(),
+  S3_BACKUP_ACCESS_KEY_ID: z.string().optional(),
+  S3_BACKUP_SECRET_ACCESS_KEY: z.string().optional(),
+
+  /** Ops console (docs/adr/018) */
+  /** comma-separated IPs or prefixes ("203.0.113.", "2001:db8:") allowed into /api/admin; empty = anywhere */
+  ADMIN_IP_ALLOWLIST: z.string().default(""),
+  /** key for staff authenticator secrets; defaults to one derived from BETTER_AUTH_SECRET */
+  STAFF_2FA_KEY: z.string().min(32).optional(),
+  /** comma-separated emails for staff alerts when a rule lists none (falls back to every Owner) */
+  ALERT_EMAILS: z.string().default(""),
+
+  /** WhatsApp Cloud API (Meta). All four set → WhatsApp on; otherwise it's skipped and logged. */
+  WHATSAPP_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  /** App secret: verifies X-Hub-Signature-256 on status webhooks */
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  /** any string you also type into Meta's webhook settings */
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_API_VERSION: z.string().default("v21.0"),
+
   /** pino level; `silent` in tests */
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default(isProd ? "info" : "debug"),
 });
@@ -142,6 +166,35 @@ export const config = {
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
+  backupS3:
+    env.S3_BACKUP_BUCKET && env.S3_BACKUP_ACCESS_KEY_ID && env.S3_BACKUP_SECRET_ACCESS_KEY
+      ? {
+          endpoint: env.S3_BACKUP_ENDPOINT,
+          region: env.S3_BACKUP_REGION,
+          bucket: env.S3_BACKUP_BUCKET,
+          accessKeyId: env.S3_BACKUP_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_BACKUP_SECRET_ACCESS_KEY,
+        }
+      : null,
+  ops: {
+    ipAllowlist: env.ADMIN_IP_ALLOWLIST.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    staffKey: env.STAFF_2FA_KEY ?? null,
+    alertEmails: env.ALERT_EMAILS.split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  },
+  whatsapp:
+    env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID
+      ? {
+          token: env.WHATSAPP_TOKEN,
+          phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
+          appSecret: env.WHATSAPP_APP_SECRET ?? null,
+          verifyToken: env.WHATSAPP_VERIFY_TOKEN ?? null,
+          apiVersion: env.WHATSAPP_API_VERSION,
+        }
+      : null,
   logLevel: env.LOG_LEVEL,
 } as const;
 

@@ -26,8 +26,9 @@
  * (docs/adr/011).
  */
 
-import { mkdir, readFile, rm, stat, writeFile } from "fs/promises";
-import { existsSync, mkdirSync } from "fs";
+import { mkdir, readFile, rm, stat, writeFile, copyFile } from "fs/promises";
+import { existsSync, mkdirSync, createReadStream } from "fs";
+import type { Readable } from "stream";
 import path from "path";
 import { randomUUID } from "crypto";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -64,6 +65,16 @@ export interface MediaStore {
   /** server-side read — used by the image pipeline for source bytes */
   get(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
+  /** Stream a file from disk into the store (print PDFs: hundreds of MB, never held in memory). */
+  putFile(key: string, filePath: string, contentType: string): Promise<void>;
+  /** Stream an object out (verifying print PDFs byte by byte). */
+  getStream(key: string): Promise<Readable>;
+  /**
+   * A short-lived link that downloads as `filename` (print PDFs for staff).
+   * Only call after checking the requester may read `key`. Links from S3/R2
+   * honour HTTP Range, so a dropped download resumes instead of restarting.
+   */
+  signedDownload(key: string, filename: string, seconds: number): Promise<string>;
 }
 
 /* ── Key hygiene ────────────────────────────────────────────── */
@@ -174,6 +185,21 @@ export class LocalDiskMediaStore implements MediaStore {
   async delete(key: string): Promise<void> {
     await rm(this.filePath(key), { force: true });
   }
+
+  async putFile(key: string, filePath: string, _contentType: string): Promise<void> {
+    const fp = this.filePath(key);
+    await mkdir(path.dirname(fp), { recursive: true });
+    await copyFile(filePath, fp);
+  }
+
+  async getStream(key: string): Promise<Readable> {
+    return createReadStream(this.filePath(key));
+  }
+
+  /** Local files go through the /media route, which checks access itself. */
+  async signedDownload(key: string, _filename: string, _seconds: number): Promise<string> {
+    return mediaUrl(key);
+  }
 }
 
 /* ── S3-compatible (Cloudflare R2 in prod) ──────────────────── */
@@ -245,6 +271,33 @@ export class S3MediaStore implements MediaStore {
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.cfg.bucket, Key: key }));
   }
+
+  /**
+   * One streamed PUT with an explicit length. R2 and S3 accept up to 5 GB in a
+   * single PUT, far above a print PDF, so multipart isn't needed; the file is
+   * read from disk as it goes, never buffered whole.
+   */
+  async putFile(key: string, filePath: string, contentType: string): Promise<void> {
+    const { size } = await stat(filePath);
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.cfg.bucket, Key: key, Body: createReadStream(filePath), ContentLength: size, ContentType: contentType }),
+    );
+  }
+
+  async getStream(key: string): Promise<Readable> {
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }));
+    if (!res.Body) throw new Error(`empty object ${key}`);
+    return res.Body as Readable;
+  }
+
+  async signedDownload(key: string, filename: string, seconds: number): Promise<string> {
+    const cmd = new GetObjectCommand({
+      Bucket: this.cfg.bucket,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${filename.replace(/[^\w.-]/g, "_")}"`,
+    });
+    return getSignedUrl(this.client, cmd, { expiresIn: seconds });
+  }
 }
 
 /* ── Factory ────────────────────────────────────────────────── */
@@ -299,3 +352,17 @@ function createMediaStore(): MediaStore {
 }
 
 export const mediaStore = createMediaStore();
+
+/**
+ * A second, independent bucket for print PDFs (S3_BACKUP_*), or null. A file
+ * counts as safe only when both copies are checked (server/print/pipeline.ts).
+ */
+export const backupStore: MediaStore | null = config.backupS3
+  ? new S3MediaStore({
+      endpoint: normaliseS3Endpoint(config.backupS3.endpoint),
+      region: config.backupS3.region || "auto",
+      bucket: config.backupS3.bucket,
+      accessKeyId: config.backupS3.accessKeyId,
+      secretAccessKey: config.backupS3.secretAccessKey,
+    })
+  : null;
