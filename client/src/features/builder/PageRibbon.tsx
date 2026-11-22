@@ -84,13 +84,19 @@ export function PageRibbon({
   const ps = Math.max(140, Math.floor(Math.min(box.w - PEEK * 2, box.h - 8)));
   const spineW = cover && spine ? Math.round(ps * 0.07) : 0;
   const hasCover = Boolean(cover);
+  // The cover stands alone (owner, 2026-11-22: "front cover not showing on
+  // mobile"): page 1 starts past the edge of the stage while the cover is in
+  // the middle, so only the cover and its spine are in view.
+  // The space beside a centred page is half of what the page leaves of the
+  // stage, which grows when the stage is short and the page shrinks to fit.
+  const coverGap = GAP + Math.ceil(Math.max(PEEK, (box.w - ps) / 2)) + 8;
   const count = pages.length + (hasCover ? 1 : 0);
 
   /** Scroll offset at which stop i sits in the middle of the stage. */
   const stops = useMemo(() => {
     const out: number[] = [];
     if (hasCover) out.push(0);
-    const first = hasCover ? ps + GAP : 0;
+    const first = hasCover ? ps + coverGap : 0;
     for (let k = 0; k < pages.length; k++) out.push(first + k * ps + Math.floor(k / 2) * GAP);
     return out;
   }, [hasCover, ps, pages.length]);
@@ -170,7 +176,7 @@ export function PageRibbon({
           <div className="pr-rail" ref={railRef} onScroll={onScroll} role="region" aria-roledescription="carousel" aria-label={label}>
             <div className="pr-spacer" style={{ width: pad - spineW }} aria-hidden="true" />
             {hasCover ? (
-              <div className="pr-spread pr-cover" style={{ marginRight: pages.length ? GAP : 0 }}>
+              <div className="pr-spread pr-cover" style={{ marginRight: pages.length ? coverGap : 0 }}>
                 {spine ? (
                   <div className="pr-spine" style={{ width: spineW, height: ps, background: spine.bg, color: spine.ink }} aria-hidden="true">
                     <span style={{ fontFamily: spine.font, fontSize: Math.max(8, spineW * 0.42) }}>{title}</span>

@@ -18,9 +18,9 @@
  * same order, while changing the quantity or address makes a new one.
  */
 
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpen, Check, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CheckCircle2, Copy, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { MiniBook } from "../book";
 import { BINDINGS, DENSITIES, coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
@@ -31,7 +31,8 @@ import { useUploads } from "../upload/UploadContext";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
 import { finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
-import { PK_PROVINCES, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
+import { PK_PROVINCES, STATUS_LABEL, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
+import { useOrdered } from "../useOrdered";
 import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
 import "../flow.css";
 import { useSession } from "@/features/auth/useSession";
@@ -65,11 +66,14 @@ export function OrderScreen({
   set,
   copy,
   onBack,
+  onRestart,
 }: {
   state: BuilderState;
   set: (patch: Partial<BuilderState>) => void;
   copy: CopyVoice;
   onBack: () => void;
+  /** start a new book (the header's "Start over") */
+  onRestart: () => void;
 }) {
   const { user } = useSession();
   const occ = occasionById(state.occasion);
@@ -109,12 +113,46 @@ export function OrderScreen({
   const [busy, setBusy] = useState(false);
   const nonce = useRef(Math.random().toString(36).slice(2));
 
+  /*
+   * Has this book already been ordered? (owner, 2026-11-22: pressing Back
+   * after placing an order showed this form again and seemed stuck.) An
+   * ordered book shows its order instead; "Order another copy" is the
+   * deliberate way to order it again, and the server refuses a second order
+   * without it (createOrder, ALREADY_ORDERED).
+   */
+  const { ordered, refetch: refetchOrders } = useOrdered(state.projectId);
+  const [again, setAgain] = useState(false);
+
+  // Back from the order page restores this page from the browser's cache with
+  // the button still saying "Placing…". Wake it up and look for the order.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      setBusy(false);
+      void refetchOrders();
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, [refetchOrders]);
+
+  /** One field checked on its own, when the customer leaves it (not on every key). */
+  const check = (k: keyof AddressForm) => {
+    if (k === "province") return setFieldErrors((fe) => ({ ...fe, province: addr.province ? "" : "Choose a province" }));
+    const shape = shippingAddressSchema.shape as Record<string, { safeParse: (v: unknown) => { success: boolean; error?: { issues: Array<{ message: string }> } } }>;
+    const one = shape[k]?.safeParse(addr[k] ?? "");
+    if (!one) return;
+    // an optional field left empty is fine; a required one waits for the button
+    if (!(addr[k] ?? "").trim()) return;
+    setFieldErrors((fe) => ({ ...fe, [k]: one.success ? "" : one.error?.issues[0]?.message ?? "Check this" }));
+  };
+
   const field = (k: keyof AddressForm) => ({
     value: addr[k] ?? "",
     onChange: (e: { target: { value: string } }) => {
       setAddr((a) => ({ ...a, [k]: e.target.value }));
       if (fieldErrors[k]) setFieldErrors((fe) => ({ ...fe, [k]: "" }));
     },
+    onBlur: () => check(k),
     "aria-invalid": Boolean(fieldErrors[k]) || undefined,
   });
 
@@ -132,6 +170,8 @@ export function OrderScreen({
       for (const issue of parsed.error.issues) fe[String(issue.path[0])] ||= issue.message;
       if (!addr.province) fe.province = "Choose a province";
       setFieldErrors(fe);
+      // take them to the first problem
+      requestAnimationFrame(() => (document.querySelector('.bb-ship [aria-invalid="true"]') as HTMLElement | null)?.focus());
       return;
     }
     if (!state.projectId) {
@@ -158,12 +198,19 @@ export function OrderScreen({
           document: toDocument(state),
           idempotencyKey: `${idempotencyKey}-${method}`,
           method,
+          again: again || undefined,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string | null; order?: { id: string }; error?: string; fields?: Record<string, string> };
       // bank transfer: no payment page; the order page shows how to pay
       if (res.ok && bank && data.order) {
         window.location.assign(`/orders/${data.order.id}?placed=1`);
+        return;
+      }
+      // ordered in another tab, or before a Back press: show that order
+      if (res.status === 409 && (data as { code?: string }).code === "ALREADY_ORDERED") {
+        setBusy(false);
+        void refetchOrders();
         return;
       }
       if (!res.ok || !data.checkoutUrl) {
@@ -181,6 +228,33 @@ export function OrderScreen({
   };
 
   const disabled = busy || pricing.isLoading || !checkout?.enabled || awaiting.length > 0;
+
+  if (ordered && !again) {
+    return (
+      <div className="bb-screen bb-order">
+        <div className="bb-order-inner">
+          <div className="bb-ordered" role="status">
+            <CheckCircle2 size={28} />
+            <h1>You've ordered this book</h1>
+            <p>
+              Order {ordered.orderNumber} · {STATUS_LABEL[ordered.status]}. Changes now would make a different book, so this one stays as you ordered it.
+            </p>
+            <div className="bb-ordered-actions">
+              <a className="bb-btn bb-btn-primary bb-btn-lg" href={`/orders/${ordered.id}`}>
+                See my order <ArrowRight size={18} />
+              </a>
+              <button type="button" className="bb-btn bb-btn-secondary" onClick={() => setAgain(true)}>
+                <Copy size={16} /> Order another copy
+              </button>
+              <button type="button" className="bb-btn bb-btn-ghost" onClick={onRestart}>
+                Start a new book
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bb-screen bb-order">
@@ -257,6 +331,11 @@ export function OrderScreen({
 
             <fieldset className="bb-ship" disabled={busy}>
               <legend className="bb-panel-label">Deliver to</legend>
+              {user?.email ? (
+                <p className="bb-ship-email">
+                  Order updates go to <b>{user.email}</b>
+                </p>
+              ) : null}
               <label className="bb-ship-field wide">
                 <span>Full name</span>
                 <input autoComplete="name" {...field("fullName")} />

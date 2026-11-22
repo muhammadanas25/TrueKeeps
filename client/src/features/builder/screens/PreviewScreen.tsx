@@ -23,7 +23,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Hand, PenLine, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Hand, PenLine, Plus } from "lucide-react";
+import { STATUS_LABEL } from "@shared/orders";
+import { useOrdered } from "../useOrdered";
 import { Book3D, CoverFace, type Book3DApi } from "../book";
 import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
 import { DENSITIES, FEEL_CHOICES, bookPhotos, coverHasPhoto, coverPhotoIdFor, isFeelChoice, occasionById, toSpreads, type CopyVoice } from "../data";
@@ -59,6 +61,7 @@ export function PreviewScreen({
   const n = spreads.length;
   const api = useRef<Book3DApi | null>(null);
   const [approved, setApproved] = useState(false);
+  const { ordered } = useOrdered(state.projectId);
   const [picking, setPicking] = useState(false);
   const [index, setIndex] = useState(0);
   // the "click to turn" hint hides forever after the first flip
@@ -125,6 +128,36 @@ export function PreviewScreen({
       </button>
     </div>
   ) : null;
+  const rows: Array<[string, string]> = [
+    ["Title", title],
+    ["Line under it", line || "None"],
+    ["Lettering", font.name],
+    ["Book", `${arrangement}, ${pageCount} pages`],
+    ["Photos", String(photoCount)],
+    ["Paper", finishName(state.finish)],
+  ];
+  const detailRows = (
+    <dl className="pv-rows">
+      {rows.map(([k, v]) => (
+        <div key={k}>
+          <dt>{k}</dt>
+          <dd>{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+  // an ordered book shows its order, not "Approve and pay" again (useOrdered)
+  const orderedNote = ordered ? (
+    <div className="pv-ordered" role="status">
+      <CheckCircle2 size={20} />
+      <span>
+        <b>You've ordered this book.</b> Order {ordered.orderNumber} · {STATUS_LABEL[ordered.status]}
+      </span>
+      <a className="bb-btn bb-btn-primary" href={`/orders/${ordered.id}`}>
+        See my order <ArrowRight size={16} />
+      </a>
+    </div>
+  ) : null;
   const approve = (
     <label className={"pv-approve" + (approved ? " on" : "")}>
       <input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
@@ -166,20 +199,23 @@ export function PreviewScreen({
           <span className="bk-grip" aria-hidden="true" />
           <h1 className="pv-title">Check your book</h1>
           {coverSwitch}
-          <p className="pv-line">
-            {arrangement} book · {pageCount} pages · {photoCount} photos · {finishName(state.finish).toLowerCase()} · {font.name} lettering
-          </p>
+          {/* the same details as desktop, as a table (owner, 2026-11-22: not as prominent on the phone) */}
+          {detailRows}
           {oddNote}
-          {approve}
-          <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" disabled={!approved} onClick={onOrder}>
-            {approved ? (
-              <>
-                Approve and pay {price} <ArrowRight size={18} />
-              </>
-            ) : (
-              "Tick the box to approve"
-            )}
-          </button>
+          {orderedNote ?? (
+            <>
+              {approve}
+              <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" disabled={!approved} onClick={onOrder}>
+                {approved ? (
+                  <>
+                    Approve and pay {price} <ArrowRight size={18} />
+                  </>
+                ) : (
+                  "Tick the box to approve"
+                )}
+              </button>
+            </>
+          )}
           <div className="pv-links">
             <button type="button" className="pv-link" onClick={onCustomize}>
               <PenLine size={15} /> Make changes
@@ -196,14 +232,6 @@ export function PreviewScreen({
     state.pos === 0
       ? "Front cover and spine"
       : "Pages " + (state.pos * 2 - 1) + (spreads[state.pos - 1] && spreads[state.pos - 1].right ? " and " + state.pos * 2 : "") + " of " + pageCount;
-  const rows: Array<[string, string]> = [
-    ["Title", title],
-    ["Line under it", line || "None"],
-    ["Lettering", font.name],
-    ["Book", `${arrangement}, ${pageCount} pages`],
-    ["Photos", String(photoCount)],
-    ["Paper", finishName(state.finish)],
-  ];
 
   return (
     <div className="bb-screen pv-wide">
@@ -241,21 +269,19 @@ export function PreviewScreen({
           <p>Turn every page. This is exactly what we print.</p>
         </div>
         {coverSwitch}
-        <dl className="pv-rows">
-          {rows.map(([k, v]) => (
-            <div key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
+        {detailRows}
         {oddNote}
-        {approve}
+        {orderedNote}
+        {ordered ? null : approve}
         <div className="pv-actions">
-          <button className="bb-btn bb-btn-primary bb-btn-lg" disabled={!approved} onClick={onOrder}>
-            Approve and pay {price} <ArrowRight size={18} />
-          </button>
-          {!approved ? <span className="pv-hint">Tick the box above to approve your book.</span> : null}
+          {ordered ? null : (
+            <>
+              <button className="bb-btn bb-btn-primary bb-btn-lg" disabled={!approved} onClick={onOrder}>
+                Approve and pay {price} <ArrowRight size={18} />
+              </button>
+              {!approved ? <span className="pv-hint">Tick the box above to approve your book.</span> : null}
+            </>
+          )}
           <button type="button" className="pv-link" onClick={onCustomize}>
             <PenLine size={15} /> Make changes
           </button>

@@ -32,7 +32,7 @@
 .pr-page.left::after { right: 0; background: linear-gradient(to left, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0)); }
 .pr-page.right::after { left: 0; background: linear-gradient(to right, rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0)); }
 .pr-spine { flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: inset -2px 0 3px rgba(0, 0, 0, 0.28); }
-.pr-spine span { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font-weight: 600; line-height: 1; }
+.pr-spine span { writing-mode: vertical-rl; white-space: nowrap; font-weight: 600; line-height: 1; overflow: hidden; text-overflow: ellipsis; max-height: 91.6%; /* reads top to bottom, as the step 4 spine and the printed book; 0.5 in clear at each end */ }
 .pr-nav { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 0 30px; }
 .pr-arrow { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--tk-indigo-200) !important; color: #fff !important; background: transparent; }
 .pr-arrow:disabled { opacity: 0.35; cursor: default; }
@@ -127,6 +127,17 @@
 .bk-card-top b { font-size: 18px; line-height: 26px; color: var(--heading); }
 .bk-card-price { margin-left: auto; font-weight: 700; font-size: 18px; line-height: 26px; color: var(--heading); font-variant-numeric: tabular-nums; }
 .bk-card-line { font-size: 14px; line-height: 22px; color: var(--color-fg2); }
+/* phone cards (2026-11-22): the same picture, tighter */
+.bk-card.sm { padding: 10px 12px; border-radius: 12px; gap: 2px; }
+.bk-card.sm .bk-card-top b, .bk-card.sm .bk-card-price { font-size: 15px; line-height: 22px; }
+.bk-card.sm .bk-card-art .bb-wire { --pw: 28px; width: 28px; height: 28px; }
+.bk-card.sm .bk-fit-line { font-size: 12.5px; line-height: 18px; }
+.bk-phone .bk-cards { gap: 8px; }
+/* how to unlock the next arrangement, instead of a choice that changes nothing */
+.bk-unlock { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--tk-teal-50); border: 1px solid var(--tk-teal-200); color: var(--success-fg); font-size: 14px; line-height: 20px; }
+.bk-unlock svg { flex: none; margin-top: 2px; }
+.bk-unlock b { font-weight: 700; }
+.bk-paper { padding-top: 2px; }
 .bk-field { display: flex; flex-direction: column; gap: 8px; }
 .bk-label { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--heading); }
 .bk-help { font-size: 14px; line-height: 21px; color: var(--color-fg3); }
@@ -262,6 +273,17 @@
 .up-status svg { flex: none; margin-top: 2px; }
 .up-need { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--heading); }
 .up-status.ok { background: var(--success-bg); color: var(--success-fg); }
+/* a few photos may print soft (quality.ts): amber, informative, not an error */
+.up-status.warn { background: #FFF4D6; color: #5C4200; font-weight: 500; }
+.up-status.warn b { font-weight: 700; }
+/* remove button on each photo: always visible (phones can't hover), 32px circle on a 44px hit area */
+.ck-tile-x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
+.ck-tile-x::before { content: ""; position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; background: rgba(27, 23, 54, 0.72); }
+.ck-tile-x svg { position: relative; margin: -4px -4px 0 0; }
+.ck-tile-x:focus-visible::before { outline: 2px solid var(--heading); outline-offset: 2px; }
+.ck-tile-flag { position: absolute; left: 6px; right: 6px; bottom: 6px; padding: 4px 7px; border-radius: 7px; background: #FFF4D6; color: #6B4A00; font-size: 11px; line-height: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.up-undo { position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30; display: flex; gap: 14px; align-items: center; padding: 12px 16px; border-radius: 12px; background: var(--tk-indigo-800); color: #fff; font-size: 14px; box-shadow: 0 10px 30px rgba(22, 20, 41, 0.3); }
+.up-undo button { border: 0; background: none; padding: 4px 2px; color: var(--tk-rose-200); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
 
 /* ── Step 3: the cover photo row under the three covers ──── */
 .ck-coverphoto { margin-top: 14px; }
@@ -295,3 +317,14 @@
 @media (prefers-reduced-motion: reduce) {
   .bk-seg > button, .bk-card { transition: none; }
 }
+
+/* ── Step 6: phone details table and an ordered book (2026-11-22) ── */
+.pv-phone .pv-rows { padding: 0 12px; }
+.pv-phone .pv-rows > div { padding: 6px 0; font-size: 13px; line-height: 18px; }
+.pv-phone .pv-rows dd { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 62%; }
+.pv-ordered { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 14px 16px; border-radius: 14px; background: var(--success-bg); color: var(--success-fg); font-size: 14px; line-height: 20px; }
+.pv-ordered > span { flex: 1 1 200px; color: var(--heading); }
+.pv-ordered svg { flex: none; }
+/* step 4: how much title still fits (TITLE_MAX) */
+.ck-count { font-size: 13px; line-height: 18px; color: var(--color-fg3); }
+.ck-count.full { color: var(--tk-rose-700); }

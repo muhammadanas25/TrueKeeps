@@ -136,6 +136,33 @@ for (const id of Object.keys(RAW)) {
   BY_COUNT[t.n].push(t);
 }
 
+/**
+ * The engine templates the editor's layout picker offers for 4, 5 and 6
+ * photos a page (owner, 2026-11-22: "I don't see the advanced layouts, like
+ * 4 boxes in one"). The picker's own named layouts stop at three photos; these
+ * are the engine's, so a page picked here looks exactly like one the engine
+ * made. `frames` are page fractions, for drawing the thumbnail.
+ */
+export const PICKER_TEMPLATES: Array<{ id: string; name: string; n: number; frames: PageFrame[] }> = (
+  [
+    ["S4", "Grid of 4"],
+    ["L1S3", "Big + 3"],
+    ["M4", "Mosaic"],
+    ["L2S3", "2 + 3"],
+    ["M5", "3 + 2"],
+    ["P5", "Five tall"],
+    ["L6", "Six wide"],
+    ["P6", "Six tall"],
+    ["S6", "Six square"],
+  ] as const
+).map(([id, name]) => ({
+  id,
+  name,
+  n: RAW[id].s.length,
+  // inches → page fractions (toFrame is defined further down, after this runs)
+  frames: RAW[id].s.map(([x, y, w, h]) => ({ x: x / PAGE, y: y / PAGE, w: w / PAGE, h: h / PAGE })),
+}));
+
 /* ── Arrangements ──────────────────────────────────────────── */
 
 export type ArrangementId = "story" | "classic" | "family";
@@ -549,11 +576,13 @@ export function arrangeBook(photos: BuilderPhoto[], style: ArrangementId, chosen
  * Framing the customer already set on a photo is kept: only photos that are
  * new to the page get the engine's default framing.
  */
-export function relayoutPage(page: BookPage, slots: Placement[], photos: BuilderPhoto[], pageIndex: number): BookPage | null {
+export function relayoutPage(page: BookPage, slots: Placement[], photos: BuilderPhoto[], pageIndex: number, templateId?: string): BookPage | null {
   if (!slots.length || slots.length > MAX_PER_PAGE) return null;
   const byId = new Map(photos.map((p) => [p.id, p]));
   const chunk: SizedPhoto[] = slots.map((s) => byId.get(s.photoId) ?? { id: s.photoId });
-  const best = rank(chunk)[0];
+  // a template the customer picked in the editor, when it holds exactly these photos
+  const asked = templateId ? BY_COUNT[chunk.length].find((t) => t.id === templateId) : undefined;
+  const best = asked ? { tpl: asked, ...assign(chunk, asked) } : rank(chunk)[0];
   const laid = layPage(chunk, best, pageIndex % 2 === 1);
   const before = new Set(page.slots.map((s) => s.photoId));
   return {

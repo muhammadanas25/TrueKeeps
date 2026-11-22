@@ -14,7 +14,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { occasionById, type BuilderPhoto } from "../data";
+import { occasionById, reshapePage, type BookPage, type BuilderPhoto } from "../data";
 import type { BuilderState } from "../state";
 import { uploadEngine, type UploadSnapshot } from "./engine";
 
@@ -35,6 +35,13 @@ export interface UploadProgress {
 
 export interface UploadApi {
   addFiles: (files: FileList | File[] | null) => Promise<void>;
+  /**
+   * Delete a photo for good (the remove button on the photos step): it leaves
+   * the photo list, every page it was on (that page lays itself out again, or
+   * goes if it was the page's only photo), the taken-out list and the cover
+   * choice, and the upload engine stops working on it.
+   */
+  removePhoto: (id: string) => void;
   snapshot: UploadSnapshot;
   progress: UploadProgress;
 }
@@ -191,6 +198,27 @@ export function UploadProvider({
     return () => window.removeEventListener("beforeunload", warn);
   }, [snapshot.active]);
 
-  const api = useMemo<UploadApi>(() => ({ addFiles, snapshot, progress }), [snapshot, progress]); // eslint-disable-line react-hooks/exhaustive-deps
+  const removePhoto = (id: string) => {
+    uploadEngine.forget(id);
+    const s = stateRef.current;
+    const left = s.photos.filter((p) => p.id !== id);
+    const pages: BookPage[] = [];
+    s.pages.forEach((page) => {
+      if (!page.slots.some((x) => x.photoId === id)) return pages.push(page);
+      const slots = page.slots.filter((x) => x.photoId !== id);
+      const next = slots.length ? reshapePage(page, slots, left, pages.length) : null;
+      if (next) pages.push(next);
+    });
+    // pagesEdited and removedPhotoIds are passed so the reducer doesn't count this as taking a photo out
+    set({
+      pages,
+      pagesEdited: s.pagesEdited,
+      removedPhotoIds: s.removedPhotoIds.filter((x) => x !== id),
+      ...(s.coverPhotoId === id ? { coverPhotoId: null } : null),
+    });
+    updatePhotos((photos) => photos.filter((p) => p.id !== id));
+  };
+
+  const api = useMemo<UploadApi>(() => ({ addFiles, removePhoto, snapshot, progress }), [snapshot, progress]); // eslint-disable-line react-hooks/exhaustive-deps
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

@@ -33,6 +33,7 @@ import { createWriteStream } from "fs";
 import sharp from "sharp";
 import type { BuilderDocument } from "@shared/document";
 import { bookTheme, deriveTheme } from "../../client/src/features/builder/palette";
+import { CAPTION_SIZE } from "../../client/src/features/builder/data";
 import { mediaStore } from "../media";
 import type { PrintManifest } from "./render";
 
@@ -231,13 +232,17 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
 
     const caption = page.caption?.trim();
     if (caption && !doc.captionsHidden) {
-      const size = W * (doc.fontId === "script" ? 0.04 : 0.026);
+      // golden-ratio type scale (CAPTION_SIZE in the client's data.ts); handwriting reads small
+      const size = W * (doc.fontId === "script" ? 0.03 : CAPTION_SIZE);
       pdf.font(fontFor(doc.fontId)).fontSize(size);
       if (page.layout === "full") {
         const tw = Math.min(pdf.widthOfString(caption) + size * 2, W * 0.86);
         const y = B + H * 0.93 - size * 1.6;
         pdf.save().fillColor(theme.page).opacity(0.88).roundedRect(B + (W - tw) / 2, y, tw, size * 1.6, size * 0.8).fill().restore();
         pdf.fillColor(theme.ink).text(caption, B + (W - tw) / 2, y + size * 0.3, { width: tw, align: "center", lineBreak: false, ellipsis: true });
+      } else if (page.layout === "grid") {
+        // the band the page's photos made room for (captionFrames): 86% down to the foot
+        pdf.fillColor(theme.ink).text(caption, B + W * 0.08, B + H * 0.9, { width: W * 0.84, height: H * 0.07, align: "center", ellipsis: true });
       } else {
         pdf.fillColor(theme.ink).text(caption, B + W * 0.075, B + H * 0.937, { width: W * 0.85, align: "center", lineBreak: false, ellipsis: true });
       }

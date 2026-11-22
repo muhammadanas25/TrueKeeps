@@ -20,6 +20,9 @@ import { memo, useEffect, useRef, useState, type CSSProperties, type MutableRefO
 import { GripVertical, ImageOff } from "lucide-react";
 import {
   DEFAULT_FRAMING,
+  LINE_MAX,
+  TITLE_MAX,
+  captionable,
   LAYOUT_SLOTS,
   placement,
   signatureFor,
@@ -493,6 +496,8 @@ function PageFaceImpl({
   const caption = (wrapScrim = false) => {
     if (look.captionsHidden) return null;
     if (!page.caption && !editing) return null;
+    // no empty "Add a caption" on a page with no room for one (captionable)
+    if (!page.caption && !captionable(page)) return null;
     const text = editing ? (
       <Editable value={page.caption} placeholder="Add a caption" onCommit={(v) => look.onEditCaption!(page.id, v)} />
     ) : (
@@ -509,11 +514,11 @@ function PageFaceImpl({
     return (
       <div className={"bb-page bb-page-title" + lc} style={base}>
         <div className="t">
-          {look.onEditTitle ? <Editable value={title} placeholder="Book title" maxLength={48} onCommit={(v) => v && look.onEditTitle!(v)} /> : title}
+          {look.onEditTitle ? <Editable value={title} placeholder="Book title" maxLength={TITLE_MAX} onCommit={(v) => v && look.onEditTitle!(v)} /> : title}
         </div>
         <div className="rule" style={{ background: theme.accent }}></div>
         <div className="s">
-          {look.onEditSubtitle ? <Editable value={sub} placeholder="Add a date or a line" maxLength={60} onCommit={(v) => look.onEditSubtitle!(v)} /> : sub}
+          {look.onEditSubtitle ? <Editable value={sub} placeholder="Add a date or a line" maxLength={LINE_MAX} onCommit={(v) => look.onEditSubtitle!(v)} /> : sub}
         </div>
       </div>
     );
@@ -558,10 +563,13 @@ function PageFaceImpl({
     /*
      * A page laid out by the engine (arrange.ts): every slot is placed at
      * the rectangle stored on the page, so the preview, the editors and the
-     * print files all draw the same thing. No caption: the engine fills the
-     * page, and a caption would sit on top of a photo.
+     * print files all draw the same thing. A caption sits in the band at the
+     * foot that setCaption made room for (captionFrames, editor-v2/book-ops.ts);
+     * there's no empty placeholder, because until it has words the photos
+     * fill that band. Captions are added from the Text panel.
      */
     const frames = page.frames ?? [];
+    const words = page.caption.trim() && !look.captionsHidden;
     return (
       <div className={"bb-page bb-page-grid" + lc} style={base}>
         {frames.map((f, i) => {
@@ -576,6 +584,7 @@ function PageFaceImpl({
             </div>
           );
         })}
+        {words ? <div className="bb-page-caption bb-grid-caption">{editing ? <Editable value={page.caption} placeholder="Add a caption" onCommit={(v) => look.onEditCaption!(page.id, v)} /> : page.caption}</div> : null}
       </div>
     );
   }
@@ -709,7 +718,7 @@ export function CoverFace({
       contentEditable
       suppressContentEditableWarning
       spellCheck={false}
-      onBlur={(e) => onTitle && onTitle((e.target as HTMLElement).textContent?.trim().slice(0, 48) || title)}
+      onBlur={(e) => onTitle && onTitle((e.target as HTMLElement).textContent?.trim().slice(0, TITLE_MAX) || title)}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -731,9 +740,11 @@ export function CoverFace({
     return (
       <div className={"bb-cover bb-cover-classic" + lc} style={base}>
         <Ph photo={photo} theme={theme} showLabel={false} />
-        {titleEl}
-        <div className="rule" style={{ background: theme.accent }}></div>
-        {sub}
+        <div className="bb-cover-words">
+          {titleEl}
+          <div className="rule" style={{ background: theme.accent }}></div>
+          {sub}
+        </div>
       </div>
     );
   }

@@ -62,7 +62,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { CoverFace, PageFace } from "../book";
-import { bookPhotos, firstMovablePage, hasTitlePage, occasionById, pageNumber, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
+import { bookPhotos, firstMovablePage, hasTitlePage, occasionById, pageNumber, prettyCaption, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
 import { PageLookContext, usePageLook, type EdgeId, type FontId } from "../looks";
 import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
@@ -329,9 +329,19 @@ export function EditorV2({
       setSel({ pageId, slot });
       setActiveId(pageId);
     },
-    layout: (l: BookPage["layout"]) => {
+    /** a named layout, "grid" (Auto), or an engine template for 4 to 6 photos */
+    layout: (l: BookPage["layout"], template?: { id: string; n: number }) => {
       if (!activePage) return;
-      commit((b) => (l === "grid" ? ops.autoLayout(b, activePage.id, photos) : ops.changeLayout(b, activePage.id, l, photos)));
+      if (l === "grid" && !template) {
+        commit((b) => ops.autoLayout(b, activePage.id, photos));
+      } else {
+        // only the book's photos: ones taken out (or on a deleted page) stay out
+        const r = ops.changeLayout(slice(), activePage.id, template ? { template: template.id, n: template.n } : { layout: l }, bookPhotos(stateRef.current));
+        const note = ops.layoutChangeNote(r);
+        if (r.short) return say(note!);
+        commit(() => r.book);
+        if (note) say(note, true);
+      }
       setSel(null);
       setCrop(false);
     },
@@ -351,8 +361,8 @@ export function EditorV2({
       say("Page deleted", true);
     },
     addPage: () => {
-      const r = ops.addPage(slice(), isMobile ? idx : 2 * spreadK + 1, photos);
-      if (!r) return say("Add some photos first");
+      const r = ops.addPage(slice(), isMobile ? idx : 2 * spreadK + 1, bookPhotos(stateRef.current));
+      if (!r) return say("Every page has one photo. Add more photos to add a page.");
       commit(() => r.book);
       jumpTo(r.index);
       say("Page added", true);
@@ -363,7 +373,15 @@ export function EditorV2({
     edge: (e: EdgeId) => commit((b) => ops.setEdge(b, e)),
     title: (v: string) => set({ title: v }),
     subtitle: (v: string) => set({ subtitle: v }),
-    caption: (id: string, v: string) => liveSet((b) => ops.setCaption(b, id, v)),
+    caption: (id: string, v: string) => liveSet((b) => ops.setCaption(b, id, v, bookPhotos(stateRef.current))),
+    fillCaptions: () => {
+      commit((b) => ops.fillCaptions(b, bookPhotos(stateRef.current), occ.photoLabels));
+      say("Captions added to every page with room. Change any of them on the page.", true);
+    },
+    clearCaptions: () => {
+      commit((b) => ops.clearCaptions(b, bookPhotos(stateRef.current)));
+      say("Captions cleared", true);
+    },
     captions: (hidden: boolean) => commit((b) => ({ ...b, captionsHidden: hidden })),
   };
 
@@ -549,6 +567,17 @@ export function EditorV2({
   const spreadTargets = shown
     .filter((s) => s.page && s.page.layout !== "title")
     .map((s, i, arr) => ({ id: s.page!.id, label: (arr.length > 1 ? (i === 0 ? "Left" : "Right") + " · " : "") + "p." + pageNumber(pages, s.idx) }));
+  // caption ideas for the open page: its photos' occasion labels, then the occasion's others
+  const captionIdeas = (() => {
+    const own = (activePage?.slots ?? []).map((s) => photos.find((p) => p.id === s.photoId)?.label).filter((l): l is string => Boolean(l));
+    const out: string[] = [];
+    for (const l of [...own, ...occ.photoLabels]) {
+      const w = prettyCaption(l);
+      if (!out.includes(w)) out.push(w);
+      if (out.length >= 6) break;
+    }
+    return out;
+  })();
   const panel =
     tool === "layout" ? (
       <LayoutPanel
@@ -559,6 +588,7 @@ export function EditorV2({
         density={state.density}
         onPickPage={setActiveId}
         onLayout={A.layout}
+        onTemplate={(t) => A.layout("grid", t)}
         onMirror={A.mirror}
         onReflow={A.reflow}
       />
@@ -577,6 +607,9 @@ export function EditorV2({
         onSubtitle={A.subtitle}
         onCaption={A.caption}
         onCaptions={A.captions}
+        onFillCaptions={A.fillCaptions}
+        onClearCaptions={A.clearCaptions}
+        suggestions={captionIdeas}
       />
     ) : null;
   const toolTitle = tool ? TOOLS.find((t) => t.id === tool)!.label : "";
@@ -587,7 +620,7 @@ export function EditorV2({
       ...baseLook,
       onEditTitle: (v: string) => commit((b) => ({ ...b, title: v })),
       onEditSubtitle: (v: string) => commit((b) => ({ ...b, subtitle: v })),
-      onEditCaption: (id: string, v: string) => commit((b) => ops.setCaption(b, id, v)),
+      onEditCaption: (id: string, v: string) => commit((b) => ops.setCaption(b, id, v, bookPhotos(stateRef.current))),
     }),
     [baseLook, commit],
   );

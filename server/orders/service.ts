@@ -40,7 +40,7 @@ import { randomInt } from "crypto";
 import type { Order } from "@shared/schema";
 import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { printedPageCount, quote } from "@shared/pricing";
-import { PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
+import { LIVE_ORDER_STATUSES, PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
 import { startPrintJob } from "../print/pipeline";
 import { notifyOrder } from "../notify/outbox";
@@ -166,6 +166,14 @@ export async function createOrder(
   // 1. idempotency
   const existing = await storage.getOrderByIdempotencyKey(user.id, body.idempotencyKey);
   if (existing) return isBankTransfer(existing) ? { order: existing, checkoutUrl: null } : checkoutUrlFor(existing);
+
+  // one standing order per book, unless they asked for another copy (a Back
+  // press after ordering used to land on the order form again)
+  if (!body.again) {
+    const mine = await storage.listOrdersForUser(user.id);
+    const live = mine.find((o) => o.projectId === body.projectId && LIVE_ORDER_STATUSES.includes(o.status as OrderStatus));
+    if (live) throw new OrderError(`You've already ordered this book (${live.orderNumber}).`, 409, "ALREADY_ORDERED");
+  }
 
   // the book must actually be designed: title page + at least one photo page
   const doc = body.document;

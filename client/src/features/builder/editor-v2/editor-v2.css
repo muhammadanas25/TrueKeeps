@@ -313,3 +313,11 @@ textarea.tke-input { height: auto; padding: 10px 12px; resize: vertical; line-he
 
 /* odd page count: the last page would print blank (EditorV2 page counter) */
 .tke-odd { padding: 3px 10px; border-radius: 999px; background: var(--offer-bg) !important; color: var(--error-fg) !important; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* Text panel: caption counter, suggestion chips, whole-book caption buttons (2026-11-22) */
+.tke-count { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--color-fg3); }
+.tke-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tke-chip { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-border); background: var(--surface-card); color: var(--heading); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tke-chip:hover { border-color: var(--tk-indigo-300); }
+.tke-row-btns { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
+.tke-row-btns .tke-more { margin-top: 0; }

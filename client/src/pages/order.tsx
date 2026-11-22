@@ -202,7 +202,7 @@ export default function OrderPage() {
               </div>
             </div>
             <Link href={`/wizard?project=${order.projectId}`} className="bb-btn bb-btn-ghost" style={{ alignSelf: "flex-start" }}>
-              Open the book
+              See the book
             </Link>
           </section>
 

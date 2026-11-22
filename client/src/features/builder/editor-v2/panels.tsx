@@ -27,12 +27,16 @@ import {
   SquareDashed,
   Sparkles,
 } from "lucide-react";
+import { PICKER_TEMPLATES } from "../arrange";
 import { GridWire, LayoutWire } from "../book";
 import {
   BOOK_THEMES,
   pickableCoverStyles,
   DENSITIES,
   LAYOUTS,
+  LINE_MAX,
+  TITLE_MAX,
+  captionable,
   isMirrorable,
   themeById,
   type BookPage,
@@ -45,6 +49,9 @@ import {
 import { FONTS, LOOK_ORDER, lookDefaults, type EdgeId, type FontId } from "../looks";
 import { THEME_COLOUR, relativeLuminance, resolvePageHex } from "../palette";
 import type { BookSlice } from "./book-ops";
+
+/** Longest caption: two lines at caption size on a 12 in page. */
+const CAPTION_MAX = 70;
 import { PHOTO_MIME } from "./SlotLayer";
 
 /* ── small building blocks ─────────────────────────────────────── */
@@ -111,6 +118,7 @@ export function LayoutPanel({
   density,
   onPickPage,
   onLayout,
+  onTemplate,
   onMirror,
   onReflow,
 }: {
@@ -123,6 +131,8 @@ export function LayoutPanel({
   density: DensityId;
   onPickPage: (id: string) => void;
   onLayout: (layout: PageLayoutId) => void;
+  /** an engine template for 4 to 6 photos (PICKER_TEMPLATES) */
+  onTemplate: (t: { id: string; n: number }) => void;
   onMirror: () => void;
   onReflow: (d: DensityId) => void;
 }) {
@@ -178,6 +188,24 @@ export function LayoutPanel({
                       <LayoutWire id={l.id} theme={theme} mirror={l.id === activePage.layout ? activePage.mirror : false} />
                     </span>
                     <span className="tke-wire-l">{l.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {/* 4 to 6 photos: the layout engine's own templates (owner, 2026-11-22).
+              Picking one with more slots than the page has moves photos up
+              from the next pages; see changeLayout in book-ops.ts. */}
+          {[4, 5, 6].map((n) => (
+            <div key={n} className="tke-wire-group">
+              <div className="tke-wire-n">{n} photos</div>
+              <div className="tke-wire-row">
+                {PICKER_TEMPLATES.filter((t) => t.n === n).map((t) => (
+                  <button key={t.id} className="tke-wire" onClick={() => onTemplate({ id: t.id, n: t.n })}>
+                    <span className="tke-wire-pg">
+                      <GridWire frames={t.frames} theme={theme} />
+                    </span>
+                    <span className="tke-wire-l">{t.name}</span>
                   </button>
                 ))}
               </div>
@@ -533,6 +561,9 @@ export function TextPanel({
   onSubtitle,
   onCaption,
   onCaptions,
+  onFillCaptions,
+  onClearCaptions,
+  suggestions,
   onFont,
 }: {
   book: BookSlice;
@@ -544,11 +575,16 @@ export function TextPanel({
   onSubtitle: (v: string) => void;
   onCaption: (pageId: string, v: string) => void;
   onCaptions: (hidden: boolean) => void;
+  /** "Fill them in for me": occasion suggestions on every empty captionable page */
+  onFillCaptions: () => void;
+  onClearCaptions: () => void;
+  /** caption ideas for this page: its photos' occasion labels first */
+  suggestions: string[];
   onFont: (f: FontId) => void;
 }) {
   const titleView = onCover || activePage?.layout === "title";
-  // no caption on a collage, or on a grid page (its photos fill the page)
-  const capable = activePage && activePage.layout !== "title" && activePage.layout !== "collage" && activePage.layout !== "grid";
+  // a caption never sits on a photo: full-page and collage pages have no room (data.ts captionable)
+  const capable = activePage && captionable(activePage);
   const fontPairs = (
     <Section label="Font pair" hint="Titles and captions change together. Text turns dark or light by itself to stay readable on your page colour.">
       <div className="tke-pairs" role="radiogroup" aria-label="Font pair">
@@ -572,11 +608,11 @@ export function TextPanel({
         <Section label={onCover ? "Front cover" : "Title page"}>
           <label className="tke-field">
             <span>Title</span>
-            <input className="tke-input" value={book.title} maxLength={48} onChange={(e) => onTitle(e.target.value)} />
+            <input className="tke-input" value={book.title} maxLength={TITLE_MAX} onChange={(e) => onTitle(e.target.value)} />
           </label>
           <label className="tke-field">
             <span>Line underneath</span>
-            <input className="tke-input" value={book.subtitle ?? subtitleDefault} maxLength={60} onChange={(e) => onSubtitle(e.target.value)} />
+            <input className="tke-input" value={book.subtitle ?? subtitleDefault} maxLength={LINE_MAX} onChange={(e) => onSubtitle(e.target.value)} />
           </label>
         </Section>
         {fontPairs}
@@ -585,18 +621,37 @@ export function TextPanel({
   }
   return (
     <div>
-      <Section label="Caption for this page" hint="Tip: you can also tap a caption right on the page.">
+      <Section label="Caption for this page" hint="Captions sit under the photos, never on them.">
         {capable ? (
-          <textarea
-            className="tke-input"
-            rows={2}
-            maxLength={280}
-            placeholder="A few words…"
-            value={activePage!.caption}
-            onChange={(e) => onCaption(activePage!.id, e.target.value)}
-          />
+          <>
+            <textarea
+              className="tke-input"
+              rows={2}
+              maxLength={CAPTION_MAX}
+              placeholder="A few words…"
+              value={activePage!.caption}
+              onChange={(e) => onCaption(activePage!.id, e.target.value)}
+            />
+            <div className="tke-count">
+              <span>Up to 2 lines</span>
+              <span>
+                {activePage!.caption.length} / {CAPTION_MAX}
+              </span>
+            </div>
+            {suggestions.length ? (
+              <div className="tke-chips" aria-label="Suggestions">
+                {suggestions.map((w) => (
+                  <button key={w} type="button" className="tke-chip" onClick={() => onCaption(activePage!.id, w)}>
+                    {w}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : (
-          <p className="tke-empty">Collage pages let the photos speak. Switch to another layout to add words.</p>
+          <p className="tke-empty">
+            {activePage?.layout === "full" ? "A full-page photo has no room for words without covering it." : "A collage fills the page with photos."} Pick another layout in Layout to add a caption.
+          </p>
         )}
       </Section>
       <Section label="Captions in the book">
@@ -608,6 +663,14 @@ export function TextPanel({
           value={book.captionsHidden}
           onChange={onCaptions}
         />
+        <div className="tke-row-btns">
+          <button type="button" className="tke-more" onClick={onFillCaptions}>
+            Fill them in for me
+          </button>
+          <button type="button" className="tke-more" onClick={onClearCaptions}>
+            Clear all captions
+          </button>
+        </div>
       </Section>
       {fontPairs}
     </div>

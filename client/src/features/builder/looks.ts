@@ -72,7 +72,7 @@ export const LOOK_DEFAULTS: Record<string, { font: FontId; edge: EdgeId }> = {
 export const lookDefaults = (themeId: string) => LOOK_DEFAULTS[themeId] ?? LOOK_DEFAULTS.ivory;
 
 /** Order of the look cards in the editor (first four shown, rest on "more"). */
-export const LOOK_ORDER = ["ivory", "indigo", "blush", "gallery", "sage", "midnight", "golden", "kraft"];
+export const LOOK_ORDER = ["gallery", "ivory", "indigo", "blush", "sage", "midnight", "golden", "kraft"];
 
 export interface PageLook {
   fontId: FontId;

@@ -25,7 +25,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Info, X } from "lucide-react";
 import { CoverFace, Ph } from "../book";
-import { bookPhotos, coverHasPhoto, coverPhotoIdFor, generatePages, occasionById, FEEL_CHOICES, isFeelChoice, type CopyVoice } from "../data";
+import { bookPhotos, coverHasPhoto, coverPhotoIdFor, generatePages, occasionById, FEEL_CHOICES, isFeelChoice, LINE_MAX, TITLE_MAX, type CopyVoice } from "../data";
 import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
 import { FONTS } from "../looks";
 import "../flow.css";
@@ -290,13 +290,16 @@ export function ComposeScreen({
                 <input
                   className="bb-title-input"
                   value={title}
-                  maxLength={48}
+                  maxLength={TITLE_MAX}
                   onChange={(e) => set({ title: e.target.value })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && title.trim()) onDone();
                   }}
                   placeholder={occ.suggestedTitle}
                 />
+                <span className={"ck-count" + (title.length >= TITLE_MAX ? " full" : "")} aria-live="polite">
+                  {title.length >= TITLE_MAX ? "That's the most that fits on the cover. Put the rest in the line under it." : `Up to 2 lines on the cover · ${title.length} / ${TITLE_MAX}`}
+                </span>
               </label>
               <label className="ck-field">
                 <span>
@@ -305,7 +308,7 @@ export function ComposeScreen({
                 <input
                   className="bb-title-input"
                   value={subtitle}
-                  maxLength={60}
+                  maxLength={LINE_MAX}
                   onChange={(e) => set({ subtitle: e.target.value })}
                   placeholder="Lahore, March 2026"
                 />

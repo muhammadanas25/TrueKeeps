@@ -20,6 +20,8 @@
  *   3. Draw the 1600px canvas onto a 400px one, which is much cheaper than
  *      resizing from the original a second time.
  *   4. Average a tiny copy for brightness, to warn about very dark photos.
+ *   4b. Measure sharpness on the middle of the display copy (see sharpness()),
+ *       to flag the few photos that are far blurrier than the rest.
  *   5. Optionally make a full-size JPEG "master", for the rare files that
  *      cannot go to the printer as they are (HEIC, or over the upload limit).
  *
@@ -37,6 +39,8 @@ export interface PreparedPhoto {
   h: number;
   /** average brightness, 0 to 255 */
   luma: number;
+  /** sharpness of the display copy (see sharpness()); higher is sharper */
+  sharp: number;
   /** full-size JPEG to upload instead of the source file, when one was asked for */
   master?: Blob;
 }
@@ -101,6 +105,41 @@ async function decode(source: Blob): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
+/**
+ * How sharp a photo is: the variance of the Laplacian (each pixel's grey
+ * level against its four neighbours) over a 400px square from the middle of
+ * the display copy, where the subject usually is. A focused photo has strong
+ * edges, so a high variance; a shaken or out-of-focus one has soft edges and
+ * a low one. It's measured on the display copy so every photo is judged at
+ * the same scale, whatever camera took it.
+ *
+ * The number means little on its own (a plain sky is "blurry"), so it is only
+ * ever compared with the customer's other photos: see photoFlag() in
+ * ../quality.ts.
+ */
+function sharpness(canvas: AnyCanvas, w: number, h: number): number {
+  const side = Math.min(400, w, h);
+  if (side < 8) return 0;
+  const x0 = Math.floor((w - side) / 2);
+  const y0 = Math.floor((h - side) / 2);
+  const px = context(canvas).getImageData(x0, y0, side, side).data;
+  const grey = new Float32Array(side * side);
+  for (let i = 0, j = 0; j < grey.length; i += 4, j++) grey[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+  let sum = 0;
+  let sumSq = 0;
+  let n = 0;
+  for (let y = 1; y < side - 1; y++)
+    for (let x = 1; x < side - 1; x++) {
+      const k = y * side + x;
+      const lap = grey[k - 1] + grey[k + 1] + grey[k - side] + grey[k + side] - 4 * grey[k];
+      sum += lap;
+      sumSq += lap * lap;
+      n++;
+    }
+  const mean = sum / n;
+  return Math.round(sumSq / n - mean * mean);
+}
+
 /** Prepare one photo. `makeMaster` also re-encodes it at full size as JPEG. */
 export async function preparePhoto(source: Blob, makeMaster: boolean): Promise<PreparedPhoto> {
   const image = await decode(source);
@@ -126,6 +165,7 @@ export async function preparePhoto(source: Blob, makeMaster: boolean): Promise<P
     let sum = 0;
     for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
     const luma = sum / (px.length / 4);
+    const sharp = sharpness(displayCanvas, d.w, d.h);
 
     let master: Blob | undefined;
     if (makeMaster) {
@@ -142,7 +182,7 @@ export async function preparePhoto(source: Blob, makeMaster: boolean): Promise<P
         master = undefined;
       }
     }
-    return { display, thumb, w, h, luma, master };
+    return { display, thumb, w, h, luma, sharp, master };
   } finally {
     if ("close" in image) image.close();
   }

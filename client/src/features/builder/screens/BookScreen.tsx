@@ -6,18 +6,21 @@
  * out live by the engine (arrange.ts) for the customer's own photos, so
  * every tap shows what they would actually get and what it costs.
  *
- * Rules the owner set (2026-11-16):
+ * Rules the owner set (2026-11-16, revised 2026-11-22):
  *  - one choice, not two groups of options
- *  - nothing is shown that can't be chosen: the book size comes from the
- *    photos and the arrangement, and the page stepper only moves inside the
- *    range that works (fewest sheets that hold every photo, up to 16 sheets
- *    and never more pages than photos)
+ *  - nothing is shown that can't be chosen. An arrangement only appears when
+ *    it makes a different book from the one before it: with 10 photos every
+ *    arrangement gives the same 10 pages, so only Story shows, with a note on
+ *    how many more photos unlock the next one (visibleArrangements())
+ *  - no pages control here any more (2026-11-22): the book takes the fewest
+ *    sheets that hold every photo; pages can be added in the editor
+ *  - the paper finish stays
  *  - "Our pick" on Classic is a recommendation, not a sales claim
  *
  * Layout: on a wide screen, the choices on the left and the 3-D book on the
  * right. On a phone ("Option C", owner's pick 2026-11-17), the book fills a
  * dark stage one page at a time (PageRibbon) and the choices sit in a white
- * sheet under it, with pages and paper behind one tap.
+ * sheet under it, as the same picture cards as desktop (2026-11-22).
  *
  * The laid-out pages are written to the book only on "Preview my book". If
  * the customer changed pages by hand (Customize) and came back here, their
@@ -25,10 +28,10 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ImagePlus, Info, Minus, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, ImagePlus, Info } from "lucide-react";
 import { FINISHES, PRICE_LIST, formatPKR, quote } from "@shared/pricing";
 import { Book3D, GridWire, Ph, shiftColor, type Book3DApi } from "../book";
-import { ARRANGEMENTS, MAX_SHEETS, arrangeBook, arrangementOf, arrangementThatFits, densityOf, sheetRange, type ArrangementId } from "../arrange";
+import { ARRANGEMENTS, arrangeBook, arrangementOf, arrangementThatFits, densityOf, sheetRange, type ArrangementId } from "../arrange";
 import { bookPhotos, occasionById, toSpreads, type PageFrame } from "../data";
 import { fontById } from "../looks";
 import { bookTheme } from "../palette";
@@ -56,6 +59,32 @@ export const MIN_PHOTOS = PRICE_LIST.includedSheets * 2;
 
 const unitPrice = (sheets: number) => quote({ binding: "hardcover", qty: 1, printedPages: sheets * 2 }).unitMinor;
 
+/**
+ * The arrangements worth offering for `n` photos, in order, and the next one
+ * still locked with how many more photos would unlock it.
+ *
+ * An arrangement makes a different book from the one before it only once the
+ * one before needs more than the smallest book: below that both lay the same
+ * photos on the same 10 pages. With today's arrangements that is Classic from
+ * 21 photos and Family Album from 41 (owner approved, 2026-11-22), but it is
+ * worked out from the engine so it follows any change to the arrangements.
+ */
+export function visibleArrangements(n: number): { shown: ArrangementId[]; next: { id: ArrangementId; more: number } | null } {
+  const shown: ArrangementId[] = [ARRANGEMENTS[0].id];
+  const opens = (prev: ArrangementId, m: number) => sheetRange(m, prev).min > PRICE_LIST.includedSheets;
+  for (let i = 1; i < ARRANGEMENTS.length; i++) {
+    const prev = ARRANGEMENTS[i - 1].id;
+    if (opens(prev, n)) {
+      shown.push(ARRANGEMENTS[i].id);
+      continue;
+    }
+    let m = n + 1;
+    while (!opens(prev, m) && m < 1000) m++;
+    return { shown, next: { id: ARRANGEMENTS[i].id, more: m - n } };
+  }
+  return { shown, next: null };
+}
+
 export function BookScreen({
   state,
   set,
@@ -77,9 +106,11 @@ export function BookScreen({
   const photos = useMemo(() => bookPhotos(state), [state.photos, state.removedPhotoIds]);
   const n = photos.length;
   const takenOut = state.photos.filter((p) => state.removedPhotoIds.includes(p.id));
-  const style = arrangementOf(state.density);
-  const range = sheetRange(n, style);
-  const [open, setOpen] = useState(false);
+  const vis = visibleArrangements(n);
+  // A book still set to an arrangement that isn't offered (the default is
+  // Classic) shows, and orders, the fullest one that is.
+  const asked = arrangementOf(state.density);
+  const style: ArrangementId = vis.shown.includes(asked) ? asked : vis.shown[vis.shown.length - 1];
   const [index, setIndex] = useState(0);
   const [pos, setPos] = useState(1);
   const api = useRef<Book3DApi | null>(null);
@@ -91,9 +122,10 @@ export function BookScreen({
   // file is read) or a choice change; a 60-photo book takes a few ms.
   const photoKey = photos.map((p) => p.id + ":" + (p.w ?? 0) + "x" + (p.h ?? 0)).join(",");
   const plan = useMemo(
-    () => arrangeBook(photos, style, state.sheets),
+    // always the fewest sheets that hold every photo: step 5 has no pages control (2026-11-22)
+    () => arrangeBook(photos, style, null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [photoKey, style, state.sheets],
+    [photoKey, style],
   );
   const pages = keepHandEdits ? state.pages : plan.pages;
   const sheets = keepHandEdits ? Math.ceil(state.pages.length / 2) : plan.sheets;
@@ -111,10 +143,6 @@ export function BookScreen({
     setPos(1);
   };
   const pick = (id: ArrangementId) => choose({ density: densityOf(id), sheets: null });
-  const atMin = sheets <= range.min;
-  const atMax = sheets >= range.max;
-  const fewer = () => !atMin && choose({ density: densityOf(style), sheets: sheets - 1 });
-  const more = () => !atMax && choose({ density: densityOf(style), sheets: sheets + 1 });
   const fits = arrangementThatFits(n);
   const finish = FINISHES.find((f) => f.id === state.finish) ?? FINISHES[0];
   const price = formatPKR(unitPrice(sheets));
@@ -126,7 +154,7 @@ export function BookScreen({
   };
 
   const commit = () => {
-    if (!keepHandEdits) set({ pages: plan.pages, pagesEdited: false, sheets: plan.sheets });
+    if (!keepHandEdits) set({ pages: plan.pages, pagesEdited: false, sheets: plan.sheets, density: densityOf(style) });
     onPreview();
   };
 
@@ -151,14 +179,43 @@ export function BookScreen({
     if (r.holds < n) return { text: `Our biggest book holds ${r.holds} of your ${n} photos this way`, warn: true };
     return { text: `Your ${n} photos on ${sh * 2} pages`, warn: false };
   };
-  const pagesNote = (() => {
-    const bits = [`Each extra sheet is 2 pages and adds ${formatPKR(PRICE_LIST.extraSheetMinor)}.`];
-    if (atMin) bits.push(sheets > PRICE_LIST.includedSheets ? "Fewer pages would crowd this book." : `${PRICE_LIST.includedSheets * 2} pages is our smallest book.`);
-    if (atMax) bits.push(sheets >= MAX_SHEETS ? `${MAX_SHEETS * 2} pages is our biggest book.` : "Every page needs at least one photo.");
-    return bits.join(" ");
-  })();
   const leftover = !keepHandEdits && plan.leftover > 0;
   const current = ARRANGEMENTS.find((a) => a.id === style)!;
+  const shownArrangements = ARRANGEMENTS.filter((a) => vis.shown.includes(a.id));
+  // how to unlock the next arrangement, instead of a choice that changes nothing
+  const unlockNote = vis.next ? (
+    <p className="bk-unlock" role="note">
+      <Info size={16} />
+      <span>
+        {vis.shown.length === 1 ? `With ${n} photos there's one layout. ` : ""}
+        <b>
+          Add {vis.next.more} more {vis.next.more === 1 ? "photo" : "photos"}
+        </b>{" "}
+        to choose {ARRANGEMENTS.find((a) => a.id === vis.next!.id)!.name} ({ARRANGEMENTS.find((a) => a.id === vis.next!.id)!.line.split(".")[0].toLowerCase()}).
+      </span>
+    </p>
+  ) : null;
+  const card = (a: (typeof ARRANGEMENTS)[number], small: boolean) => {
+    const on = style === a.id && !keepHandEdits;
+    const fl = fitLine(a.id);
+    const sh = a.id === style ? sheets : sheetRange(n, a.id).min;
+    return (
+      <button key={a.id} type="button" role="radio" aria-checked={on} className={"bk-card" + (on ? " on" : "") + (small ? " sm" : "")} onClick={() => pick(a.id)}>
+        <span className="bk-card-top">
+          {/* a typical spread of this arrangement, so the difference shows before the tap */}
+          <span className="bk-card-art" aria-hidden="true">
+            <GridWire frames={SAMPLE_SPREADS[a.id][0]} theme={theme} />
+            <GridWire frames={SAMPLE_SPREADS[a.id][1]} theme={theme} />
+          </span>
+          <b>{a.name}</b>
+          {a.id === "classic" && vis.shown.length > 1 ? <i className="bk-pick">Our pick</i> : null}
+          <span className="bk-card-price">{formatPKR(unitPrice(sh))}</span>
+        </span>
+        {small ? null : <span className="bk-card-line">{vis.shown.length === 1 && a.id === "story" && n <= sh * 2 ? "One photo on each page." : a.line}</span>}
+        <span className={"bk-fit-line" + (fl.warn ? " warn" : "")}>{fl.text}</span>
+      </button>
+    );
+  };
 
   const handNote = keepHandEdits ? (
     <p className="bk-note">
@@ -204,19 +261,6 @@ export function BookScreen({
       ) : null}
     </div>
   ) : null;
-  const stepper = (
-    <div className="bk-stepper">
-      <button type="button" onClick={fewer} disabled={atMin} aria-label="Fewer pages">
-        <Minus size={18} />
-      </button>
-      <span aria-live="polite">
-        {sheets * 2} pages <small>({sheets} sheets)</small>
-      </span>
-      <button type="button" onClick={more} disabled={atMax} aria-label="More pages">
-        <Plus size={18} />
-      </button>
-    </div>
-  );
   const finishes = (
     <div className="bk-seg" role="radiogroup" aria-label="Paper finish">
       {FINISHES.map((f) => (
@@ -250,47 +294,20 @@ export function BookScreen({
               {price}
             </span>
           </div>
-          <div className="bk-seg bk-seg-wide" role="radiogroup" aria-label="How full the pages feel">
-            {ARRANGEMENTS.map((a) => (
-              <button key={a.id} type="button" role="radio" aria-checked={style === a.id && !keepHandEdits} className={style === a.id && !keepHandEdits ? "on" : ""} onClick={() => pick(a.id)}>
-                {a.name}
-              </button>
-            ))}
-          </div>
           {handNote}
           {outNote}
-          {!keepHandEdits ? (
-            <div className="bk-fit">
-              <span className={"bk-fit-line" + (fitLine(style).warn ? " warn" : "")}>
-                {fitLine(style).text}
-                {style === "classic" ? <i className="bk-pick">Our pick</i> : null}
-              </span>
-              <span>{current.line}</span>
-            </div>
-          ) : null}
+          <div className="bk-cards" role="radiogroup" aria-label="How full the pages feel">
+            {shownArrangements.map((a) => card(a, true))}
+          </div>
+          {unlockNote}
           {leftoverNote}
-          <button type="button" className="bk-disclose" onClick={() => setOpen(!open)} aria-expanded={open}>
-            <span>{open ? "Hide pages and paper" : `Pages and paper: ${sheets * 2} pages, ${finish.name.toLowerCase()}`}</span>
-            {open ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          </button>
-          {open ? (
-            <div className="bk-more">
-              <div className="bk-row">
-                <span>
-                  <b>Pages</b>
-                  <small>2 more pages add {formatPKR(PRICE_LIST.extraSheetMinor)}</small>
-                </span>
-                {stepper}
-              </div>
-              <div className="bk-row">
-                <span>
-                  <b>Paper</b>
-                  <small>Both cost the same</small>
-                </span>
-                {finishes}
-              </div>
-            </div>
-          ) : null}
+          <div className="bk-row bk-paper">
+            <span>
+              <b>Paper</b>
+              <small>Both cost the same</small>
+            </span>
+            {finishes}
+          </div>
           <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={commit}>
             Preview my book <ArrowRight size={18} />
           </button>
@@ -311,34 +328,10 @@ export function BookScreen({
           {handNote}
           {outNote}
           <div className="bk-cards" role="radiogroup" aria-label="How full the pages feel">
-            {ARRANGEMENTS.map((a) => {
-              const on = style === a.id && !keepHandEdits;
-              const fl = fitLine(a.id);
-              const sh = a.id === style ? sheets : sheetRange(n, a.id).min;
-              return (
-                <button key={a.id} type="button" role="radio" aria-checked={on} className={"bk-card" + (on ? " on" : "")} onClick={() => pick(a.id)}>
-                  <span className="bk-card-top">
-                    {/* a typical spread of this arrangement, so the difference shows before the click */}
-                    <span className="bk-card-art" aria-hidden="true">
-                      <GridWire frames={SAMPLE_SPREADS[a.id][0]} theme={theme} />
-                      <GridWire frames={SAMPLE_SPREADS[a.id][1]} theme={theme} />
-                    </span>
-                    <b>{a.name}</b>
-                    {a.id === "classic" ? <i className="bk-pick">Our pick</i> : null}
-                    <span className="bk-card-price">{formatPKR(unitPrice(sh))}</span>
-                  </span>
-                  <span className="bk-card-line">{a.line}</span>
-                  <span className={"bk-fit-line" + (fl.warn ? " warn" : "")}>{fl.text}</span>
-                </button>
-              );
-            })}
+            {shownArrangements.map((a) => card(a, false))}
           </div>
+          {unlockNote}
           {leftoverNote}
-          <div className="bk-field">
-            <span className="bk-label">Pages</span>
-            {stepper}
-            <span className="bk-help">{pagesNote}</span>
-          </div>
           <div className="bk-field">
             <span className="bk-label">Paper finish</span>
             {finishes}

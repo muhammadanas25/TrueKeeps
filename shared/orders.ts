@@ -49,6 +49,14 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
+/**
+ * An order in one of these states still stands, so the same book can't be
+ * ordered again by accident (owner, 2026-11-22: going back after placing an
+ * order showed the order form again). "Order another copy" is the deliberate
+ * way round it (createOrderSchema.again).
+ */
+export const LIVE_ORDER_STATUSES: OrderStatus[] = ["pending_payment", "paid", "in_production", "shipped", "delivered"];
+
 /** States from which the customer may (re)start payment. */
 export const PAYABLE: OrderStatus[] = ["pending_payment"];
 
@@ -111,6 +119,8 @@ export const createOrderSchema = z.object({
   idempotencyKey: z.string().min(8).max(80),
   /** how they pay (shared/payments.ts); older clients sent nothing and paid by card */
   method: z.enum(["card", "bank_transfer"]).default("card"),
+  /** the customer chose "Order another copy" of a book they already ordered */
+  again: z.boolean().optional(),
 });
 export type CreateOrderBody = z.infer<typeof createOrderSchema>;
 

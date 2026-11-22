@@ -116,7 +116,8 @@ export const DEFAULT_STATE: BuilderState = {
   projectId: null,
   photos: [],
   pages: [],
-  themeId: "ivory",
+  // new books start white (owner, 2026-11-22); saved books keep their colour
+  themeId: "gallery",
   pageColor: "theme",
   density: "balanced",
   sheets: null,

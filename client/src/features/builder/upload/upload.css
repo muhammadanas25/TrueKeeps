@@ -92,7 +92,7 @@ button.ck-pill { cursor: pointer; }
 .ck-back { transform: rotateY(180deg) translateZ(calc(var(--t) / 2)); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 9%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
 .ck-spine, .ck-edge { top: 0; height: 100%; width: var(--t); left: calc(50% - var(--t) / 2); }
 .ck-spine { transform: rotateY(-90deg) translateZ(calc(var(--w) / 2)); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07); }
-.ck-spine span { writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; max-height: 88%; }
+.ck-spine span { writing-mode: vertical-rl; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 91.6%; /* 0.5 in clear at each end of 12 in */ }
 /* page block: hairlines, because that's what paper edges look like from here */
 .ck-edge { transform: rotateY(90deg) translateZ(calc(var(--w) / 2)); background: repeating-linear-gradient(90deg, #F4F0EA 0 2px, #E4DDD2 2px 3px); }
 .ck-top, .ck-bottom { left: 0; width: 100%; height: var(--t); top: calc(50% - var(--t) / 2); background: repeating-linear-gradient(0deg, #F4F0EA 0 2px, #E4DDD2 2px 3px); }
@@ -106,10 +106,16 @@ button.ck-pill { cursor: pointer; }
 .ck-flyer { position: absolute; top: 0; left: 0; z-index: 5; object-fit: cover; border-radius: 2px; border: 3px solid #fff; box-shadow: 0 8px 18px -8px rgba(42, 30, 92, 0.5); pointer-events: none; will-change: transform, opacity; }
 
 /* ── Covers offered while uploading ─────────────────────────── */
-.bb-cover-classic { align-items: center; justify-content: center; text-align: center; padding: 8%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05); }
-.bb-cover-classic .bb-ph { flex: none; width: 46%; aspect-ratio: 1; margin-bottom: 6%; border-radius: 1px; box-shadow: 0 2px 7px rgba(42, 30, 92, 0.2); }
-.bb-cover-classic .rule { flex: none; width: 15%; height: 2px; margin: 4% 0 0; }
-.bb-cover-classic .bb-cover-sub { margin-top: 4%; }
+/*
+ * "Minimal" cover (owner, 2026-11-22: golden ratio, margins). Inside the
+ * 0.75 in margin (6.25% of 12 in), the photo has the top 61.8% and the words
+ * the 38.2% under it. The photo is square and centred in its part.
+ */
+.bb-cover.bb-cover-classic { display: grid; grid-template-rows: 61.8fr 38.2fr; justify-items: center; text-align: center; padding: 6.25%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05); }
+.bb-cover.bb-cover-classic .bb-ph { align-self: center; height: 92%; width: auto; aspect-ratio: 1; border-radius: 1px; box-shadow: 0 2px 7px rgba(42, 30, 92, 0.2); }
+.bb-cover.bb-cover-classic .bb-cover-words { align-self: center; width: 100%; display: flex; flex-direction: column; align-items: center; }
+.bb-cover-classic .rule { flex: none; width: 10%; height: 2px; margin: 4% 0 0; }
+.bb-cover-classic .bb-cover-sub { margin-top: 3.5%; }
 .bb-cover-moment { padding: 4.1667%; }
 .bb-cover-moment .bb-ph { flex: 1; min-height: 0; border-radius: 0; }
 .bb-cover-signature { align-items: center; justify-content: center; }

@@ -223,7 +223,7 @@ export default function BookBuilder() {
       <main className="bb-main">
         {state.screen === "quiz" ? <QuizScreen key="quiz" state={state} set={set} copy={copy} onDone={() => set({ screen: "upload" })} /> : null}
         {state.screen === "upload" ? (
-          <UploadScreen key="upload" state={state} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "compose", qstep: 0 })} />
+          <UploadScreen key="upload" state={state} set={set} copy={copy} theme={bookTheme(state.themeId, state.pageColor)} onContinue={() => set({ screen: "compose", qstep: 0 })} />
         ) : null}
         {state.screen === "compose" ? <ComposeScreen key="compose" state={state} set={set} copy={copy} onDone={() => set({ screen: "book" })} /> : null}
         {state.screen === "book" ? (
@@ -248,7 +248,7 @@ export default function BookBuilder() {
           </>
         ) : null}
         {state.screen === "order" ? (
-          <OrderScreen key="order" state={state} set={set} copy={copy} onBack={() => set({ screen: "preview", pos: 0 })} />
+          <OrderScreen key="order" state={state} set={set} copy={copy} onBack={() => set({ screen: "preview", pos: 0 })} onRestart={reset} />
         ) : null}
         {state.screen === "confirm" ? <ConfirmScreen key="confirm" copy={copy} onRestart={reset} onBack={() => set({ screen: "preview", pos: 0 })} /> : null}
       </main>

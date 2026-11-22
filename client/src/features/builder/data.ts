@@ -66,6 +66,15 @@ export const BOOK_THEMES: BookTheme[] = [
   { id: "kraft", name: "Kraft Journal", page: "#D9C3A0", ink: "#33332F", accent: "#6E4A26", soft: "#CAB696", stripeA: "#CFBA99", stripeB: "#C5B292", scrim: "rgba(217,195,160,0.88)", dark: false },
 ];
 
+/**
+ * Longest book title and line under it (owner, 2026-11-22): the title sits in
+ * a box at most 6 in wide on a 12 in cover and wraps to two lines, never
+ * stretched toward the edges. 32 characters is what two lines hold at the
+ * smallest title size we allow; the line under it is one line.
+ */
+export const TITLE_MAX = 32;
+export const LINE_MAX = 40;
+
 export const themeById = (id: string | null | undefined): BookTheme =>
   BOOK_THEMES.find((t) => t.id === id) ?? BOOK_THEMES[0];
 
@@ -367,6 +376,8 @@ export interface BuilderPhoto {
   w?: number;
   /** natural pixel height, EXIF-rotated; undefined = not measurable */
   h?: number;
+  /** sharpness measured while uploading (prepare.ts); compared within the book by quality.ts */
+  sharp?: number;
   /** false while the HD original we print from is still on the customer's device */
   hd?: boolean;
   /** fingerprint of the source file, to match it again after a closed tab */
@@ -606,6 +617,23 @@ export function layoutForCount(from: PageLayoutId, count: number): PageLayoutId 
 
 /** The most photos any one page can hold, i.e. the top of the ladder. */
 export const MAX_SLOTS_PER_PAGE = 3;
+
+/**
+ * Can this page carry a caption? (owner, 2026-11-22: "a caption never goes
+ * over a photo".) A full-page photo and the collage have no paper left for
+ * words, so they don't take one; an engine ("grid") page does, by making room
+ * for it (captionFrames in editor-v2/book-ops.ts).
+ */
+export const captionable = (page: Pick<BookPage, "layout">): boolean =>
+  page.layout === "single" || page.layout === "duo" || page.layout === "duo-side" || page.layout === "trio-strip" || page.layout === "grid";
+
+/**
+ * Caption type size as a fraction of the page width: the golden-ratio type
+ * scale (owner, 2026-11-22) puts a caption at title ÷ φ², and the cover title
+ * is about 0.054 of the width, so 0.054 / 2.618 ≈ 0.021 (about 18 pt on a
+ * 12 in page). builder.css and the print PDFs (server/print/pdf.ts) both use it.
+ */
+export const CAPTION_SIZE = 0.021;
 
 export function prettyCaption(label: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);

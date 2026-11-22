@@ -308,6 +308,24 @@ class UploadEngine {
     this.pump();
   }
 
+  /**
+   * The customer removed this photo (the remove button on the photos step):
+   * stop working on it. Every stage checks isCurrent() before it acts, so a
+   * request already in flight finishes harmlessly and nothing is written back.
+   * Its batch counts it like a rejected file, so the upload report still
+   * settles.
+   */
+  forget(id: string) {
+    const item = this.items.get(id);
+    this.held.delete(id);
+    if (!item) return;
+    this.items.delete(id);
+    item.batch.reject(id);
+    this.settle(item.batch);
+    this.emit();
+    this.pump();
+  }
+
   /** Forget everything: the customer started over. In-flight requests finish harmlessly. */
   reset() {
     this.items.clear();
@@ -492,7 +510,7 @@ class UploadEngine {
       // resuming a photo whose copies are already up skips the display lane
       item.stage = item.key ? "in" : "prepared";
       item.attempts = 0;
-      this.patch(item.id, { w: result.w, h: result.h });
+      this.patch(item.id, { w: result.w, h: result.h, sharp: result.sharp });
     } catch {
       // A file the browser can't open won't open on the next try either.
       this.reject(item);

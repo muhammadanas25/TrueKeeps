@@ -19,19 +19,24 @@
  */
 
 import {
+  captionable,
+  DEFAULT_FRAMING,
   firstMovablePage,
   hasTitlePage,
   LAYOUT_SLOTS,
   generatePages,
   pageCapacity,
   placement,
+  prettyCaption,
   reshapePage,
   type BookPage,
   type BuilderPhoto,
   type DensityId,
+  type PageFrame,
   type PageLayoutId,
   type Placement,
 } from "../data";
+import { relayoutPage } from "../arrange";
 import { lookDefaults, type EdgeId, type FontId } from "../looks";
 import { THEME_COLOUR } from "../palette";
 import { slotMaxZoom } from "../print";
@@ -118,22 +123,116 @@ export function replacePhoto(b: BookSlice, pageId: string, slot: number, photoId
 
 /* ── page shape ────────────────────────────────────────────────── */
 
+/** What a layout change did, so the editor can say it in a line. */
+export interface LayoutChange {
+  book: BookSlice;
+  /** photos moved onto this page from later pages (or from photos on no page) */
+  pulled: number;
+  /** photos moved off this page onto later pages */
+  pushed: number;
+  /** photos that found no room on a later page and are now "Not in book" */
+  out: number;
+  /** >0 when the change was refused: this many more photos would be needed */
+  short: number;
+}
+
 /**
- * Switch a page's layout. Slots that survive keep their framing (the
- * expensive thing to redo); new slots come from unused photos first,
- * then reuse, so a page never has a hole.
+ * Switch a page's layout, moving photos between pages instead of copying
+ * them or dropping them (owner, 2026-11-22: "layout should add or delete
+ * accordingly; currently it duplicates or doesn't take images from the next
+ * page").
+ *
+ * Approach:
+ *  1. A layout with MORE slots takes the first photo of each following page
+ *     that has more than one, in reading order, so no page is emptied. Those
+ *     pages lay themselves out again. If that isn't enough, it takes photos
+ *     that are in the book but on no page yet. If still short, nothing
+ *     changes and `short` says how many photos are missing: a photo is never
+ *     repeated.
+ *  2. A layout with FEWER slots keeps the first photos and moves the rest to
+ *     the front of the following pages that have room (up to each page's
+ *     capacity). Whatever finds no room leaves the book and shows under "Not
+ *     in book" in the Photos panel (trackRemovals in state.ts records it).
+ *  3. Slots that stay keep their framing; moved photos keep theirs too.
+ *
+ * `photos` must be the book's photos (bookPhotos(state)): photos the customer
+ * took out stay out. Passing every photo is what used to bring a deleted
+ * page's photos back.
+ *
+ * `target` is a named layout, or an engine template (`template` + its photo
+ * count `n`) from PICKER_TEMPLATES.
  */
-export function changeLayout(b: BookSlice, pageId: string, layout: PageLayoutId, photos: BuilderPhoto[]): BookSlice {
-  const want = LAYOUT_SLOTS[layout];
-  const pool = unusedPhotoIds(b.pages, photos);
-  return mapPage(b, pageId, (p) => {
-    const slots = p.slots.slice(0, want);
-    let k = 0;
-    while (slots.length < want && photos.length) {
-      slots.push(placement(pool.shift() ?? photos[(slots.length * 5 + 3 + k++) % photos.length].id));
+export function changeLayout(
+  b: BookSlice,
+  pageId: string,
+  target: { layout: PageLayoutId } | { template: string; n: number },
+  photos: BuilderPhoto[],
+): LayoutChange {
+  const i = b.pages.findIndex((p) => p.id === pageId);
+  const none: LayoutChange = { book: b, pulled: 0, pushed: 0, out: 0, short: 0 };
+  if (i < 0 || b.pages[i].layout === "title") return none;
+  const page = b.pages[i];
+  const want = "template" in target ? target.n : LAYOUT_SLOTS[target.layout];
+  const pages = b.pages.slice();
+  let slots = page.slots.slice();
+  let pulled = 0;
+  let pushed = 0;
+  let out = 0;
+
+  if (slots.length < want) {
+    // 1a. borrow from later pages, never leaving one empty
+    for (let j = i + 1; j < pages.length && slots.length < want; j++) {
+      const pj = pages[j];
+      if (pj.layout === "title" || pj.slots.length < 2) continue;
+      let rest = pj.slots;
+      while (rest.length > 1 && slots.length < want) {
+        slots.push(rest[0]);
+        rest = rest.slice(1);
+        pulled++;
+      }
+      pages[j] = reshapePage(pj, rest, photos, j) ?? pj;
     }
-    return { ...p, layout, slots, frames: undefined, mirror: layout === "collage" ? p.mirror : undefined };
-  });
+    // 1b. then photos in the book that are on no page
+    const onPages = new Set(pages.flatMap((p) => p.slots.map((s) => s.photoId)));
+    for (const ph of photos) {
+      if (slots.length >= want) break;
+      if (onPages.has(ph.id) || slots.some((s) => s.photoId === ph.id)) continue;
+      slots.push(placement(ph.id));
+      pulled++;
+    }
+    if (slots.length < want) return { ...none, short: want - slots.length };
+  } else if (slots.length > want) {
+    // 2. move the extra photos forward
+    const extra = slots.slice(want);
+    slots = slots.slice(0, want);
+    for (let j = i + 1; j < pages.length && extra.length; j++) {
+      const pj = pages[j];
+      if (pj.layout === "title") continue;
+      const room = pageCapacity(pj) - pj.slots.length;
+      if (room <= 0) continue;
+      const take = extra.splice(0, room);
+      pages[j] = reshapePage(pj, [...take, ...pj.slots], photos, j) ?? pj;
+      pushed += take.length;
+    }
+    out = extra.length;
+  }
+
+  const next =
+    "template" in target
+      ? relayoutPage(page, slots, photos, i, target.template)
+      : { ...page, layout: target.layout, slots, frames: undefined, mirror: target.layout === "collage" ? page.mirror : undefined };
+  pages[i] = next ?? page;
+  return { book: { ...b, pages }, pulled, pushed, out, short: 0 };
+}
+
+/** The line the editor shows after a layout change (null: nothing worth saying). */
+export function layoutChangeNote(r: LayoutChange): string | null {
+  if (r.short) return `This layout needs ${r.short} more ${r.short === 1 ? "photo" : "photos"}. Add photos, or pick a smaller layout.`;
+  const parts: string[] = [];
+  if (r.pulled) parts.push(`${r.pulled} ${r.pulled === 1 ? "photo" : "photos"} moved here from the next pages`);
+  if (r.pushed) parts.push(`${r.pushed} moved to the next pages`);
+  if (r.out) parts.push(`${r.out} moved to "Not in book"`);
+  return parts.length ? parts.join(", ") : null;
 }
 
 /**
@@ -193,14 +292,34 @@ export function deletePage(b: BookSlice, idx: number): BookSlice {
   return { ...b, pages: b.pages.filter((_, i) => i !== idx) };
 }
 
-/** Insert a framed page after `afterIdx`, using an unused photo if any. */
+/**
+ * Insert a framed page after `afterIdx`.
+ *
+ * Its photo is one on no page yet; failing that, the last photo of the
+ * fullest page moves onto it (that page lays itself out again). Step 5 no
+ * longer has a pages control (owner, 2026-11-22), so this is how a customer
+ * makes the book longer, and a photo is never repeated to fill a page. Null
+ * only when every page has a single photo and none is spare. Pass the book's
+ * photos (bookPhotos), so photos taken out stay out.
+ */
 export function addPage(b: BookSlice, afterIdx: number, photos: BuilderPhoto[]): { book: BookSlice; index: number; id: string } | null {
-  const photoId = unusedPhotoIds(b.pages, photos)[0] ?? photos[0]?.id;
-  if (!photoId) return null;
-  const id = newPageId();
-  const at = Math.max(firstMovablePage(b.pages), Math.min(b.pages.length, afterIdx + 1));
   const pages = b.pages.slice();
-  pages.splice(at, 0, { id, layout: "single", slots: [placement(photoId)], caption: "" });
+  let photo: Placement | null = null;
+  const spare = unusedPhotoIds(b.pages, photos)[0];
+  if (spare) photo = placement(spare);
+  else {
+    let donor = -1;
+    pages.forEach((p, j) => {
+      if (p.layout !== "title" && p.slots.length > 1 && (donor < 0 || p.slots.length > pages[donor].slots.length)) donor = j;
+    });
+    if (donor < 0) return null;
+    const d = pages[donor];
+    photo = { ...DEFAULT_FRAMING, photoId: d.slots[d.slots.length - 1].photoId };
+    pages[donor] = reshapePage(d, d.slots.slice(0, -1), photos, donor) ?? d;
+  }
+  const id = newPageId();
+  const at = Math.max(firstMovablePage(pages), Math.min(pages.length, afterIdx + 1));
+  pages.splice(at, 0, { id, layout: "single", slots: [photo], caption: "" });
   return { book: { ...b, pages }, index: at, id };
 }
 
@@ -269,4 +388,87 @@ export function setPageColour(b: BookSlice, colour: string | null, pageIds?: str
 
 export const setFont = (b: BookSlice, fontId: FontId): BookSlice => ({ ...b, fontId });
 export const setEdge = (b: BookSlice, edge: EdgeId): BookSlice => ({ ...b, edge });
-export const setCaption = (b: BookSlice, pageId: string, caption: string) => mapPage(b, pageId, (p) => ({ ...p, caption }));
+/* ── captions ──────────────────────────────────────────────────── */
+
+/** Where the photos of a captioned engine page must end: the band below holds the words. */
+export const CAPTION_TOP = 0.86;
+
+/**
+ * An engine page's slot rectangles, shrunk to leave a caption band at the
+ * foot of the page.
+ *
+ * The engine fills the page edge to edge (0.5 in margins), so a caption would
+ * sit on a photo. Instead every rectangle is scaled by the same factor about
+ * the top of the content and the page's centre line: shapes are kept, so each
+ * photo's crop is exactly what it was, and the gaps between photos shrink in
+ * proportion. Rectangles already above CAPTION_TOP are left alone. Edge-to-
+ * edge ("bleed") slots stop being bleeds, which is right: a bleed under a
+ * caption is a caption on a photo.
+ */
+export function captionFrames(frames: PageFrame[]): PageFrame[] {
+  if (!frames.length) return frames;
+  const top = Math.min(...frames.map((f) => f.y));
+  const bottom = Math.max(...frames.map((f) => f.y + f.h));
+  if (bottom <= CAPTION_TOP) return frames;
+  const s = (CAPTION_TOP - Math.max(top, 0.0417)) / (bottom - top);
+  const y0 = Math.max(top, 0.0417);
+  return frames.map((f) => ({
+    x: 0.5 + (f.x - 0.5) * s,
+    y: y0 + (f.y - top) * s,
+    w: f.w * s,
+    h: f.h * s,
+  }));
+}
+
+/**
+ * Set a page's caption. On an engine page, the first words make room for the
+ * caption (captionFrames) and clearing it lays the page out again full size,
+ * keeping the customer's framing (relayoutPage keeps it). Pass the book's
+ * photos so that relayout can measure them; without them an emptied caption
+ * just leaves the room.
+ */
+export function setCaption(b: BookSlice, pageId: string, caption: string, photos?: BuilderPhoto[]): BookSlice {
+  const i = b.pages.findIndex((p) => p.id === pageId);
+  if (i < 0) return b;
+  const p = b.pages[i];
+  const had = Boolean(p.caption.trim());
+  const has = Boolean(caption.trim());
+  let next: BookPage = { ...p, caption };
+  if (p.layout === "grid" && p.frames) {
+    if (!had && has) next = { ...next, frames: captionFrames(p.frames) };
+    else if (had && !has && photos) next = { ...(relayoutPage(p, p.slots, photos, i) ?? p), caption };
+  }
+  const pages = b.pages.slice();
+  pages[i] = next;
+  return { ...b, pages };
+}
+
+/**
+ * "Fill them in for me" (owner, 2026-11-22: simple suggestions by occasion).
+ * Every captionable page without a caption gets one: the occasion label of
+ * its first photo (labels are dealt out on upload, data.ts OCCASIONS), never
+ * the same words twice in a row. Pages with the customer's own words are left
+ * alone. Undoable like any edit.
+ */
+export function fillCaptions(b: BookSlice, photos: BuilderPhoto[], fallback: string[]): BookSlice {
+  const label = new Map(photos.map((p) => [p.id, p.label]));
+  let last = "";
+  let k = 0;
+  let out = b;
+  for (const page of b.pages) {
+    if (!captionable(page) || page.caption.trim() || !page.slots.length) continue;
+    let words = label.get(page.slots[0].photoId) || fallback[k++ % Math.max(1, fallback.length)] || "";
+    if (words === last) words = fallback[k++ % Math.max(1, fallback.length)] || words;
+    if (!words) continue;
+    last = words;
+    out = setCaption(out, page.id, prettyCaption(words), photos);
+  }
+  return out;
+}
+
+/** Take every caption out of the book (pages that made room for one get it back). */
+export function clearCaptions(b: BookSlice, photos: BuilderPhoto[]): BookSlice {
+  let out = b;
+  for (const page of b.pages) if (page.caption.trim()) out = setCaption(out, page.id, "", photos);
+  return out;
+}

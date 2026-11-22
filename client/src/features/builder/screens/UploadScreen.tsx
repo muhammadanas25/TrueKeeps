@@ -6,20 +6,22 @@
  * 30 there's a gentle note that 30 to 50 make a fuller book; from 30, a tick.
  *
  * Choosing is the whole job. The moment files are picked they go to the upload
- * engine (see ../upload/engine.ts) and the customer moves straight on to
- * ComposeScreen, so nobody waits here. Coming back shows every photo with its
- * state, and a way to add more or to re-add any whose original was lost when a
- * tab closed mid-upload.
+ * engine (see ../upload/engine.ts), which works in the background, and the
+ * customer stays here: photos often live in more than one folder, so they can
+ * add more before pressing Continue (owner, 2026-11-22; this used to jump to
+ * step 3 on the first pick). Every photo has a remove button (with Undo), and
+ * the few that would print badly are flagged (../quality.ts).
  *
  * Print advice lives on this screen, before the picker, because it can still
  * change what they choose. Afterwards it's only worth saying about the actual
  * photos they picked (see ../upload/tips.ts).
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle2, ImagePlus, Info, Lock, Plus, RotateCcw, X } from "lucide-react";
 import { Ph } from "../book";
-import { generatePages, type BookTheme, type CopyVoice } from "../data";
+import { generatePages, type BookTheme, type BuilderPhoto, type CopyVoice } from "../data";
+import { flagLabel, flaggedPhotos } from "../quality";
 import type { BuilderState } from "../state";
 import { uploadEngine } from "../upload/engine";
 import { BEFORE_TIPS } from "../upload/tips";
@@ -33,11 +35,13 @@ const FULL_BOOK = 30;
 
 export function UploadScreen({
   state,
+  set,
   copy,
   theme,
   onContinue,
 }: {
   state: BuilderState;
+  set: (patch: Partial<BuilderState>) => void;
   copy: CopyVoice;
   theme: BookTheme;
   onContinue: () => void;
@@ -46,18 +50,44 @@ export function UploadScreen({
   const hasPhotos = photos.length > 0;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const { addFiles, progress, snapshot } = useUploads();
+  const { addFiles, removePhoto, progress, snapshot } = useUploads();
+  const flags = useMemo(() => flaggedPhotos(photos), [photos]);
 
-  /**
-   * The first pick of a book carries straight on to the next questions while
-   * it uploads, when it is enough for a book; adding more stays here to review.
-   */
+  /** Picked files start uploading; the customer stays to add more (see the header). */
   const take = (files: FileList | File[] | null) => {
-    const first = !hasPhotos;
     void addFiles(files);
-    if (first && files && files.length >= MIN_PHOTOS) onContinue();
   };
   const enough = photos.length >= MIN_PHOTOS;
+
+  /**
+   * Undo for the remove button: what the book looked like just before, for a
+   * few seconds. A photo whose full-quality copy hadn't finished uploading
+   * comes back marked "needs adding again", like after a closed tab.
+   */
+  const [undo, setUndo] = useState<{
+    photo: BuilderPhoto;
+    at: number;
+    book: Pick<BuilderState, "pages" | "pagesEdited" | "removedPhotoIds" | "coverPhotoId">;
+  } | null>(null);
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 6000);
+    return () => clearTimeout(t);
+  }, [undo]);
+  const remove = (p: BuilderPhoto) => {
+    setUndo({
+      photo: p,
+      at: photos.indexOf(p),
+      book: { pages: state.pages, pagesEdited: state.pagesEdited, removedPhotoIds: state.removedPhotoIds, coverPhotoId: state.coverPhotoId },
+    });
+    removePhoto(p.id);
+  };
+  const putBack = () => {
+    if (!undo) return;
+    const { photo, at, book } = undo;
+    set({ ...book, photos: [...photos.slice(0, at), photo, ...photos.slice(at)] });
+    setUndo(null);
+  };
 
   const openPicker = () => inputRef.current?.click();
   const estPages = photos.length ? generatePages(photos, state.density).length : 0;
@@ -159,6 +189,17 @@ export function UploadScreen({
                 <CheckCircle2 size={17} /> {photos.length} photos added. That makes a full book.
               </p>
             )}
+            {flags.size ? (
+              <p className="up-status warn" role="status">
+                <Info size={17} />
+                <span>
+                  <b>
+                    {flags.size} {flags.size === 1 ? "photo" : "photos"} may print soft.
+                  </b>{" "}
+                  We'll keep {flags.size === 1 ? "it" : "them"} small in your book. You can also remove {flags.size === 1 ? "it" : "them"} and add a sharper copy.
+                </span>
+              </p>
+            ) : null}
             <div
               className="bb-photo-grid"
               onDragOver={(e) => e.preventDefault()}
@@ -167,11 +208,19 @@ export function UploadScreen({
                 take(e.dataTransfer.files);
               }}
             >
-              {photos.map((p) => (
-                <div key={p.id} className={"ck-tile" + (p.url ? "" : " waiting")}>
-                  <Ph photo={p} theme={theme} variant="thumb" showLabel={Boolean(p.url)} />
-                </div>
-              ))}
+              {photos.map((p) => {
+                const flag = flags.get(p.id);
+                return (
+                  <div key={p.id} className={"ck-tile" + (p.url ? "" : " waiting")}>
+                    <Ph photo={p} theme={theme} variant="thumb" showLabel={Boolean(p.url) && !flag} />
+                    {/* always visible: phones can't hover */}
+                    <button type="button" className="ck-tile-x" aria-label="Remove this photo" onClick={() => remove(p)}>
+                      <X size={14} strokeWidth={2.6} />
+                    </button>
+                    {flag ? <span className="ck-tile-flag">{flagLabel(p, flag)}</span> : null}
+                  </div>
+                );
+              })}
             </div>
             <div className="bb-upload-meta">
               <span className="bb-upload-count">
@@ -186,6 +235,15 @@ export function UploadScreen({
           </>
         )}
       </div>
+
+      {undo ? (
+        <div className="up-undo" role="status">
+          <span>Photo removed.</span>
+          <button type="button" onClick={putBack}>
+            Undo
+          </button>
+        </div>
+      ) : null}
 
       {hasPhotos ? (
         <div className="bb-actionbar">

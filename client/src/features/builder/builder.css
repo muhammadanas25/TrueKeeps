@@ -285,9 +285,12 @@
 .bb-page-full { padding: 0; }
 .bb-page-full .bb-ph { position: absolute; inset: 0; border-radius: 0; }
 .bb-page-caption {
-  font-family: var(--font-display); font-size: calc(var(--pw) * 0.042); font-weight: var(--fw-medium);
-  text-align: center; margin-top: calc(var(--pw) * 0.035); flex: none;
+  /* golden-ratio type scale: caption = title ÷ φ² ≈ 0.021 of the page (CAPTION_SIZE in data.ts) */
+  font-family: var(--font-display); font-size: calc(var(--pw) * 0.021); line-height: 1.35; font-weight: var(--fw-medium);
+  text-align: center; margin-top: calc(var(--pw) * 0.03); flex: none;
 }
+/* an engine page's caption: in the band its photos made room for (captionFrames, from 86% down) */
+.bb-grid-caption { position: absolute; left: 8%; right: 8%; top: 87.5%; bottom: 4%; margin: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .bb-page-full .bb-page-caption { position: absolute; left: 0; right: 0; bottom: 7%; margin: 0; z-index: 2; }
 .bb-page-full .bb-page-caption span { background: var(--scrim, rgba(255,255,255,0.85)); padding: 0.35em 1em; border-radius: 99px; }
 .bb-page-single .bb-ph { flex: 1; }
@@ -338,16 +341,25 @@
 /* ── Cover ─────────────────────────────────────────── */
 .bb-cover { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; overflow: hidden; }
 .bb-cover::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7%; background: linear-gradient(to right, rgba(0,0,0,0.16), transparent); z-index: 3; pointer-events: none; }
-.bb-cover-title { font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: calc(var(--pw) * 0.075); line-height: 1.18; letter-spacing: -0.01em; }
-.bb-cover-sub { font-size: calc(var(--pw) * 0.034); letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.7; margin-top: 0.5em; }
+/*
+ * Cover lettering (owner, 2026-11-22). Sizes are fractions of the cover's width
+ * (--pw), so a phone preview is the same cover made smaller and a title wraps
+ * where it prints. Golden-ratio scale: title 0.054, the line under it
+ * 0.054 ÷ φ ≈ 0.0334. The title never runs wider than 6 in on the 12 in cover
+ * (50%) and never more than two lines (TITLE_MAX in data.ts keeps it there).
+ */
+.bb-cover-title { font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: calc(var(--pw) * 0.054); line-height: 1.16; letter-spacing: -0.01em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.bb-cover-sub { font-size: calc(var(--pw) * 0.0334); line-height: 1.3; opacity: 0.85; margin-top: 0.45em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bb-cover [contenteditable]:focus { outline: 2px dashed rgba(42,30,92,0.5); outline-offset: 4px; border-radius: 2px; }
 .bb-cover-full .bb-ph { position: absolute; inset: 0; border-radius: 0; }
 .bb-cover-full .bb-cover-text { position: absolute; left: 8%; right: 8%; bottom: 8%; z-index: 2; padding: 5% 6%; border-radius: 8px; }
 .bb-cover-framed { padding: 8%; }
 .bb-cover-framed .bb-ph { flex: 1; min-height: 0; }
 .bb-cover-framed .bb-cover-text { text-align: center; padding-top: 6%; flex: none; }
-.bb-cover-minimal { align-items: center; justify-content: center; text-align: center; padding: 10%; }
-.bb-cover-minimal .rule { width: 18%; height: 2px; margin: 7% auto 0; }
+/* "Just text": the title block centred on the 38.2% line (golden ratio), inside the 0.75 in margin */
+.bb-cover.bb-cover-minimal { text-align: center; padding: 6.25%; }
+.bb-cover.bb-cover-minimal > div { position: absolute; left: 6.25%; right: 6.25%; top: 38.2%; transform: translateY(-50%); }
+.bb-cover-minimal .rule { width: 12%; height: 2px; margin: 5% auto 0; }
 .bb-cover-split .bb-ph { height: 55%; border-radius: 0; flex: none; }
 .bb-cover-split .bb-cover-text { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 9%; }
 
@@ -637,6 +649,13 @@
 /* ── Order ─────────────────────────────────────────── */
 .bb-order { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 48px 20px 80px; }
 .bb-order-inner { width: 100%; max-width: 880px; }
+/* a book that's already ordered (a Back press after ordering lands here) */
+.bb-ordered { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; max-width: 560px; margin: 40px auto 0; padding: 36px 28px; border-radius: 20px; background: var(--surface-card); border: 1px solid var(--color-border); color: var(--success-fg); }
+.bb-ordered h1 { color: var(--heading); }
+.bb-ordered p { margin: 0; color: var(--color-fg2); font-size: 16px; line-height: 24px; }
+.bb-ordered-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+.bb-ship-email { grid-column: 1 / -1; margin: 0 0 4px; font-size: 14px; line-height: 20px; color: var(--color-fg2); }
+.bb-ship-email b { color: var(--heading); font-weight: 600; word-break: break-all; }
 .bb-order h1 { font-family: var(--font-display); font-size: clamp(26px, 3.2vw, 36px); line-height: 1.25; font-weight: var(--fw-semibold); text-align: center; letter-spacing: var(--ls-tight); margin: 0; }
 .bb-order .bb-sub { text-align: center; margin-top: 10px; font-size: 16px; color: var(--color-fg2); }
 .bb-order-card { display: grid; grid-template-columns: 1fr 1.15fr; gap: clamp(24px, 4vw, 48px); background: var(--surface-card); border: 1px solid var(--color-border); border-radius: var(--radius-2xl); padding: clamp(24px, 4vw, 44px); margin-top: 40px; align-items: center; }
@@ -746,12 +765,12 @@
    filmstrip, the 3-D preview and the order mini-book all agree. The
    defaults (classic + clean) add nothing, which is the pre-v2 look. */
 .bb-font-editorial .t, .bb-font-editorial .bb-cover-title { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: 0; }
-.bb-font-editorial .bb-page-caption { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: calc(var(--pw) * 0.048); }
+.bb-font-editorial .bb-page-caption { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: calc(var(--pw) * 0.024); }
 .bb-font-modern .t, .bb-font-modern .bb-cover-title { font-family: 'Archivo', var(--font-body), sans-serif; font-weight: 500; letter-spacing: -0.015em; }
 .bb-font-modern .bb-page-caption { font-family: 'Archivo', var(--font-body), sans-serif; font-weight: 400; }
 .bb-font-script .t, .bb-font-script .bb-cover-title { font-family: 'Caveat', 'Segoe Script', cursive; font-weight: 600; letter-spacing: 0; font-size: calc(var(--pw) * 0.11); }
-.bb-font-script .bb-cover-title { font-size: calc(var(--pw) * 0.1); }
-.bb-font-script .bb-page-caption { font-family: 'Caveat', 'Segoe Script', cursive; font-weight: 600; font-size: calc(var(--pw) * 0.06); }
+.bb-font-script .bb-cover-title { font-size: calc(var(--pw) * 0.07); }
+.bb-font-script .bb-page-caption { font-family: 'Caveat', 'Segoe Script', cursive; font-weight: 600; font-size: calc(var(--pw) * 0.03); }
 .bb-edge-soft:not(.bb-page-full) .bb-ph { border-radius: calc(var(--pw) * 0.022); }
 /* Shadow: photos sit on the page like loose prints. Replaces "Bordered" in the
    picker (a thin white ring that vanished on light pages); .bb-edge-border

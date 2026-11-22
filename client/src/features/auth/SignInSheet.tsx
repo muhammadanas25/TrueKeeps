@@ -16,6 +16,7 @@
  * loads builder.css, and inside the builder.
  */
 
+import { EMAIL_RE, suggestEmail } from "./email-check";
 import { useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Mail, X, Check, ArrowRight } from "lucide-react";
@@ -67,6 +68,8 @@ export function SignInSheet({
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** a near-miss domain ("gmial.com"): asked once, then sent as typed if they insist */
+  const [suggest, setSuggest] = useState<string | null>(null);
   const copy = COPY[intent];
 
   const onGoogle = async () => {
@@ -83,8 +86,15 @@ export function SignInSheet({
   const onEmail = async (e: FormEvent) => {
     e.preventDefault();
     const value = email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setError("Enter a valid email address");
+    if (!EMAIL_RE.test(value)) {
+      setError("Enter a valid email address, like name@gmail.com");
+      return;
+    }
+    const fix = suggestEmail(value);
+    if (fix && suggest !== value) {
+      // ask once; pressing Send again with the same address sends it as typed
+      setSuggest(value);
+      setError(null);
       return;
     }
     setBusy(true);
@@ -158,6 +168,22 @@ export function SignInSheet({
                 <button className="au-btn au-btn-primary au-submit" type="submit" disabled={busy}>
                   Send me a sign-in link <ArrowRight size={17} />
                 </button>
+                {suggest && suggest === email.trim().toLowerCase() && suggestEmail(suggest) ? (
+                  <p className="au-error" role="alert">
+                    Did you mean{" "}
+                    <button
+                      type="button"
+                      className="au-suggest"
+                      onClick={() => {
+                        setEmail(suggestEmail(suggest)!);
+                        setSuggest(null);
+                      }}
+                    >
+                      {suggestEmail(suggest)}
+                    </button>
+                    ? If not, press the button again.
+                  </p>
+                ) : null}
                 {error ? <p className="au-error">{error}</p> : null}
                 <p className="au-fine">No password needed. The link works once and expires in 15 minutes.</p>
               </form>
