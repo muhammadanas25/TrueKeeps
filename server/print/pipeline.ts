@@ -10,7 +10,9 @@
  *   1. rendering  — cut every placed photo from its HD original
  *                   (server/print/render.ts, writes manifest.json last)
  *   2. composing  — interior.pdf + cover.pdf to a temp folder
- *                   (server/print/pdf.ts), SHA-256 of each
+ *                   (server/print/pdf.ts), then jpegs.zip: every printed
+ *                   side as a 300 DPI JPEG, rendered from those two PDFs
+ *                   (server/print/jpegs.ts); SHA-256 of each
  *   3. upload     — to an IMMUTABLE key: …/print/<order>/v<version>/<file>.
  *                   A rebuild is a new version; a file a printer downloaded
  *                   is never overwritten, so its checksum always proves it.
@@ -47,6 +49,7 @@ import { opsDb, requireOpsDb } from "../ops/db";
 import { notifyOrder } from "../notify/outbox";
 import { printPrefix, renderOrder } from "./render";
 import { composeCover, composeInterior } from "./pdf";
+import { composeJpegZip } from "./jpegs";
 
 /** Orders in these states should have a print file. */
 const PRINTABLE_STATUSES = ["paid", "in_production", "shipped", "delivered"];
@@ -82,8 +85,8 @@ async function digest(stream: NodeJS.ReadableStream): Promise<{ sha256: string; 
 }
 
 /** Upload a local file and prove the stored copy is byte-identical. */
-async function storeAndVerify(store: MediaStore, key: string, localPath: string, expected: { sha256: string; bytes: number }) {
-  await store.putFile(key, localPath, "application/pdf");
+async function storeAndVerify(store: MediaStore, key: string, localPath: string, expected: { sha256: string; bytes: number }, contentType = "application/pdf") {
+  await store.putFile(key, localPath, contentType);
   const back = await digest(await store.getStream(key));
   if (back.sha256 !== expected.sha256 || back.bytes !== expected.bytes) {
     throw new Error(`stored copy of ${path.basename(key)} doesn't match (${back.bytes} bytes vs ${expected.bytes})`);
@@ -137,20 +140,25 @@ async function buildJob(data: unknown): Promise<void> {
     const coverPath = path.join(work, "cover.pdf");
     const interior = await composeInterior(doc, manifest, interiorPath);
     const cover = await composeCover(doc, manifest, coverPath);
+    const zipPath = path.join(work, "jpegs.zip");
+    const jpegs = await composeJpegZip(interiorPath, coverPath, zipPath, { orderNumber: order.orderNumber, title: doc.title || "Untitled book" });
 
     await setState(job.id, "verifying");
     const files: PrintJobFile[] = [];
-    for (const [kind, local, pages] of [
-      ["interior", interiorPath, interior.pages],
-      ["cover", coverPath, cover.pages],
+    for (const [kind, local, pages, file, type] of [
+      ["interior", interiorPath, interior.pages, "interior.pdf", "application/pdf"],
+      ["cover", coverPath, cover.pages, "cover.pdf", "application/pdf"],
+      // "pages" of the ZIP is how many JPEGs it holds (cover front and back + every page)
+      ["jpegs", zipPath, jpegs.files, "jpegs.zip", "application/zip"],
     ] as const) {
       const local_ = await digest(createReadStream(local));
-      if (local_.pages !== pages) throw new Error(`${kind}.pdf has ${local_.pages} pages, expected ${pages}`);
-      const key = versionKey(order.projectId, order.id, job.version, `${kind}.pdf`);
-      await storeAndVerify(mediaStore, key, local, local_);
+      if (type === "application/pdf" && local_.pages !== pages) throw new Error(`${file} has ${local_.pages} pages, expected ${pages}`);
+      if (kind === "jpegs" && pages !== interior.pages + cover.pages) throw new Error(`jpegs.zip holds ${pages} pictures, expected ${interior.pages + cover.pages}`);
+      const key = versionKey(order.projectId, order.id, job.version, file);
+      await storeAndVerify(mediaStore, key, local, local_, type);
       let backupKey: string | null = null;
       if (backupStore) {
-        await storeAndVerify(backupStore, key, local, local_);
+        await storeAndVerify(backupStore, key, local, local_, type);
         backupKey = key;
       }
       files.push({ kind, key, bytes: (await stat(local)).size, sha256: local_.sha256, pages, backupKey });
@@ -226,7 +234,7 @@ async function integrity(): Promise<void> {
       }
       if (!ok) {
         log.error({ orderId: job.orderId, key: f.key }, "[print] stored file missing or changed — rebuilding");
-        await storage.addOrderEvent({ orderId: job.orderId, kind: "note", actor: "system", note: `Daily check: ${f.kind}.pdf v${job.version} missing or changed in storage; rebuilding` });
+        await storage.addOrderEvent({ orderId: job.orderId, kind: "note", actor: "system", note: `Daily check: ${path.basename(f.key)} v${job.version} missing or changed in storage; rebuilding` });
         await startPrintJob(job.orderId, { force: true, requestedBy: "integrity-check" });
         break;
       }

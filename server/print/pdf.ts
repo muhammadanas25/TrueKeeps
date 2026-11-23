@@ -6,7 +6,8 @@
  * with the customer's framing, at up to 300 DPI). Output: two PDFs streamed to
  * disk, never held whole in memory:
  *   interior.pdf  one PDF page per book page, trim 12×12 in + 3 mm bleed
- *   cover.pdf     the front cover at the same trim + bleed
+ *   cover.pdf     the front cover (page 1) and back cover (page 2), same trim
+ *                 + bleed, each cover style drawn as the preview draws it
  *
  * The print spec (trim, bleed) is PRINT_SPEC below; when the printer sends
  * theirs, that is the one place to change.
@@ -24,15 +25,16 @@
  *
  * What is approximate in this version (flagged on the order in the admin):
  * captions, the title page and the cover's title use standard PDF fonts
- * (Helvetica / Times) rather than the book's chosen lettering, and the cover
- * is drawn as a full-bleed photo with the title, not each cover style.
+ * (Helvetica / Times) rather than the book's chosen lettering. Covers made
+ * before 2026-11-22 in the retired styles keep their simplified layout.
  */
 
 import PDFDocument from "pdfkit";
 import { createWriteStream } from "fs";
 import sharp from "sharp";
 import type { BuilderDocument } from "@shared/document";
-import { bookTheme, deriveTheme } from "../../client/src/features/builder/palette";
+import { bookTheme, contrastRatio, deriveTheme } from "../../client/src/features/builder/palette";
+import { LOGO_PATHS, LOGO_VIEWBOX } from "./logo";
 import { CAPTION_SIZE } from "../../client/src/features/builder/data";
 import { mediaStore } from "../media";
 import type { PrintManifest } from "./render";
@@ -253,33 +255,141 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
   return { pages: doc.pages.length, lowDpi, missing };
 }
 
+/** Indigo, the logo's colour on a light cover (brand kit). */
+const LOGO_INDIGO = "#2A1E5C";
+
 /**
- * Compose cover.pdf: the cover photo (from the manifest, so it follows the
- * same cover choice as the renderer) full-bleed, the title in a band at the
- * foot. Returns 0 pages when the book has no cover photo stored.
+ * The logo's colour on a page (owner, 2026-11-22: "condition for logo with
+ * matching to color"): indigo when it reads clearly (WCAG 4.5:1 or better),
+ * otherwise white. Measured, so a custom page colour works too.
+ */
+export function logoColourOn(pageHex: string): string {
+  return contrastRatio(LOGO_INDIGO, pageHex) >= 4.5 ? LOGO_INDIGO : "#FFFFFF";
+}
+
+/** The cover photo cut to w × h inches at 300 DPI (cover-fit, centred), or null. */
+async function coverPhoto(manifest: PrintManifest, wIn: number, hIn: number): Promise<Buffer | null> {
+  if (!manifest.cover) return null;
+  return sharp(await mediaStore.get(manifest.cover.originalKey))
+    .rotate()
+    .resize(Math.round(wIn * 300), Math.round(hIn * 300), { fit: "cover", position: "centre", withoutEnlargement: false })
+    .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}
+
+/**
+ * The title, a short rule and the line under it, centred on `cx` and
+ * vertically centred on `cy`, never wider than 6 in (half the cover) and never
+ * more than two lines: the title steps down in size until it fits, as the
+ * preview does (builder.css .bb-cover-title). Sizes follow the golden-ratio
+ * scale: title 0.054 of the cover, the line under it ÷ 1.618.
+ */
+function coverWords(pdf: Pdf, doc: BuilderDocument, theme: ReturnType<typeof bookTheme>, W: number, cx: number, cy: number, withRule: boolean) {
+  const title = (doc.title || "").trim();
+  const sub = (doc.subtitle ?? "").trim();
+  const maxW = W * 0.5;
+  let size = W * (doc.fontId === "script" ? 0.07 : 0.054);
+  const titleFont = fontFor(doc.fontId, true);
+  pdf.font(titleFont).fontSize(size);
+  while (title && pdf.heightOfString(title, { width: maxW, align: "center" }) > size * 2.5 && size > W * 0.03) {
+    size *= 0.94;
+    pdf.fontSize(size);
+  }
+  const titleH = title ? pdf.heightOfString(title, { width: maxW, align: "center" }) : 0;
+  const subSize = size / 1.618;
+  const gap = size * 0.4;
+  const ruleH = withRule ? 2 : 0;
+  const subH = sub ? subSize * 1.3 : 0;
+  const total = titleH + (withRule ? gap + ruleH : 0) + (sub ? gap + subH : 0);
+  let y = cy - total / 2;
+  if (title) {
+    pdf.fillColor(theme.ink).font(titleFont).fontSize(size).text(title, cx - maxW / 2, y, { width: maxW, align: "center" });
+    y += titleH;
+  }
+  if (withRule) {
+    y += gap;
+    pdf.rect(cx - W * 0.03, y, W * 0.06, ruleH).fill(theme.accent);
+    y += ruleH;
+  }
+  if (sub) {
+    y += gap;
+    pdf.fillColor(theme.ink).font(fontFor(doc.fontId)).fontSize(subSize).text(sub, cx - maxW / 2, y, { width: maxW, align: "center", lineBreak: false, ellipsis: true });
+  }
+}
+
+/**
+ * Compose cover.pdf: page 1 the front, page 2 the back (owner, 2026-11-22:
+ * the printer gets the cover and the back; the spine waits for the printer's
+ * spine width, which depends on the paper and page count).
+ *
+ * The front is drawn per cover style, with the same geometry as the preview
+ * (builder.css / upload.css), so what was approved is what prints:
+ *   classic ("Minimal")   inside a 0.75 in margin, a square photo centred in
+ *                         the top 61.8%, the words centred in the 38.2% below
+ *   moment ("Full Picture") the photo inside a 0.5 in border, no words
+ *   minimal ("Just text") the words centred on the 38.2% line
+ *   older styles          the photo full-bleed with the title in a band at
+ *                         the foot, as these books printed before
+ * The back is the page colour with the logo 4 in wide, centred, 1 in up from
+ * the bottom edge, indigo or white by contrast (logoColourOn).
  */
 export async function composeCover(doc: BuilderDocument, manifest: PrintManifest, path: string): Promise<{ pages: number }> {
   const { pdf, W, H, B } = newPdf(`${doc.title || "TrueKeeps book"} (cover)`);
   const theme = bookTheme(doc.themeId, doc.pageColor);
   const file = streamTo(pdf, path);
+  const inch = PT_PER_IN;
+  const style = doc.coverStyle;
+
+  // ── front
   addPage(pdf, W, H, B, theme.page);
-  if (manifest.cover) {
-    // the cover carries no framing: centre-crop the original to the cover at 300 DPI
-    const px = Math.round((PRINT_SPEC.trimInches.w + (2 * PRINT_SPEC.bleedMm) / 25.4) * 300);
-    const jpeg = await sharp(await mediaStore.get(manifest.cover.originalKey))
-      .rotate()
-      .resize(px, px, { fit: "cover", position: "centre", withoutEnlargement: false })
-      .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
-      .toBuffer();
-    pdf.image(jpeg, 0, 0, { width: W + 2 * B, height: H + 2 * B });
+  if (style === "classic") {
+    const m = W * 0.0625;
+    const live = H - 2 * m;
+    const photoPart = live * 0.618;
+    const side = photoPart * 0.92;
+    const img = await coverPhoto(manifest, side / inch, side / inch);
+    const x = B + (W - side) / 2;
+    const y = B + m + (photoPart - side) / 2;
+    if (img) pdf.image(img, x, y, { width: side, height: side });
+    else pdf.rect(x, y, side, side).fill(theme.soft);
+    coverWords(pdf, doc, theme, W, B + W / 2, B + m + photoPart + (live * 0.382) / 2, true);
+  } else if (style === "moment") {
+    const border = W * 0.041667;
+    const img = await coverPhoto(manifest, (W - 2 * border) / inch, (H - 2 * border) / inch);
+    if (img) pdf.image(img, B + border, B + border, { width: W - 2 * border, height: H - 2 * border });
+  } else if (style === "minimal") {
+    coverWords(pdf, doc, theme, W, B + W / 2, B + H * 0.382, true);
+  } else {
+    // older styles (Full photo, Framed, Split, Truekeeps Design): as before
+    if (manifest.cover) {
+      const px = Math.round((PRINT_SPEC.trimInches.w + (2 * PRINT_SPEC.bleedMm) / 25.4) * 300);
+      const jpeg = await sharp(await mediaStore.get(manifest.cover.originalKey))
+        .rotate()
+        .resize(px, px, { fit: "cover", position: "centre", withoutEnlargement: false })
+        .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+        .toBuffer();
+      pdf.image(jpeg, 0, 0, { width: W + 2 * B, height: H + 2 * B });
+    }
+    if (doc.title) {
+      const size = W * 0.054;
+      pdf.save().fillColor("#000000").opacity(0.35).rect(0, B + H * 0.72, W + 2 * B, H * 0.28 + B).fill().restore();
+      pdf.fillColor("#FFFFFF").font(fontFor(doc.fontId, true)).fontSize(size);
+      pdf.text(doc.title, B + W * 0.08, B + H * 0.78, { width: W * 0.84, align: "left" });
+      if (doc.subtitle) pdf.font(fontFor(doc.fontId)).fontSize(size / 1.618).text(doc.subtitle, { width: W * 0.84 });
+    }
   }
-  if (doc.title) {
-    const size = W * 0.065;
-    pdf.save().fillColor("#000000").opacity(0.35).rect(0, B + H * 0.72, W + 2 * B, H * 0.28 + B).fill().restore();
-    pdf.fillColor("#FFFFFF").font(fontFor(doc.fontId, true)).fontSize(size);
-    pdf.text(doc.title, B + W * 0.08, B + H * 0.78, { width: W * 0.84, align: "left" });
-    if (doc.subtitle) pdf.font("Helvetica").fontSize(W * 0.026).text(doc.subtitle.toUpperCase(), { width: W * 0.84, characterSpacing: W * 0.002 });
-  }
+
+  // ── back
+  addPage(pdf, W, H, B, theme.page);
+  const logoW = 4 * inch;
+  const scale = logoW / LOGO_VIEWBOX.w;
+  const logoH = LOGO_VIEWBOX.h * scale;
+  pdf.save();
+  pdf.translate(B + (W - logoW) / 2, B + H - inch - logoH).scale(scale);
+  const colour = logoColourOn(theme.page);
+  for (const d of LOGO_PATHS) pdf.path(d).fill(colour);
+  pdf.restore();
+
   await file.end();
-  return { pages: 1 };
+  return { pages: 2 };
 }

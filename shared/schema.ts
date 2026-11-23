@@ -590,7 +590,7 @@ export const auditLog = pgTable(
 
 /** One stored, checked file of a print job (see `print_jobs.files`). */
 export interface PrintJobFile {
-  /** `interior` | `cover` */
+  /** `interior` | `cover` (PDFs) | `jpegs` (a ZIP of 300 DPI JPEGs; `pages` = how many) */
   kind: string;
   key: string;
   bytes: number;

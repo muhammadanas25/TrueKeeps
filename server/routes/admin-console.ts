@@ -24,6 +24,7 @@
  * Test (sandbox) orders are left out of every figure unless `test=1`.
  */
 
+import path from "path";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
@@ -338,7 +339,9 @@ adminConsoleRouter.get(
     const file = job?.files?.find((f) => f.kind === req.params.kind);
     if (!job || job.state !== "checked" || !file) return res.status(404).json({ error: "No checked file" });
     const [order] = await db.select({ n: orders.orderNumber }).from(orders).where(eq(orders.id, job.orderId)).limit(1);
-    const url = await mediaStore.signedDownload(file.key, `${order?.n ?? "order"}-v${version}-${file.kind}.pdf`, 15 * 60);
+    // the stored name carries the type: interior.pdf, cover.pdf, jpegs.zip
+    const ext = path.extname(file.key) || ".pdf";
+    const url = await mediaStore.signedDownload(file.key, `${order?.n ?? "order"}-v${version}-${file.kind}${ext}`, 15 * 60);
     void audit(req, "print.download", { type: "order", id: job.orderId }, { version, kind: file.kind, sha256: file.sha256 });
     res.json({ url, sha256: file.sha256, bytes: file.bytes, expiresInSeconds: 15 * 60 });
   }),

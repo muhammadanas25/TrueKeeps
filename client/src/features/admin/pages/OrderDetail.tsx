@@ -161,9 +161,14 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
                 {(job.files ?? []).map((f) => (
                   <div key={f.kind} className="oc-row" style={{ padding: 12, border: "1px solid #DEE2E1", borderRadius: 10 }}>
                     <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                      <b style={{ color: "#2A1E5C" }}>{f.kind}.pdf</b>
+                      <b style={{ color: "#2A1E5C" }}>{f.key.split("/").pop()}</b>
                       <div className="oc-small">
-                        {f.pages} page{f.pages > 1 ? "s" : ""} · {(f.bytes / 1e6).toFixed(1)} MB · {f.backupKey ? "2 copies" : "1 copy"}
+                        {f.kind === "jpegs"
+                          ? `${f.pages} JPEGs: front cover, every page by sheet, back cover · 300 dpi`
+                          : f.kind === "cover"
+                            ? `${f.pages} page${f.pages > 1 ? "s" : ""}${f.pages > 1 ? ": front, back" : ""}`
+                            : `${f.pages} page${f.pages > 1 ? "s" : ""}`}{" "}
+                        · {(f.bytes / 1e6).toFixed(1)} MB · {f.backupKey ? "2 copies" : "1 copy"}
                       </div>
                       <div className="oc-mono" title={f.sha256} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                         sha256 {f.sha256.slice(0, 12)}…{f.sha256.slice(-6)}
@@ -184,7 +189,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
                 ) : null}
                 {job.state === "checked" ? (
                   <p className="oc-small">
-                    Captions, the title page and the cover title use standard fonts in this version, and the cover is a simplified layout. Check the PDF before the first print run.
+                    Captions, the title page and the cover title use standard fonts in this version. The JPEGs are rendered from the two PDFs, so they match them exactly.
                   </p>
                 ) : null}
                 <div className="oc-row">
