@@ -193,7 +193,8 @@ export function EditorV2({
       hist.current.past.push(before);
       if (hist.current.past.length > 80) hist.current.past.shift();
       hist.current.future = [];
-      set(after);
+      // the first real edit marks the book as customised (owner's analytics)
+      set(stateRef.current.customized === "changed" ? after : { ...after, customized: "changed" });
       bump((x) => x + 1);
     },
     [set],
@@ -204,7 +205,7 @@ export function EditorV2({
     hist.current.future = [];
     bump((x) => x + 1);
   };
-  const liveSet = (fn: (b: ops.BookSlice) => ops.BookSlice) => set(fn(slice()));
+  const liveSet = (fn: (b: ops.BookSlice) => ops.BookSlice) => set({ ...fn(slice()), customized: "changed" });
   const undo = () => {
     const h = hist.current;
     const prev = h.past.pop();

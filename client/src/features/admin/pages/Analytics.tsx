@@ -125,6 +125,11 @@ function Sales({ qs }: { qs: string }) {
           <h2>By occasion</h2>
           <Bars items={groupBars(d.byOccasion as R[], (r) => n(r.n), (r) => `${n(r.n)} orders`)} />
         </section>
+        <section className="oc-card">
+          <h2>How books were made</h2>
+          <Bars items={groupBars((d.byMade as R[]) ?? [], (r) => n(r.n), (r) => `${n(r.n)} orders · ${money_(r)}`)} />
+          <p className="oc-small">"Customised" means at least one change in the editor: layout, photos, text, colour or framing.</p>
+        </section>
       </div>
     </>
   );

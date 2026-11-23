@@ -91,6 +91,13 @@ export interface BuilderState {
   coverStyle: CoverStyleId;
   /** the pattern on a "pattern" cover (shared/patterns.ts) */
   coverPattern: PatternId;
+  /**
+   * How the book was made, for the owner's "customised vs ready-made" count
+   * (2026-11-22): "none" = ordered as we laid it out, "looked" = opened the
+   * editor but changed nothing, "changed" = made at least one edit there.
+   * Saved on the book, so it travels with the order.
+   */
+  customized: "none" | "looked" | "changed";
   voice: "warm" | "concise";
   /** preview position: 0 = closed cover, k = spread k−1 open */
   pos: number;
@@ -129,6 +136,7 @@ export const DEFAULT_STATE: BuilderState = {
   removedPhotoIds: [],
   coverStyle: "full",
   coverPattern: "floral",
+  customized: "none",
   voice: "warm",
   pos: 0,
   qty: 1,

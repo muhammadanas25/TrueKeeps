@@ -17,7 +17,7 @@
 
 import type { NotifyEvent } from "@shared/ops";
 import { config } from "../config";
-import { orderConfirmedEmail } from "../email/templates";
+import { emailFrame, orderConfirmedEmail } from "../email/templates";
 
 export type Vars = Record<string, string | number | boolean | null | undefined>;
 export type Audience = "staff" | "customer";
@@ -35,14 +35,8 @@ function shell(title: string, lines: string[], cta?: { href: string; label: stri
   const btn = cta
     ? `<tr><td style="padding:18px 0"><a href="${esc(cta.href)}" style="display:inline-block;background:#CA3A58;color:#fff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:999px">${esc(cta.label)}</a></td></tr>`
     : "";
-  return `<!doctype html><html><body style="margin:0;background:#FBF6F0;font-family:Figtree,Helvetica,Arial,sans-serif;color:#404442">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#FBF6F0;padding:32px 16px"><tr><td align="center">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#fff;border-radius:14px;padding:36px 32px">
-<tr><td style="padding-bottom:12px"><img src="${config.appUrl}/email-logo.png" width="140" height="28" alt="truekeeps" style="display:block;border:0"></td></tr>
-<tr><td style="font-size:20px;line-height:28px;font-weight:700;color:#2A1E5C;padding:12px 0 6px">${esc(title)}</td></tr>
-${body}${btn}
-<tr><td style="font-size:12px;color:#595080;padding-top:28px;border-top:1px solid #DEE2E1">TrueKeeps · thetruekeeps.com</td></tr>
-</table></td></tr></table></body></html>`;
+  // the same frame as the order emails (server/email/templates.ts)
+  return emailFrame(esc(title), body + btn);
 }
 
 function make(title: string, subject: string, lines: string[], cta?: { href: string; label: string }): EmailBody {
@@ -71,7 +65,7 @@ export function renderEmail(event: NotifyEvent, audience: Audience, v: Vars): Em
       case "order_shipped":
         return make(
           "Your book is on its way",
-          `${test(v)}Your TrueKeeps order ${s(v.orderNumber)} has shipped`,
+          `${test(v)}Order ${s(v.orderNumber)} is on its way`,
           [`Hi ${s(v.firstName)}, your book "${s(v.title)}" is with ${s(v.courier) || "the courier"}.`, v.tracking ? `Tracking number: ${s(v.tracking)}` : "We'll let you know when it's delivered."],
           { href: s(v.orderUrl), label: "See your order" },
         );

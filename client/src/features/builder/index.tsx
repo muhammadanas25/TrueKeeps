@@ -100,6 +100,10 @@ export default function BookBuilder() {
   const { status: syncStatus } = useBuilderSync(state, set);
   // funnel analytics: which step people reach and how long they spend there (docs/adr/018)
   useEffect(() => trackStep(state.screen === "compose" ? `compose-${state.qstep ?? 0}` : state.screen), [state.screen, state.qstep]);
+  // opening the editor counts as "looked" until an edit there makes it "changed"
+  useEffect(() => {
+    if (state.screen === "customize" && state.customized === "none") set({ customized: "looked" });
+  }, [state.screen, state.customized]); // eslint-disable-line react-hooks/exhaustive-deps
   const uploadsBusy = useSyncExternalStore(uploadEngine.subscribe, () => uploadEngine.getSnapshot().active);
   const { loading: sessionLoading, isMember } = useSession();
   const [editorVersion, setEditorVersion] = useEditorVersion();

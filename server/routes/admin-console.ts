@@ -396,6 +396,10 @@ analytics.get(
       byCity: await by(sql`initcap(shipping_address->>'city')`),
       byPages: await by(sql`CASE WHEN page_count <= 12 THEN 'up to 12 pages' WHEN page_count <= 20 THEN '13–20 pages' WHEN page_count <= 28 THEN '21–28 pages' ELSE '29+ pages' END`),
       byOccasion: await by(sql`coalesce(occasion, 'not set')`),
+      // owner, 2026-11-22: ordered as we made it vs customised (BuilderState.customized)
+      byMade: await by(
+        sql`CASE document_snapshot->>'customized' WHEN 'changed' THEN 'Customised in the editor' WHEN 'looked' THEN 'Opened the editor, changed nothing' WHEN 'none' THEN 'Ordered as we made it' ELSE 'Before this was counted' END`,
+      ),
       refunds: { n: num(refunds.n), minor: num(refunds.minor) },
       repeat: (await rows(db, sql`SELECT count(*) FILTER (WHERE n > 1)::int AS repeat, count(*)::int AS buyers FROM (SELECT user_id, count(*) AS n FROM orders WHERE paid_at IS NOT NULL AND ${liveOnly(req)} GROUP BY 1) t`))[0],
     });

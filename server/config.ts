@@ -59,7 +59,9 @@ const envSchema = z.object({
 
   /** Email delivery (Resend when a key is set; console otherwise) */
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default("TrueKeeps <hello@thetruekeeps.com>"),
+  EMAIL_FROM: z.string().default("TrueKeeps <orders@thetruekeeps.com>"),
+  /** where replies to our emails go; unset = the From address */
+  EMAIL_REPLY_TO: z.string().optional(),
 
   /** Media store (see server/media.ts) */
   S3_ENDPOINT: z.string().optional(),
@@ -157,7 +159,10 @@ export const config = {
       : null,
   email: {
     resendApiKey: env.RESEND_API_KEY ?? null,
-    from: env.EMAIL_FROM,
+    // Always sent as "TrueKeeps" (owner, 2026-11-22: the full name on emails),
+    // even when EMAIL_FROM is a bare address.
+    from: /</.test(env.EMAIL_FROM) ? env.EMAIL_FROM : `TrueKeeps <${env.EMAIL_FROM.trim()}>`,
+    replyTo: env.EMAIL_REPLY_TO || null,
   },
   s3: {
     endpoint: env.S3_ENDPOINT,

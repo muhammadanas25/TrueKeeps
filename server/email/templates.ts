@@ -11,6 +11,7 @@
 
 import { finishName, formatPKR } from "@shared/pricing";
 import { config } from "../config";
+import { SUPPORT_WHATSAPP } from "@shared/payments";
 
 const BRAND = {
   paper: "#FBF6F0",
@@ -27,17 +28,61 @@ const BRAND = {
   line: "#DEE2E1",
 };
 
-function shell(title: string, bodyHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;background:${BRAND.paper};font-family:Figtree,Helvetica,Arial,sans-serif;color:${BRAND.body}">
+/**
+ * The frame every email shares (owner, 2026-11-22: "can we make it more
+ * professional"): an Indigo band with the white logo and, for order mail, the
+ * order number; a white card; a footer with help hours and the policies.
+ * Tables, inline styles and a hosted PNG logo, because email clients strip
+ * <style> and many won't show SVG. Exported for server/notify/templates.ts.
+ */
+export function emailFrame(title: string, bodyHtml: string, opts: { reference?: string; preheader?: string } = {}): string {
+  const app = config.appUrl;
+  const pre = opts.preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(opts.preheader)}</div>`
+    : "";
+  return `<!doctype html><html><body style="margin:0;background:${BRAND.paper};font-family:Figtree,Helvetica,Arial,sans-serif;color:${BRAND.body}">${pre}
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${BRAND.paper};padding:32px 16px">
 <tr><td align="center">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background:#fff;border-radius:14px;padding:36px 32px">
-<tr><td style="padding-bottom:12px"><img src="${config.appUrl}/email-logo.png" width="140" height="28" alt="truekeeps" style="display:block;border:0"></td></tr>
-<tr><td style="font-size:20px;line-height:28px;font-weight:700;color:${BRAND.indigo};padding:12px 0 6px">${title}</td></tr>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden">
+<tr><td style="background:${BRAND.indigo};padding:22px 28px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+<td><img src="${app}/email-logo-white.png" width="140" height="28" alt="truekeeps" style="display:block;border:0"></td>
+${opts.reference ? `<td align="right" style="color:#D9D6E2;font-size:13px;font-weight:600">${escapeHtml(opts.reference)}</td>` : ""}
+</tr></table></td></tr>
+<tr><td style="padding:28px 28px 8px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr><td style="font-size:22px;line-height:30px;font-weight:800;color:${BRAND.indigo};padding:0 0 10px">${title}</td></tr>
 ${bodyHtml}
-<tr><td style="font-size:12px;color:${BRAND.soft};padding-top:28px;border-top:1px solid ${BRAND.line}">Beautiful quality, for beautiful moments. · thetruekeeps.com</td></tr>
+</table></td></tr>
+<tr><td style="padding:18px 28px 24px;border-top:1px solid ${BRAND.line};font-size:12.5px;line-height:20px;color:${BRAND.soft}">
+Help: WhatsApp ${SUPPORT_WHATSAPP.display}, Monday to Friday, 10am to 6pm<br>
+<a href="${app}/policies/shipping" style="color:${BRAND.soft}">Shipping</a> · <a href="${app}/policies/refund-and-reprint" style="color:${BRAND.soft}">Refund and reprint</a> · <a href="${app}/policies/cancellation" style="color:${BRAND.soft}">Cancellation</a> · <a href="${app}" style="color:${BRAND.soft}">thetruekeeps.com</a>
+</td></tr>
 </table></td></tr></table></body></html>`;
 }
+
+function shell(title: string, bodyHtml: string, opts: { reference?: string; preheader?: string } = {}): string {
+  return emailFrame(title, bodyHtml, opts);
+}
+
+/** Label / value rows, value on the right: the order details and bank details. */
+function factTable(rows: Array<[string, string]>): string {
+  const tr = rows
+    .map(
+      ([k, v], i) =>
+        `<tr><td style="padding:9px 0;font-size:14px;color:${BRAND.soft};${i ? `border-top:1px solid ${BRAND.line};` : ""}">${escapeHtml(k)}</td><td align="right" style="padding:9px 0;font-size:14px;font-weight:700;color:${BRAND.indigo};${i ? `border-top:1px solid ${BRAND.line};` : ""}">${escapeHtml(v)}</td></tr>`,
+    )
+    .join("");
+  return `<tr><td style="padding:6px 0 10px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid ${BRAND.line};border-radius:10px;padding:2px 14px">${tr}</table></td></tr>`;
+}
+
+/** A small numbered heading inside an email ("1. Transfer Rs 5,690"). */
+function stepHead(text: string): string {
+  return `<tr><td style="font-size:16px;line-height:24px;font-weight:800;color:${BRAND.indigo};padding:14px 0 4px">${text}</td></tr>`;
+}
+
+/** The delivery promise, the same everywhere (shipping policy). */
+const DELIVERY_LINE = "Most books reach you in 4 to 7 working days after your payment is confirmed.";
 
 function button(href: string, label: string): string {
   return `<tr><td style="padding:18px 0"><a href="${href}" style="display:inline-block;background:${BRAND.button};color:#fff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:999px">${label}</a></td></tr>`;
@@ -80,17 +125,23 @@ export function orderConfirmedEmail(params: {
     ? para(`<b style="color:${BRAND.roseText}">Test order.</b> This was paid in Safepay's sandbox, so no money moved and nothing will be printed.`)
     : "";
   return {
-    subject: `${testMode ? "[TEST] " : ""}Order ${orderNumber} confirmed: ${title}`,
+    subject: `${testMode ? "[TEST] " : ""}Order ${orderNumber} confirmed: printing now`,
     html: shell(
-      "Thank you, your order is confirmed",
+      "Thank you. Your book is going to print.",
       testNote +
-        para(`We've received your payment of <b>${total}</b> for <b>${escapeHtml(title)}</b> (${details}).`) +
-        para(`Your order number is <b>${orderNumber}</b>. We'll email you again when your book ships.`) +
-        button(orderUrl, "View your order"),
+        para(`We've received your payment of <b>${total}</b>. Here's what you ordered:`) +
+        factTable([
+          ["Book", title],
+          ["Details", details],
+          ["Paid", total],
+        ]) +
+        para(`${DELIVERY_LINE} We'll email you again when it's on its way.`) +
+        button(orderUrl, "See your order"),
+      { reference: `Order ${orderNumber}`, preheader: `Payment received. ${DELIVERY_LINE}` },
     ),
     text:
       (testMode ? "TEST ORDER: paid in Safepay's sandbox, so nothing will be printed.\n\n" : "") +
-      `Thank you, your order is confirmed.\n\nOrder ${orderNumber}\n${title}: ${details}\nPaid: ${total}\n\nWe'll email you when it ships.\nView your order: ${orderUrl}`,
+      `Thank you. Your book is going to print.\n\nOrder ${orderNumber}\n${title}: ${details}\nPaid: ${total}\n\n${DELIVERY_LINE}\nWe'll email you when it's on its way.\nSee your order: ${orderUrl}`,
   };
 }
 
@@ -118,25 +169,26 @@ export function bankTransferEmail(params: {
     ["Amount", total],
     ["Reference", orderNumber],
   ];
-  const table = rows.map(([k, v]) => `<b>${k}:</b> ${escapeHtml(v)}`).join("<br>");
   return {
-    subject: `Order ${orderNumber} received: make the payment to confirm it`,
+    subject: `Order ${orderNumber}: one step left`,
     html: shell(
-      "Your order is received",
-      para(`Make the payment to confirm it. We start printing <b>${escapeHtml(title)}</b> once it is in.`) +
-        para(`<b>1. Transfer ${total}</b> from your bank app:`) +
-        `<tr><td style="font-size:15px;line-height:24px;padding:12px 16px;background:${BRAND.paper};border-radius:10px">${table}</td></tr>` +
-        para(`<b>2. Send us the payment screenshot</b> on WhatsApp at <b>${whatsappDisplay}</b>, with your order number ${orderNumber}.`) +
-        button(whatsappUrl, "Send screenshot on WhatsApp") +
-        para(`3. We check it and email you when your order is confirmed. We hold your order for ${holdDays} days.`) +
-        para(`<a href="${orderUrl}" style="color:${BRAND.indigo}">View your order</a>`),
+      "One step left: pay to confirm your book",
+      para(`We start printing <b>${escapeHtml(title)}</b> as soon as your payment is in.`) +
+        stepHead(`1. Transfer ${total}`) +
+        factTable(rows.filter(([k]) => k !== "Amount").map(([k, v]) => [k === "Reference" ? "Put in the reference" : k, v] as [string, string])) +
+        stepHead("2. Send us the screenshot") +
+        para(`On WhatsApp at <b>${whatsappDisplay}</b>, with your order number ${orderNumber}.`) +
+        button(whatsappUrl, "Send on WhatsApp") +
+        para(`We confirm it within working hours and print right after. ${DELIVERY_LINE} We hold your order for ${holdDays} days.`) +
+        para(`<a href="${orderUrl}" style="color:${BRAND.indigo}">See your order</a>`),
+      { reference: `Order ${orderNumber}`, preheader: `Transfer ${total} to confirm your book.` },
     ),
     text:
-      `Your order is received. Make the payment to confirm it.\n\n` +
+      `One step left: pay to confirm your book.\n\n` +
       `1. Transfer ${total}:\n` +
       rows.map(([k, v]) => `${k}: ${v}`).join("\n") +
       `\n\n2. Send the payment screenshot on WhatsApp to ${whatsappDisplay} with your order number ${orderNumber}.\n` +
-      `3. We check it and email you when your order is confirmed. We hold your order for ${holdDays} days.\n\nView your order: ${orderUrl}`,
+      `We confirm it within working hours and print right after. ${DELIVERY_LINE} We hold your order for ${holdDays} days.\n\nSee your order: ${orderUrl}`,
   };
 }
 
