@@ -23,6 +23,7 @@
  *    (SwipeRail) to keep the page short; desktop layout is untouched
  */
 
+import { POLICIES } from "@shared/info-pages";
 import { Children, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Baby, Cake, Check, Eye, Heart, MessageCircle, Plane, ShieldCheck, Truck } from "lucide-react";
@@ -573,8 +574,8 @@ export function StickyCTA() {
 /* ── Footer ─────────────────────────────────────────────────── */
 
 export function Footer() {
-  // Only links that lead somewhere real. Add Privacy, Terms and Contact here
-  // once those pages exist.
+  // Only links that lead somewhere real. Privacy and Terms join the policies
+  // once the owner has approved their wording.
   const cols = [
     { h: "Photo books", links: BOOK_TYPES.slice(0, 4).map((b) => ({ label: b.label, href: `/photo-books/${b.slug}` })) },
     {
@@ -591,6 +592,13 @@ export function Footer() {
         { label: "My orders", href: "/orders" },
         { label: "Account", href: "/account" },
         { label: "Leave a review", href: "/review" },
+      ],
+    },
+    {
+      h: "Help",
+      links: [
+        { label: "Questions", href: "/questions" },
+        ...POLICIES.map((p) => ({ label: p.title.replace(" Policy", ""), href: `/policies/${p.slug}` })),
       ],
     },
   ];

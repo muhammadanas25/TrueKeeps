@@ -22,6 +22,7 @@
  * No page may claim a paper certification, such as FSC, without printer proof.
  */
 
+import { FAQ_GROUPS, POLICIES, type PolicyPage } from "./info-pages";
 import { formatPKR, INCLUDED_PAGES, PRICE_LIST, REMOTE_AREAS_TEXT } from "./pricing";
 
 export const SITE = {
@@ -208,7 +209,8 @@ export const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "How do I pay?",
-    a: "Online by card or Google Pay through Safepay's secure checkout. Because every book is personalised and made to order, we don't offer cash on delivery.",
+    // bank transfer only while card payments are off (owner, 2026-11-22)
+    a: "By bank transfer: when you place your order we show you our bank details, and we start your book once the payment is in. Because every book is personalised and made to order, we don't offer cash on delivery.",
   },
   {
     q: "Can I make my book on my phone?",
@@ -337,8 +339,40 @@ const bookMeta = (b: BookType): PageMeta => {
   };
 };
 
+/** The FAQ page (/questions): every answer from shared/info-pages.ts, as FAQPage data too. */
+const QUESTIONS_META: PageMeta = {
+  path: "/questions",
+  title: "Questions about our photo books | TrueKeeps",
+  description: "Sizes, pages, prices, delivery across Pakistan, paying by bank transfer, and what happens if something goes wrong.",
+  ogImage: SITE.defaultOgImage,
+  jsonLd: [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQ_GROUPS.flatMap((g) => g.items).map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a.join(" ") } })),
+    },
+    breadcrumbs([
+      { name: "Home", path: "/" },
+      { name: "Questions", path: "/questions" },
+    ]),
+  ],
+};
+
+const policyMeta = (p: PolicyPage): PageMeta => ({
+  path: `/policies/${p.slug}`,
+  title: `${p.title} | TrueKeeps`,
+  description: p.summary,
+  ogImage: SITE.defaultOgImage,
+  jsonLd: [
+    breadcrumbs([
+      { name: "Home", path: "/" },
+      { name: p.title, path: `/policies/${p.slug}` },
+    ]),
+  ],
+});
+
 /** Every page that is prerendered, indexable and listed in the sitemap. */
-export const PUBLIC_PAGES: PageMeta[] = [HOME_META, HUB_META, ...BOOK_TYPES.map(bookMeta)];
+export const PUBLIC_PAGES: PageMeta[] = [HOME_META, HUB_META, ...BOOK_TYPES.map(bookMeta), QUESTIONS_META, ...POLICIES.map(policyMeta)];
 
 const PUBLIC_PATHS = new Set(PUBLIC_PAGES.map((p) => p.path));
 export const isPublicPath = (path: string) => PUBLIC_PATHS.has(path);

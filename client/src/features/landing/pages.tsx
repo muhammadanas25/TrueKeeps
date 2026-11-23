@@ -16,6 +16,8 @@ import { Link } from "wouter";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { formatPKR, INCLUDED_PAGES, PRICE_LIST } from "@shared/pricing";
 import { BOOK_TYPES, FAQS, SHIPPING_LINE, type BookType } from "@shared/site";
+import { FAQ_GROUPS, POLICIES, type PolicyPage } from "@shared/info-pages";
+import { SUPPORT_WHATSAPP } from "@shared/payments";
 import { BOOK_IMAGES } from "./book-images";
 import { BUILDER_PATH, FinalCTA, Footer, Nav, StickyCTA } from "./sections";
 
@@ -211,6 +213,129 @@ export function BookTypePage({ book }: { book: BookType }) {
       <FinalCTA />
       <Footer />
       <StickyCTA />
+    </div>
+  );
+}
+
+/* ── /questions and /policies/<slug> (owner's documents, 2026-11-23) ── */
+
+/**
+ * /questions — the FAQ, grouped as in the owner's document (shared/info-pages.ts).
+ * One question open at a time is the browser's own <details>, so it works
+ * before the page's script loads and in the prerendered HTML.
+ */
+export function QuestionsPage() {
+  useScrollTopOnMount("questions");
+  return (
+    <div className="lp lp-page">
+      <Nav />
+      <main className="lp-wrap">
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Questions" }]} />
+        <header className="lp-page-head">
+          <h1>Questions</h1>
+          <p className="lp-lede">Sizes, pages, prices, delivery, paying, and what happens if something goes wrong.</p>
+        </header>
+        {FAQ_GROUPS.map((g) => (
+          <section className="lp-page-section lp-faq-group" key={g.title} aria-labelledby={"g-" + g.title}>
+            <h2 className="lp-page-h2" id={"g-" + g.title}>
+              {g.title}
+            </h2>
+            <div className="lp-faq">
+              {g.items.map((f) => (
+                <details key={f.q}>
+                  <summary>
+                    {f.q} <ChevronDown size={18} aria-hidden="true" />
+                  </summary>
+                  {f.a.length > 2 ? (
+                    <ol className="lp-faq-steps">
+                      {f.a.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ol>
+                  ) : (
+                    f.a.map((line) => <p key={line}>{line}</p>)
+                  )}
+                </details>
+              ))}
+            </div>
+          </section>
+        ))}
+        <p className="lp-page-note">
+          Still stuck?{" "}
+          <a href={`https://wa.me/${SUPPORT_WHATSAPP.digits}`} target="_blank" rel="noreferrer">
+            Ask us on WhatsApp
+          </a>
+          . Our policies: <PolicyLinks />.
+        </p>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
+function PolicyLinks({ except }: { except?: string }) {
+  const list = POLICIES.filter((p) => p.slug !== except);
+  return (
+    <>
+      {list.map((p, k) => (
+        <span key={p.slug}>
+          {k > 0 ? (k === list.length - 1 ? " and " : ", ") : null}
+          <Link href={`/policies/${p.slug}`}>{p.title.replace(" Policy", "").toLowerCase()}</Link>
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** /policies/<slug> — a plain reading page; App.tsx has already found the policy. */
+export function PolicyPageView({ policy }: { policy: PolicyPage }) {
+  useScrollTopOnMount(policy.slug);
+  return (
+    <div className="lp lp-page">
+      <Nav />
+      <main className="lp-wrap">
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: policy.title }]} />
+        <article className="lp-doc">
+          <h1>{policy.title}</h1>
+          <p className="lp-doc-date">Last updated: {policy.updated}</p>
+          {policy.blocks.map((b, k) =>
+            "h" in b ? (
+              <h2 key={k}>{b.h}</h2>
+            ) : "p" in b ? (
+              <p key={k}>{b.p}</p>
+            ) : "list" in b ? (
+              <ul key={k}>
+                {b.list.map((li) => (
+                  <li key={li}>{li}</li>
+                ))}
+              </ul>
+            ) : (
+              <div className="lp-doc-table" key={k}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{b.table.head[0]}</th>
+                      <th>{b.table.head[1]}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.table.rows.map((r) => (
+                      <tr key={r[0]}>
+                        <td>{r[0]}</td>
+                        <td>{r[1]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ),
+          )}
+          <p className="lp-doc-more">
+            Also see our <PolicyLinks except={policy.slug} />, or the <Link href="/questions">questions</Link> page.
+          </p>
+        </article>
+      </main>
+      <Footer />
     </div>
   );
 }

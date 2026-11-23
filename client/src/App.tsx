@@ -5,7 +5,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { bookTypeBySlug, metaForPath, SITE } from "@shared/site";
-import { BookTypePage, PhotoBooksPage } from "@/features/landing/pages";
+import { BookTypePage, PhotoBooksPage, PolicyPageView, QuestionsPage } from "@/features/landing/pages";
+import { policyBySlug } from "@shared/info-pages";
 import { WhatsAppHelpFloating } from "@/features/support/WhatsAppHelp";
 import { startTracking, trackPage } from "@/lib/track";
 
@@ -100,6 +101,13 @@ function Router() {
           {(params) => {
             const book = bookTypeBySlug(params.slug);
             return book ? <BookTypePage book={book} /> : <NotFound />;
+          }}
+        </Route>
+        <Route path="/questions" component={QuestionsPage} />
+        <Route path="/policies/:slug">
+          {(params) => {
+            const policy = policyBySlug(params.slug);
+            return policy ? <PolicyPageView policy={policy} /> : <NotFound />;
           }}
         </Route>
         {/* The old template gallery had dead controls and stock photos, and nothing
