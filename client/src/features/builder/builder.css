@@ -795,3 +795,10 @@
 /* classic editor → "Try the new editor" (editor-v2/pref.ts) */
 .bb-try-v2 { position: fixed; right: 18px; bottom: 18px; z-index: 35; display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 999px; background: var(--surface-dark) !important; color: #fff !important; font-weight: 600; font-size: 13.5px; box-shadow: var(--shadow-lg); }
 .bb-try-v2:hover { background: var(--tk-indigo-700) !important; }
+/* promo code at checkout (2026-11-22): a quiet link, then a field, then a line in the totals */
+.bb-promo-open { align-self: flex-start; border: 0; background: none; padding: 4px 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--tk-rose-700); text-decoration: underline; cursor: pointer; }
+.bb-promo-row { display: flex; gap: 8px; }
+.bb-promo-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: 0.04em; }
+.bb-promo-line { color: var(--success-fg); }
+.bb-promo-line b { font-weight: 600; }
+.bb-promo-remove { border: 0; background: none; padding: 0 0 0 6px; font: inherit; font-size: 13px; color: var(--color-fg2); text-decoration: underline; cursor: pointer; }

@@ -14,6 +14,7 @@ import { PrintQueuePage } from "./pages/PrintQueue";
 import { AnalyticsPage } from "./pages/Analytics";
 import { NotificationsPage } from "./pages/Notifications";
 import { TeamPage } from "./pages/Team";
+import { PromosPage } from "./pages/Promos";
 
 function OwnerOnly() {
   return (
@@ -35,6 +36,7 @@ export default function AdminConsole() {
           <Route path="/print">{() => <PrintQueuePage />}</Route>
           <Route path="/analytics">{() => (me.role === "admin" ? <AnalyticsPage /> : <OwnerOnly />)}</Route>
           <Route path="/notifications">{() => <NotificationsPage me={me} />}</Route>
+          <Route path="/promos">{() => (me.role === "admin" ? <PromosPage /> : <OwnerOnly />)}</Route>
           <Route path="/team">{() => (me.role === "admin" ? <TeamPage me={me} /> : <OwnerOnly />)}</Route>
           <Route path="/more">{() => <MorePage me={me} />}</Route>
           <Route>

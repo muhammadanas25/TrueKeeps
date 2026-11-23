@@ -35,6 +35,7 @@ import {
   orders,
   payments,
   printJobs,
+  promoCodes,
   staffElevations,
   staffFactors,
   staffInvites,
@@ -44,6 +45,8 @@ import {
 } from "@shared/schema";
 import { DELIVERY_PROMISE_DAYS, FUNNEL_STEPS, NOTIFY_EVENTS, NOTIFY_EVENT_INFO, notifyRuleSchema, STAFF_ROLES, type NotifyEvent } from "@shared/ops";
 import { formatPKR } from "@shared/pricing";
+import { promoInputSchema } from "@shared/promo";
+import { LIVE_ORDER_STATUSES } from "@shared/orders";
 import { requireStaff, isOwner } from "../middleware/staff";
 import { requireOpsDb, type OpsDb } from "../ops/db";
 import { audit } from "../ops/audit";
@@ -844,3 +847,73 @@ register(
   { retryLimit: 2 },
 );
 schedule("notify.daily", "0 9 * * *", 24 * 3600_000);
+
+/* ── promo codes (owner) ───────────────────────────────────────── */
+
+/** Every code with how many standing orders used it and what it took off. */
+adminConsoleRouter.get(
+  "/api/admin/promos",
+  owner,
+  asyncHandler(async (_req, res) => {
+    const db = requireOpsDb();
+    const list = await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
+    const used = await db
+      .select({ code: orders.promoCode, n: sql<number>`count(*)::int`, off: sql<number>`coalesce(sum(${orders.discountMinor}), 0)::int` })
+      .from(orders)
+      .where(and(sql`${orders.promoCode} IS NOT NULL`, inArray(orders.status, LIVE_ORDER_STATUSES)))
+      .groupBy(orders.promoCode);
+    const byCode = new Map(used.map((u) => [u.code, u]));
+    res.json(list.map((p) => ({ ...p, uses: byCode.get(p.code)?.n ?? 0, discountGivenMinor: byCode.get(p.code)?.off ?? 0 })));
+  }),
+);
+
+const promoRow = (b: ReturnType<typeof promoInputSchema.parse>) => ({
+  code: b.code,
+  kind: b.kind,
+  value: b.value,
+  startsAt: b.startsAt ? new Date(b.startsAt) : null,
+  endsAt: b.endsAt ? new Date(b.endsAt) : null,
+  maxUses: b.maxUses ?? null,
+  perCustomer: b.perCustomer === undefined ? 1 : b.perCustomer,
+  minSubtotalMinor: b.minSubtotalMinor ?? null,
+  active: b.active ?? true,
+  note: b.note ?? null,
+});
+
+adminConsoleRouter.post(
+  "/api/admin/promos",
+  owner,
+  asyncHandler(async (req, res) => {
+    const body = parse(promoInputSchema, req.body, res);
+    if (!body) return;
+    const db = requireOpsDb();
+    const [clash] = await db.select({ id: promoCodes.id }).from(promoCodes).where(eq(promoCodes.code, body.code)).limit(1);
+    if (clash) return res.status(409).json({ error: `There is already a code ${body.code}.` });
+    const [row] = await db
+      .insert(promoCodes)
+      .values({ ...promoRow(body), createdBy: req.staff?.userId ?? null })
+      .returning();
+    void audit(req, "promo.create", { type: "promo", id: row.id }, { code: row.code, kind: row.kind, value: row.value });
+    res.status(201).json(row);
+  }),
+);
+
+adminConsoleRouter.patch(
+  "/api/admin/promos/:id",
+  owner,
+  asyncHandler(async (req, res) => {
+    const body = parse(promoInputSchema, req.body, res);
+    if (!body) return;
+    const db = requireOpsDb();
+    const [clash] = await db.select({ id: promoCodes.id }).from(promoCodes).where(eq(promoCodes.code, body.code)).limit(1);
+    if (clash && clash.id !== req.params.id) return res.status(409).json({ error: `There is already a code ${body.code}.` });
+    const [row] = await db
+      .update(promoCodes)
+      .set({ ...promoRow(body), updatedAt: new Date() })
+      .where(eq(promoCodes.id, req.params.id))
+      .returning();
+    if (!row) return res.status(404).json({ error: "No such code" });
+    void audit(req, "promo.update", { type: "promo", id: row.id }, { code: row.code, active: row.active, kind: row.kind, value: row.value });
+    res.json(row);
+  }),
+);

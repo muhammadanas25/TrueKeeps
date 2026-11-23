@@ -354,7 +354,8 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
             </div>
             {q.data.canSeeMoney ? (
               <div className="oc-small">
-                Books {money(o.subtotalMinor)} + shipping {money(o.shippingMinor)} = <b>{money(o.totalMinor)}</b>
+                Books {money(o.subtotalMinor)}
+                {o.discountMinor ? ` − ${o.promoCode} ${money(o.discountMinor)}` : ""} + shipping {money(o.shippingMinor)} = <b>{money(o.totalMinor)}</b>
               </div>
             ) : null}
             {o.providerRef ? <div className="oc-mono">ref {o.providerRef}</div> : null}

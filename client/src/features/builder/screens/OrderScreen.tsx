@@ -33,6 +33,7 @@ import type { BuilderState } from "../state";
 import { finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
 import { PK_PROVINCES, STATUS_LABEL, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
+import { discountFor } from "@shared/promo";
 import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
 import "../flow.css";
 import { useSession } from "@/features/auth/useSession";
@@ -123,6 +124,42 @@ export function OrderScreen({
   const { ordered, refetch: refetchOrders } = useOrdered(state.projectId);
   const [again, setAgain] = useState(false);
 
+  /*
+   * Promo code (owner, 2026-11-22). Hidden behind a link so customers without
+   * one aren't sent looking. The server checks the code (a preview) and again
+   * when the order is placed, where it is priced; here the discount is worked
+   * out with the same rule (shared/promo.ts discountFor) so it follows a
+   * change of binding or quantity.
+   */
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState<{ code: string; kind: string; value: number; label: string } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const discountMinor = promo ? discountFor(promo, q.subtotalMinor) : 0;
+  const totalMinor = q.totalMinor - discountMinor;
+  const applyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setPromoBusy(true);
+    setPromoError(null);
+    try {
+      const res = await fetch("/api/promo/check", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoInput, subtotalMinor: q.subtotalMinor }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { code?: string; kind?: string; value?: number; label?: string; error?: string };
+      if (!res.ok || !data.code) return setPromoError(data.error ?? "That code didn't work. Try again.");
+      setPromo({ code: data.code, kind: data.kind!, value: data.value!, label: data.label! });
+      setPromoOpen(false);
+    } catch {
+      setPromoError("You seem to be offline. Try again in a moment.");
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
   // Back from the order page restores this page from the browser's cache with
   // the button still saying "Placing…". Wake it up and look for the order.
   useEffect(() => {
@@ -199,6 +236,7 @@ export function OrderScreen({
           idempotencyKey: `${idempotencyKey}-${method}`,
           method,
           again: again || undefined,
+          promoCode: promo?.code,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string | null; order?: { id: string }; error?: string; fields?: Record<string, string> };
@@ -211,6 +249,14 @@ export function OrderScreen({
       if (res.status === 409 && (data as { code?: string }).code === "ALREADY_ORDERED") {
         setBusy(false);
         void refetchOrders();
+        return;
+      }
+      if (res.status === 400 && (data as { code?: string }).code === "PROMO_INVALID") {
+        // the code stopped applying since it was checked (used up, expired): say so by the code
+        setPromo(null);
+        setPromoOpen(true);
+        setPromoError(data.error ?? "That code no longer applies.");
+        setBusy(false);
         return;
       }
       if (!res.ok || !data.checkoutUrl) {
@@ -404,9 +450,53 @@ export function OrderScreen({
                   <Truck size={14} /> Delivery to {REMOTE_AREAS_TEXT} is {formatPKR(PRICE_LIST.remoteDeliveryMinor)}.
                 </span>
               ) : null}
+              {promo ? (
+                <div className="bb-spec-row bb-promo-line">
+                  <b>
+                    {promo.code} · {promo.label}{" "}
+                    <button type="button" className="bb-promo-remove" onClick={() => setPromo(null)}>
+                      Remove
+                    </button>
+                  </b>
+                  <span>− {formatPKR(discountMinor)}</span>
+                </div>
+              ) : promoOpen ? (
+                <div className="bb-promo">
+                  <label className="bb-ship-field wide">
+                    <span>Promo code</span>
+                    <span className="bb-promo-row">
+                      <input
+                        value={promoInput}
+                        onChange={(e) => {
+                          setPromoInput(e.target.value.toUpperCase());
+                          setPromoError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void applyPromo();
+                          }
+                        }}
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        maxLength={24}
+                        aria-invalid={Boolean(promoError) || undefined}
+                      />
+                      <button type="button" className="bb-btn bb-btn-secondary" disabled={promoBusy || !promoInput.trim()} onClick={() => void applyPromo()}>
+                        Apply
+                      </button>
+                    </span>
+                    {promoError ? <em>{promoError}</em> : null}
+                  </label>
+                </div>
+              ) : (
+                <button type="button" className="bb-promo-open" onClick={() => setPromoOpen(true)}>
+                  Have a promo code?
+                </button>
+              )}
               <div className="bb-spec-row total">
                 <span>Total</span>
-                <span>{formatPKR(q.totalMinor)}</span>
+                <span>{formatPKR(totalMinor)}</span>
               </div>
             </div>
 
@@ -483,7 +573,7 @@ export function OrderScreen({
               {bank ? (
                 <ol className="pay-steps">
                   <li>Place your order. We save it and show you our bank details.</li>
-                  <li>Transfer {formatPKR(q.totalMinor)} from your bank app.</li>
+                  <li>Transfer {formatPKR(totalMinor)} from your bank app.</li>
                   <li>Send us the payment screenshot on WhatsApp.</li>
                   <li>We check it and email you that your order is confirmed. Then we print.</li>
                 </ol>
@@ -499,7 +589,7 @@ export function OrderScreen({
                 </>
               ) : (
                 <>
-                  <Lock size={16} /> Pay {formatPKR(q.totalMinor)} <ArrowRight size={17} />
+                  <Lock size={16} /> Pay {formatPKR(totalMinor)} <ArrowRight size={17} />
                 </>
               )}
             </button>

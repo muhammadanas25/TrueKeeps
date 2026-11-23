@@ -400,6 +400,10 @@ export const orders = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     courier: text("courier"),
     trackingNumber: text("tracking_number"),
+    /** the promo code applied, upper case (shared/promo.ts); null = none */
+    promoCode: text("promo_code"),
+    /** what the code took off the book price; totalMinor is already net of it */
+    discountMinor: integer("discount_minor").notNull().default(0),
     paidAt: ts("paid_at"),
     expiresAt: ts("expires_at"),
     createdAt: createdAt(),
@@ -469,6 +473,40 @@ export const feedback = pgTable(
  * "payments" → { card, bankTransfer } (shared/payments.ts). A table rather
  * than environment variables so a switch needs no redeploy.
  */
+/**
+ * Promo codes, made and switched on/off by the owner in Admin › Promo codes
+ * (owner, 2026-11-22: "promo code... it will have all this configurable from
+ * admin page"). The rules are in shared/promo.ts; uses are counted from the
+ * orders that carry the code, so there is no counter to drift.
+ */
+export const promoCodes = pgTable(
+  "promo_codes",
+  {
+    id: uuidPk(),
+    /** stored upper case; customers can type it any way */
+    code: text("code").notNull(),
+    /** `percent` (value 1–90) | `fixed` (value in minor units) */
+    kind: text("kind").notNull(),
+    value: integer("value").notNull(),
+    startsAt: ts("starts_at"),
+    endsAt: ts("ends_at"),
+    /** total orders that may use it; null = no limit */
+    maxUses: integer("max_uses"),
+    /** orders per customer; null = no limit */
+    perCustomer: integer("per_customer").default(1),
+    /** the book price an order needs before the code applies; null = any */
+    minSubtotalMinor: integer("min_subtotal_minor"),
+    active: boolean("active").notNull().default(true),
+    /** for the team only, e.g. "Eid campaign on Instagram" */
+    note: text("note"),
+    createdBy: varchar("created_by"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("promo_codes_code_unique").on(t.code)],
+);
+export type PromoCode = typeof promoCodes.$inferSelect;
+
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),

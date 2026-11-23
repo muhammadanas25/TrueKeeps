@@ -192,6 +192,12 @@ export default function OrderPage() {
                 <span>Subtotal</span>
                 <span>{formatPKR(order.subtotalMinor)}</span>
               </div>
+              {order.discountMinor ? (
+                <div className="or-line">
+                  <span>Promo {order.promoCode}</span>
+                  <span>− {formatPKR(order.discountMinor)}</span>
+                </div>
+              ) : null}
               <div className="or-line">
                 <span>Shipping</span>
                 <span>{order.shippingMinor ? formatPKR(order.shippingMinor) : "Free"}</span>

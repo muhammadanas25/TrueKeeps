@@ -16,6 +16,9 @@ export interface PublicOrder {
   unitMinor: number;
   subtotalMinor: number;
   shippingMinor: number;
+  /** promo code applied (upper case) and what it took off; totalMinor is net of it */
+  promoCode?: string | null;
+  discountMinor?: number;
   totalMinor: number;
   binding: string;
   finish: string;

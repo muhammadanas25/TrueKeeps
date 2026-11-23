@@ -42,6 +42,7 @@ import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
 import { printedPageCount, quote } from "@shared/pricing";
 import { LIVE_ORDER_STATUSES, PAYABLE, type CreateOrderBody, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
+import { applyPromo, PromoError } from "./promo";
 import { startPrintJob } from "../print/pipeline";
 import { notifyOrder } from "../notify/outbox";
 import { config } from "../config";
@@ -195,6 +196,19 @@ export async function createOrder(
   //    the customer submitted, never from a total sent by the browser
   const q = quote({ binding: body.binding, qty: body.qty, printedPages: printedPageCount(doc.pages), address: body.address });
 
+  // 2b. a promo code comes off the book price (never delivery), checked here
+  //     whatever the checkout showed (server/orders/promo.ts)
+  let promo: Awaited<ReturnType<typeof applyPromo>> | null = null;
+  if (body.promoCode?.trim()) {
+    try {
+      promo = await applyPromo(body.promoCode, user.id, q.subtotalMinor);
+    } catch (err) {
+      if (err instanceof PromoError) throw new OrderError(err.message, 400, "PROMO_INVALID");
+      throw err;
+    }
+  }
+  const discountMinor = promo?.discountMinor ?? 0;
+
   // 3. insert (retry on the astronomically rare order-number collision)
   let order: Order | undefined;
   for (let attempt = 0; attempt < 5 && !order; attempt++) {
@@ -209,7 +223,9 @@ export async function createOrder(
           unitMinor: q.unitMinor,
           subtotalMinor: q.subtotalMinor,
           shippingMinor: q.shippingMinor,
-          totalMinor: q.totalMinor,
+          totalMinor: q.totalMinor - discountMinor,
+          promoCode: promo?.promo.code ?? null,
+          discountMinor,
           priceListVersion: q.priceListVersion,
           binding: q.binding,
           finish: body.finish,

@@ -28,6 +28,8 @@ import { storage } from "../storage";
 import { config } from "../config";
 import { log } from "../logger";
 import { paymentProvider, FakeProvider } from "../payments";
+import { applyPromo, PromoError } from "../orders/promo";
+import { promoCheckSchema } from "@shared/promo";
 import { availableMethods, checkoutUrlFor, confirmPayment, createOrder, getPaymentSettings, isBankTransfer, markBankTransferPaid, OrderError } from "../orders/service";
 import { BANK_DETAILS, BANK_TRANSFER_WINDOW_DAYS, SUPPORT_WHATSAPP, markPaidSchema, paymentSettingsSchema } from "@shared/payments";
 import { coverPhotoIdOf, type BuilderDocument } from "@shared/document";
@@ -110,6 +112,24 @@ ordersRouter.post(
       res.status(201).json({ order: publicOrder(order), checkoutUrl });
     } catch (err) {
       sendOrderError(res, err);
+    }
+  }),
+);
+
+/** The checkout's preview of a promo code (placing the order checks it again). */
+ordersRouter.post(
+  "/api/promo/check",
+  requireMember,
+  orderLimiter,
+  asyncHandler(async (req, res) => {
+    const body = parse(promoCheckSchema, req.body, res);
+    if (!body) return;
+    try {
+      const r = await applyPromo(body.code, currentUser(req).id, body.subtotalMinor);
+      res.json({ code: r.promo.code, kind: r.promo.kind, value: r.promo.value, discountMinor: r.discountMinor, label: r.label });
+    } catch (err) {
+      if (err instanceof PromoError) return res.status(400).json({ error: err.message, code: err.code });
+      throw err;
     }
   }),
 );

@@ -121,6 +121,8 @@ export const createOrderSchema = z.object({
   method: z.enum(["card", "bank_transfer"]).default("card"),
   /** the customer chose "Order another copy" of a book they already ordered */
   again: z.boolean().optional(),
+  /** a promo code (shared/promo.ts); checked and priced again on the server */
+  promoCode: z.string().max(40).optional(),
 });
 export type CreateOrderBody = z.infer<typeof createOrderSchema>;
 

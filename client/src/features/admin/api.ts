@@ -158,6 +158,9 @@ export interface OrderDetail {
     totalMinor: number;
     subtotalMinor: number;
     shippingMinor: number;
+    /** promo code applied (upper case) and what it took off; totalMinor is net of it */
+    promoCode?: string | null;
+    discountMinor?: number;
     contactEmail: string;
     contactPhone: string;
     shippingAddress: { fullName: string; phone: string; line1: string; line2?: string; city: string; province: string; postalCode?: string };
