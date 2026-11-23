@@ -28,6 +28,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PICKER_TEMPLATES } from "../arrange";
+import { CoverPatternPicker } from "../CoverPatternPicker";
+import type { PatternId } from "@shared/patterns";
 import { GridWire, LayoutWire } from "../book";
 import {
   BOOK_THEMES,
@@ -123,7 +125,7 @@ export function LayoutPanel({
   onReflow,
 }: {
   /** set while the front cover is on the stage: the panel picks its style */
-  cover: { style: CoverStyleId; onStyle: (id: CoverStyleId) => void } | null;
+  cover: { style: CoverStyleId; onStyle: (id: CoverStyleId) => void; pattern: string; onPattern: (id: PatternId) => void } | null;
   theme: BookTheme;
   activePage: BookPage | null;
   /** the photo pages on this spread, to choose which one the panel edits */
@@ -148,6 +150,7 @@ export function LayoutPanel({
               </button>
             ))}
           </div>
+          {cover.style === "pattern" ? <CoverPatternPicker value={cover.pattern} onPick={cover.onPattern} /> : null}
         </Section>
       </div>
     );

@@ -109,8 +109,8 @@ export default function BookBuilder() {
   // resolved once here; every cover in the builder reads it from the look
   const coverPhotoId = coverPhotoIdFor(state);
   const look = useMemo<PageLook>(
-    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden, coverPhotoId }),
-    [state.fontId, state.edge, state.subtitle, state.captionsHidden, coverPhotoId],
+    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden, coverPhotoId, coverPattern: state.coverPattern }),
+    [state.fontId, state.edge, state.subtitle, state.captionsHidden, coverPhotoId, state.coverPattern],
   );
   const v2Customize = state.screen === "customize" && editorVersion === "v2";
 

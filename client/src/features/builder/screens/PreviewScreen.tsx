@@ -28,6 +28,7 @@ import { STATUS_LABEL } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
 import { Book3D, CoverFace, type Book3DApi } from "../book";
 import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
+import { CoverPatternPicker } from "../CoverPatternPicker";
 import { DENSITIES, FEEL_CHOICES, bookPhotos, coverHasPhoto, coverPhotoIdFor, isFeelChoice, occasionById, toSpreads, type CopyVoice } from "../data";
 import { addPage, sliceOf } from "../editor-v2/book-ops";
 import { fontById } from "../looks";
@@ -93,7 +94,9 @@ export function PreviewScreen({
   const coverId = coverPhotoIdFor(state);
   const coverPhoto = state.photos.find((p) => p.id === coverId);
   // An older book may have a cover style from before the three; show it as none of them picked.
-  const coverChoice = isFeelChoice(state.coverStyle) ? state.coverStyle : null;
+  // step 6 offers the three feels plus Pattern (2026-11-22); step 3 keeps the three
+  const coverChoices = [...FEEL_CHOICES, { id: "pattern" as const, name: "Pattern", line: "" }];
+  const coverChoice = isFeelChoice(state.coverStyle) || state.coverStyle === "pattern" ? state.coverStyle : null;
   const price = formatPKR(quote({ binding: state.binding, qty: state.qty, printedPages: printed }).subtotalMinor);
 
   // A book prints on sheets of two pages: an odd count leaves the last page blank.
@@ -107,7 +110,7 @@ export function PreviewScreen({
     <div className="pv-cover">
       <span className="pv-cover-label">Cover</span>
       <div className="bk-seg bk-seg-wide" role="radiogroup" aria-label="Cover">
-        {FEEL_CHOICES.map((f) => (
+        {coverChoices.map((f) => (
           <button key={f.id} type="button" role="radio" aria-checked={coverChoice === f.id} className={coverChoice === f.id ? "on" : ""} onClick={() => set({ coverStyle: f.id })}>
             {f.name}
           </button>
@@ -116,6 +119,7 @@ export function PreviewScreen({
       {coverHasPhoto(state.coverStyle) ? (
         <CoverPhotoRow photo={coverPhoto} chosen={state.coverPhotoId !== null} theme={theme} onOpen={() => setPicking(true)} compact={narrow} />
       ) : null}
+      {state.coverStyle === "pattern" ? <CoverPatternPicker value={state.coverPattern} onPick={(id) => set({ coverPattern: id })} /> : null}
     </div>
   );
   const oddNote = odd ? (

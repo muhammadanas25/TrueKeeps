@@ -86,6 +86,8 @@ export interface PageLook {
    * what every cover showed before the choice existed.
    */
   coverPhotoId?: string | null;
+  /** the pattern on a "pattern" cover (shared/patterns.ts); absent = Floral */
+  coverPattern?: string;
   /** editor-only: inline editing of text printed on the page */
   onEditTitle?: (v: string) => void;
   onEditSubtitle?: (v: string) => void;

@@ -16,6 +16,7 @@
  * 256 KB cap enforced on PATCH.
  */
 
+import { PATTERN_IDS } from "./patterns";
 import { z } from "zod";
 import { FINISH_IDS } from "./pricing";
 
@@ -121,7 +122,9 @@ export const builderDocumentSchema = z.object({
   /** paper finish; optional because documents saved before it existed lack it */
   finish: z.enum(FINISH_IDS).optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
-  coverStyle: z.enum(["full", "framed", "minimal", "split", "classic", "moment", "signature"]),
+  coverStyle: z.enum(["full", "framed", "minimal", "split", "classic", "moment", "signature", "pattern"]),
+  /** the pattern on a "pattern" cover (shared/patterns.ts); optional: older documents have none */
+  coverPattern: z.enum(PATTERN_IDS).optional(),
   voice: z.enum(["warm", "concise"]),
   qty: z.number().int().min(1).max(20),
   binding: z.string().max(40),

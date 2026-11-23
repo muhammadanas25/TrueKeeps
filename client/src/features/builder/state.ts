@@ -24,6 +24,7 @@
  * tab closed comes back as a labelled placeholder until it's added again.
  */
 
+import type { PatternId } from "@shared/patterns";
 import { useEffect, useReducer, useRef } from "react";
 import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
 import { normalizeMediaUrl } from "@shared/media";
@@ -88,6 +89,8 @@ export interface BuilderState {
    */
   removedPhotoIds: string[];
   coverStyle: CoverStyleId;
+  /** the pattern on a "pattern" cover (shared/patterns.ts) */
+  coverPattern: PatternId;
   voice: "warm" | "concise";
   /** preview position: 0 = closed cover, k = spread k−1 open */
   pos: number;
@@ -125,6 +128,7 @@ export const DEFAULT_STATE: BuilderState = {
   coverPhotoId: null,
   removedPhotoIds: [],
   coverStyle: "full",
+  coverPattern: "floral",
   voice: "warm",
   pos: 0,
   qty: 1,

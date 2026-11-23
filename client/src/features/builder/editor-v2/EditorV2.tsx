@@ -581,7 +581,7 @@ export function EditorV2({
   const panel =
     tool === "layout" ? (
       <LayoutPanel
-        cover={onCover ? { style: state.coverStyle, onStyle: (id) => set({ coverStyle: id }) } : null}
+        cover={onCover ? { style: state.coverStyle, onStyle: (id) => set({ coverStyle: id }), pattern: state.coverPattern, onPattern: (id) => set({ coverPattern: id }) } : null}
         theme={activePage?.bg ? deriveTheme(theme, activePage.bg) : theme}
         activePage={activePage}
         spreadTargets={spreadTargets}

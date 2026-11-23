@@ -16,8 +16,9 @@
  * timer fallbacks so a missed transitionend can never wedge the book.
  */
 
-import { memo, useEffect, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
+import { memo, useEffect, useId, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
 import { GripVertical, ImageOff } from "lucide-react";
+import { PATTERN_COVER_UNITS, PATTERN_PLATE, patternById } from "@shared/patterns";
 import {
   DEFAULT_FRAMING,
   LINE_MAX,
@@ -733,6 +734,8 @@ export function CoverFace({
   );
   const look = usePageLook();
   const lc = lookClasses(look);
+  // a pattern's SVG id must be unique on the page: several covers can show at once
+  const patternUid = useId().replace(/:/g, "");
   const sub = <div className="bb-cover-sub">{look.subtitle ?? occasion.subtitle}</div>;
   const base: CSSProperties = { background: theme.page, color: theme.ink };
 
@@ -765,6 +768,35 @@ export function CoverFace({
           <Ph photo={photo} theme={theme} showLabel={false} />
           <div className="name">{art.name}</div>
           {titleEl}
+        </div>
+      </div>
+    );
+  }
+  if (coverStyle === "pattern") {
+    // the tile repeats across the cover; the plate's top edge is on the 61.8% line (shared/patterns.ts)
+    const pat = patternById(look.coverPattern);
+    const pid = "pat-" + pat.id + "-" + patternUid;
+    const P = PATTERN_PLATE;
+    return (
+      <div className={"bb-cover bb-cover-pattern" + lc} style={{ background: pat.ground, color: pat.ink }}>
+        <svg className="bb-cover-art" viewBox={`0 0 ${PATTERN_COVER_UNITS} ${PATTERN_COVER_UNITS}`} preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <pattern id={pid} width={pat.tile} height={pat.tile} patternUnits="userSpaceOnUse">
+              {pat.shapes.map((sh, i) =>
+                sh.kind === "circle" ? (
+                  <circle key={i} cx={sh.x} cy={sh.y} r={sh.r} fill={sh.fill} opacity={sh.opacity} />
+                ) : (
+                  <ellipse key={i} cx={sh.x} cy={sh.y} rx={sh.rx} ry={sh.ry} fill={sh.fill} opacity={sh.opacity} transform={`rotate(${sh.rotate} ${sh.x} ${sh.y})`} />
+                ),
+              )}
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill={`url(#${pid})`} />
+        </svg>
+        <div className="bb-cover-plate" style={{ left: P.x * 100 + "%", top: P.y * 100 + "%", width: P.w * 100 + "%", height: P.h * 100 + "%", background: pat.plate }}>
+          {titleEl}
+          <div className="rule" style={{ background: pat.ink }}></div>
+          {sub}
         </div>
       </div>
     );

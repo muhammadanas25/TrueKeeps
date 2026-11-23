@@ -328,3 +328,10 @@
 /* step 4: how much title still fits (TITLE_MAX) */
 .ck-count { font-size: 13px; line-height: 18px; color: var(--color-fg3); }
 .ck-count.full { color: var(--tk-rose-700); }
+
+/* Pattern cover swatches (CoverPatternPicker) */
+.pat-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.pat-swatch { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 6px; border-radius: 12px; border: 1.5px solid var(--color-border) !important; background: var(--surface-card) !important; font: inherit; font-size: 12px; font-weight: 600; color: var(--heading); cursor: pointer; }
+.pat-swatch svg { width: 100%; aspect-ratio: 1; border-radius: 6px; display: block; }
+.pat-swatch.on { border-color: var(--selected) !important; box-shadow: 0 0 0 1px var(--selected); }
+.pat-swatch:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }

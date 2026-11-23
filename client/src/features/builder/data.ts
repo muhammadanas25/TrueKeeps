@@ -144,11 +144,13 @@ export const VIBES: Vibe[] = [
 
 /* ── Cover styles / densities / bindings ────────────────────── */
 
-export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" | "moment" | "signature";
+export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" | "moment" | "signature" | "pattern";
 export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
   { id: "classic", name: "Minimal" },
   { id: "moment", name: "Full Picture" },
   { id: "minimal", name: "Just text" },
+  // a patterned front with the title on a plate (2026-11-22; shared/patterns.ts)
+  { id: "pattern", name: "Pattern" },
   { id: "full", name: "Full photo" },
   { id: "framed", name: "Framed" },
   { id: "split", name: "Split" },
@@ -176,7 +178,7 @@ export const FEEL_CHOICES: Array<{ id: CoverStyleId; name: string; line: string 
 ];
 
 /** The cover styles that show a photo (the cover photo choice applies to these). */
-export const coverHasPhoto = (id: CoverStyleId): boolean => id !== "minimal";
+export const coverHasPhoto = (id: CoverStyleId): boolean => id !== "minimal" && id !== "pattern";
 
 /** Has the customer made this choice yet? The default cover isn't one of these. */
 export function isFeelChoice(id: CoverStyleId): boolean {

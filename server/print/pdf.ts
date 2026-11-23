@@ -35,6 +35,7 @@ import sharp from "sharp";
 import type { BuilderDocument } from "@shared/document";
 import { bookTheme, contrastRatio, deriveTheme } from "../../client/src/features/builder/palette";
 import { LOGO_PATHS, LOGO_VIEWBOX } from "./logo";
+import { PATTERN_COVER_UNITS, PATTERN_PLATE, patternById, type CoverPattern } from "@shared/patterns";
 import { CAPTION_SIZE } from "../../client/src/features/builder/data";
 import { mediaStore } from "../media";
 import type { PrintManifest } from "./render";
@@ -255,6 +256,31 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
   return { pages: doc.pages.length, lowDpi, missing };
 }
 
+/**
+ * A cover pattern across the whole page, bleed included (shared/patterns.ts).
+ * The tile grid starts at the trim's top-left corner, as the preview's does,
+ * so the same flowers sit in the same places; the bleed gets the tiles that
+ * run off the edge.
+ */
+function drawPattern(pdf: Pdf, pat: CoverPattern, W: number, H: number, B: number) {
+  const u = W / PATTERN_COVER_UNITS;
+  const t = pat.tile * u;
+  pdf.save();
+  pdf.rect(0, 0, W + 2 * B, H + 2 * B).fill(pat.ground);
+  pdf.rect(0, 0, W + 2 * B, H + 2 * B).clip();
+  for (let ty = B - Math.ceil(B / t) * t; ty < H + 2 * B; ty += t)
+    for (let tx = B - Math.ceil(B / t) * t; tx < W + 2 * B; tx += t)
+      for (const sh of pat.shapes) {
+        const x = tx + sh.x * u;
+        const y = ty + sh.y * u;
+        pdf.save().fillOpacity(sh.opacity ?? 1);
+        if (sh.kind === "circle") pdf.circle(x, y, sh.r * u).fill(sh.fill);
+        else pdf.rotate(sh.rotate, { origin: [x, y] }).ellipse(x, y, sh.rx * u, sh.ry * u).fill(sh.fill);
+        pdf.restore();
+      }
+  pdf.restore();
+}
+
 /** Indigo, the logo's colour on a light cover (brand kit). */
 const LOGO_INDIGO = "#2A1E5C";
 
@@ -328,6 +354,8 @@ function coverWords(pdf: Pdf, doc: BuilderDocument, theme: ReturnType<typeof boo
  *                         the top 61.8%, the words centred in the 38.2% below
  *   moment ("Full Picture") the photo inside a 0.5 in border, no words
  *   minimal ("Just text") the words centred on the 38.2% line
+ *   pattern               the pattern across the cover and bleed, the words
+ *                         on a plate whose top is on the 61.8% line
  *   older styles          the photo full-bleed with the title in a band at
  *                         the foot, as these books printed before
  * The back is the page colour with the logo 4 in wide, centred, 1 in up from
@@ -359,6 +387,12 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     if (img) pdf.image(img, B + border, B + border, { width: W - 2 * border, height: H - 2 * border });
   } else if (style === "minimal") {
     coverWords(pdf, doc, theme, W, B + W / 2, B + H * 0.382, true);
+  } else if (style === "pattern") {
+    drawPattern(pdf, patternById(doc.coverPattern), W, H, B);
+    const pat = patternById(doc.coverPattern);
+    const P = PATTERN_PLATE;
+    pdf.rect(B + P.x * W, B + P.y * H, P.w * W, P.h * H).fill(pat.plate);
+    coverWords(pdf, doc, { ...theme, ink: pat.ink, accent: pat.ink }, W, B + (P.x + P.w / 2) * W, B + (P.y + P.h / 2) * H, true);
   } else {
     // older styles (Full photo, Framed, Split, Truekeeps Design): as before
     if (manifest.cover) {
@@ -379,14 +413,15 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     }
   }
 
-  // ── back
-  addPage(pdf, W, H, B, theme.page);
+  // ── back: the page colour, or a patterned book's ground
+  const backColour = style === "pattern" ? patternById(doc.coverPattern).ground : theme.page;
+  addPage(pdf, W, H, B, backColour);
   const logoW = 4 * inch;
   const scale = logoW / LOGO_VIEWBOX.w;
   const logoH = LOGO_VIEWBOX.h * scale;
   pdf.save();
   pdf.translate(B + (W - logoW) / 2, B + H - inch - logoH).scale(scale);
-  const colour = logoColourOn(theme.page);
+  const colour = logoColourOn(backColour);
   for (const d of LOGO_PATHS) pdf.path(d).fill(colour);
   pdf.restore();
 
