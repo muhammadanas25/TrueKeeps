@@ -50,7 +50,7 @@ import {
 } from "../data";
 import { FONTS, LOOK_ORDER, lookDefaults, type EdgeId, type FontId } from "../looks";
 import { THEME_COLOUR, relativeLuminance, resolvePageHex } from "../palette";
-import type { BookSlice } from "./book-ops";
+import { SPREAD_PRESETS, type BookSlice } from "./book-ops";
 
 /** Longest caption: two lines at caption size on a 12 in page. */
 const CAPTION_MAX = 70;
@@ -121,6 +121,7 @@ export function LayoutPanel({
   onPickPage,
   onLayout,
   onTemplate,
+  onPreset,
   onMirror,
   onReflow,
 }: {
@@ -135,6 +136,8 @@ export function LayoutPanel({
   onLayout: (layout: PageLayoutId) => void;
   /** an engine template for 4 to 6 photos (PICKER_TEMPLATES) */
   onTemplate: (t: { id: string; n: number }) => void;
+  /** lay out both pages of the spread at once (SPREAD_PRESETS) */
+  onPreset: (id: string) => void;
   onMirror: () => void;
   onReflow: (d: DensityId) => void;
 }) {
@@ -162,6 +165,27 @@ export function LayoutPanel({
           <p className="tke-empty">The title page is words only — tap the title on the page to change it.</p>
         </Section>
       ) : (
+        <>
+        <Section label="Spread presets" hint="Both pages at once. Photos move between pages; none repeat.">
+          <div className="tke-presets">
+            {SPREAD_PRESETS.map((p) => (
+              <button key={p.id} type="button" className="tke-preset" onClick={() => onPreset(p.id)}>
+                <span className="tke-preset-spread">
+                  {[p.left, p.right].map((side, i) => (
+                    <span key={i} className="tke-wire-pg">
+                      {"template" in side ? (
+                        <GridWire frames={PICKER_TEMPLATES.find((t) => t.id === side.template)?.frames ?? []} theme={theme} />
+                      ) : (
+                        <LayoutWire id={side.layout} theme={theme} mirror={false} />
+                      )}
+                    </span>
+                  ))}
+                </span>
+                <span className="tke-wire-l">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        </Section>
         <Section label="Page layout">
           {spreadTargets.length > 1 ? (
             <Seg small options={spreadTargets.map((t) => ({ v: t.id, label: t.label }))} value={activePage.id} onChange={onPickPage} />
@@ -220,6 +244,7 @@ export function LayoutPanel({
             </button>
           ) : null}
         </Section>
+        </>
       )}
       <section className="tke-sec">
         <button className="tke-disclose" onClick={() => setOpenBook(!openBook)} aria-expanded={openBook}>

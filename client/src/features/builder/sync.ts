@@ -34,6 +34,16 @@ import { THEME_COLOUR } from "./palette";
 import { useToast } from "@/hooks/use-toast";
 import type { BuilderState } from "./state";
 import { coverPhotoIdFor } from "./data";
+import { flaggedPhotos } from "./quality";
+
+/** Flagged photos that are on a page of the book (quality.ts); undefined when none. */
+function flaggedOnPages(s: BuilderState) {
+  const onPages = new Set(s.pages.flatMap((p) => p.slots.map((x) => x.photoId)));
+  const list = Array.from(flaggedPhotos(s.photos).entries())
+    .filter(([id]) => onPages.has(id))
+    .map(([id, flag]) => ({ id, flag }));
+  return list.length ? list : undefined;
+}
 
 /* ── sync metadata (localStorage) ─────────────────────────────── */
 
@@ -148,6 +158,7 @@ export function toDocument(s: BuilderState): BuilderDocument {
     coverPhotoId: coverPhotoIdFor(s),
     coverAuto: s.coverPhotoId === null,
     removedPhotoIds: s.removedPhotoIds.length ? s.removedPhotoIds : undefined,
+    flagged: flaggedOnPages(s),
   };
 }
 

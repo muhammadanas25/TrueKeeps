@@ -346,6 +346,20 @@ export function EditorV2({
       setSel(null);
       setCrop(false);
     },
+    /** a spread preset: both pages of the spread the open page is on */
+    preset: (presetId: string) => {
+      const preset = ops.SPREAD_PRESETS.find((p) => p.id === presetId);
+      const k = Math.floor(idx / 2);
+      const left = pages[2 * k];
+      const right = pages[2 * k + 1];
+      if (!preset || !left || !right || left.layout === "title") return say("Presets work on a spread of two photo pages");
+      const r = ops.applySpreadPreset(slice(), left.id, right.id, preset, bookPhotos(stateRef.current));
+      if (r.short) return say(ops.layoutChangeNote(r)!);
+      commit(() => r.book);
+      say(`${preset.name}${ops.layoutChangeNote(r) ? ": " + ops.layoutChangeNote(r) : ""}`, true);
+      setSel(null);
+      setCrop(false);
+    },
     mirror: () => activePage && commit((b) => ({ ...b, pages: b.pages.map((p) => (p.id === activePage.id ? { ...p, mirror: !p.mirror } : p)) })),
     reflow: (d: BuilderState["density"]) => {
       // only the photos still in the book; photos added since go in too (bookPhotos)
@@ -590,6 +604,7 @@ export function EditorV2({
         onPickPage={setActiveId}
         onLayout={A.layout}
         onTemplate={(t) => A.layout("grid", t)}
+        onPreset={A.preset}
         onMirror={A.mirror}
         onReflow={A.reflow}
       />

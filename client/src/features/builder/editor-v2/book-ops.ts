@@ -225,6 +225,31 @@ export function changeLayout(
   return { book: { ...b, pages }, pulled, pushed, out, short: 0 };
 }
 
+/** One side of a spread preset: a named layout or an engine template. */
+export type PresetSide = { layout: PageLayoutId } | { template: string; n: number };
+
+/**
+ * Spread presets (owner, 2026-11-22: "presets for layout"): one tap lays out
+ * both pages of the open spread. Each side goes through changeLayout, so
+ * photos move between pages as they would by hand and nothing repeats.
+ */
+export const SPREAD_PRESETS: Array<{ id: string; name: string; left: PresetSide; right: PresetSide }> = [
+  { id: "hero-grid", name: "Hero and grid", left: { layout: "full" }, right: { template: "S4", n: 4 } },
+  { id: "two-big", name: "Two big", left: { layout: "full" }, right: { layout: "full" } },
+  { id: "framed-pair", name: "Framed pair", left: { layout: "single" }, right: { layout: "single" } },
+  { id: "big-small", name: "Big and small", left: { template: "L1S3", n: 4 }, right: { layout: "duo-side" } },
+  { id: "gallery", name: "Gallery wall", left: { template: "S4", n: 4 }, right: { template: "S4", n: 4 } },
+];
+
+/** Apply a preset to the two pages of a spread (left first). Refused as a whole when either side is short. */
+export function applySpreadPreset(b: BookSlice, leftId: string, rightId: string, preset: { left: PresetSide; right: PresetSide }, photos: BuilderPhoto[]): LayoutChange {
+  const l = changeLayout(b, leftId, preset.left, photos);
+  if (l.short) return l;
+  const r = changeLayout(l.book, rightId, preset.right, photos);
+  if (r.short) return { ...r, book: b };
+  return { book: r.book, pulled: l.pulled + r.pulled, pushed: l.pushed + r.pushed, out: l.out + r.out, short: 0 };
+}
+
 /** The line the editor shows after a layout change (null: nothing worth saying). */
 export function layoutChangeNote(r: LayoutChange): string | null {
   if (r.short) return `This layout needs ${r.short} more ${r.short === 1 ? "photo" : "photos"}. Add photos, or pick a smaller layout.`;

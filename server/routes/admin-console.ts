@@ -318,10 +318,10 @@ adminConsoleRouter.get(
       ),
     ]);
     const { documentSnapshot, idempotencyKey: _k, ...rest } = order;
-    const doc = documentSnapshot as { pages?: unknown[]; photos?: unknown[]; title?: string };
+    const doc = documentSnapshot as { pages?: unknown[]; photos?: unknown[]; title?: string; flagged?: unknown[] };
     res.json({
       order: { ...rest, deliverBy: deliverBy(order) },
-      book: { pages: doc.pages?.length ?? 0, photos: doc.photos?.length ?? 0 },
+      book: { pages: doc.pages?.length ?? 0, photos: doc.photos?.length ?? 0, flagged: doc.flagged?.length ?? 0 },
       events,
       printJobs: jobs,
       notifications: msgs.map((m) => ({ ...m, payload: undefined })),

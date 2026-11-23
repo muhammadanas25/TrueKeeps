@@ -62,7 +62,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
 
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
-  const { order: o, printJobs, events, notifications, customer } = q.data;
+  const { order: o, printJobs, events, notifications, customer, book } = q.data;
   const a = o.shippingAddress;
   const status = o.status as OrderStatus;
   const [st, stTone] = STATUS[status] ?? [status, "muted"];
@@ -127,6 +127,11 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
           {o.qty > 1 ? ` · ${o.qty} copies` : ""} · {money(o.totalMinor)}
         </span>
       </div>
+      {book.flagged ? (
+        <p className="oc-note warn">
+          {book.flagged} photo{book.flagged > 1 ? "s were" : " was"} flagged as likely to print soft, and the customer approved the book with {book.flagged > 1 ? "them" : "it"}. Under the refund policy that isn't a print fault.
+        </p>
+      ) : null}
       {msg ? (
         <p className={`oc-note ${msg.tone}`} role="status">
           {msg.text}

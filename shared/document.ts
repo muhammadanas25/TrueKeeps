@@ -123,6 +123,12 @@ export const builderDocumentSchema = z.object({
   finish: z.enum(FINISH_IDS).optional(),
   density: z.enum(["minimal", "balanced", "collage"]),
   coverStyle: z.enum(["full", "framed", "minimal", "split", "classic", "moment", "signature", "pattern"]),
+  /**
+   * Photos on the book's pages that were flagged as likely to print soft
+   * (client quality.ts) when this was saved. The order keeps it: the refund
+   * policy excludes photos used after our low-quality warning was shown.
+   */
+  flagged: z.array(z.object({ id: z.string().max(64), flag: z.enum(["small", "blurry"]) })).max(400).optional(),
   /** how the book was made: as laid out, editor opened, or edited (owner's analytics, 2026-11-22) */
   customized: z.enum(["none", "looked", "changed"]).optional(),
   /** the pattern on a "pattern" cover (shared/patterns.ts); optional: older documents have none */

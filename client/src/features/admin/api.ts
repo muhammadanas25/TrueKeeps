@@ -173,7 +173,8 @@ export interface OrderDetail {
     createdAt: string;
     deliverBy: string | null;
   };
-  book: { pages: number; photos: number };
+  /** flagged = photos the customer kept after the low-quality warning (refund policy) */
+  book: { pages: number; photos: number; flagged?: number };
   events: Array<{ id: string; kind: string; actor: string; fromStatus: string | null; toStatus: string | null; note: string | null; createdAt: string }>;
   printJobs: PrintJob[];
   notifications: Array<{ id: string; event: string; channel: string; audience: string; recipient: string; status: string; error: string | null; createdAt: string }>;

@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Hand, PenLine, Plus } from "lucide-react";
 import { STATUS_LABEL } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
+import { flaggedPhotos } from "../quality";
 import { Book3D, CoverFace, type Book3DApi } from "../book";
 import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
 import { CoverPatternPicker } from "../CoverPatternPicker";
@@ -162,6 +163,18 @@ export function PreviewScreen({
       </a>
     </div>
   ) : null;
+  // flagged photos on the pages (quality.ts): said here, before approval, because
+  // the refund policy excludes photos kept after this warning
+  const onPages = new Set(state.pages.flatMap((p) => p.slots.map((x) => x.photoId)));
+  const softCount = Array.from(flaggedPhotos(state.photos).keys()).filter((id) => onPages.has(id)).length;
+  const softNote = softCount ? (
+    <p className="pv-soft" role="note">
+      <AlertTriangle size={16} />
+      <span>
+        {softCount === 1 ? "1 photo" : `${softCount} photos`} in your book may print soft (marked on the photos step). Approving keeps {softCount === 1 ? "it" : "them"} as {softCount === 1 ? "it is" : "they are"}.
+      </span>
+    </p>
+  ) : null;
   const approve = (
     <label className={"pv-approve" + (approved ? " on" : "")}>
       <input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
@@ -206,6 +219,7 @@ export function PreviewScreen({
           {/* the same details as desktop, as a table (owner, 2026-11-22: not as prominent on the phone) */}
           {detailRows}
           {oddNote}
+          {ordered ? null : softNote}
           {orderedNote ?? (
             <>
               {approve}
@@ -275,6 +289,7 @@ export function PreviewScreen({
         {coverSwitch}
         {detailRows}
         {oddNote}
+        {ordered ? null : softNote}
         {orderedNote}
         {ordered ? null : approve}
         <div className="pv-actions">
