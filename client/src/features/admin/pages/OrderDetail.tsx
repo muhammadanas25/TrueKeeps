@@ -194,7 +194,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
                 ) : null}
                 {job.state === "checked" ? (
                   <p className="oc-small">
-                    Captions, the title page and the cover title use standard fonts in this version. The JPEGs are rendered from the two PDFs, so they match them exactly.
+                    Titles and captions are in the book's own font pair (books in the four older typefaces use standard fonts). The JPEGs are rendered from the two PDFs, so they match them exactly.
                   </p>
                 ) : null}
                 <div className="oc-row">

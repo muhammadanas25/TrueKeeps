@@ -23,10 +23,11 @@
  * cut land exactly where the editor showed them. Page colours come from the
  * client's own palette code (bookTheme / deriveTheme).
  *
- * What is approximate in this version (flagged on the order in the admin):
- * captions, the title page and the cover's title use standard PDF fonts
- * (Helvetica / Times) rather than the book's chosen lettering. Covers made
- * before 2026-11-22 in the retired styles keep their simplified layout.
+ * Lettering: the book's font pair, embedded (server/print/fonts.ts), heading
+ * face for titles and body face for the line under them and captions. Books
+ * made before the pairs print in the standard PDF fonts (Helvetica / Times)
+ * they always printed in. Covers made before 2026-11-22 in the retired styles
+ * keep their simplified layout.
  */
 
 import PDFDocument from "pdfkit";
@@ -38,6 +39,7 @@ import { LOGO_PATHS, LOGO_VIEWBOX } from "./logo";
 import { PATTERN_COVER_UNITS, PATTERN_PLATE, patternById, type CoverPattern } from "@shared/patterns";
 import { CAPTION_SIZE } from "../../client/src/features/builder/data";
 import { mediaStore } from "../media";
+import { printFonts, type PrintFonts } from "./fonts";
 import type { PrintManifest } from "./render";
 
 const PT_PER_IN = 72;
@@ -145,9 +147,6 @@ function streamTo(pdf: Pdf, path: string): { end: () => Promise<void> } {
   };
 }
 
-const fontFor = (fontId: string | undefined, bold = false) =>
-  fontId === "modern" ? (bold ? "Helvetica-Bold" : "Helvetica") : fontId === "script" ? "Times-Italic" : bold ? "Times-Bold" : "Times-Roman";
-
 export interface InteriorResult {
   pages: number;
   /** slots drawn from a photo below PRINT_SPEC.warnDpi */
@@ -168,6 +167,7 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
   const edge = doc.edge ?? "clean";
   let lowDpi = 0;
   let missing = 0;
+  const fonts = await printFonts(pdf, doc.fontId);
 
   // Write as we go: PDFKit streams finished objects to the file, so memory stays flat.
   const file = streamTo(pdf, path);
@@ -179,12 +179,12 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
 
     if (page.layout === "title") {
       const title = doc.title || "";
-      pdf.fillColor(theme.ink).font(fontFor(doc.fontId, true)).fontSize(W * 0.07);
+      pdf.fillColor(theme.ink).font(fonts.head).fontSize(W * 0.07);
       pdf.text(title, B + W * 0.1, B + H * 0.38, { width: W * 0.8, align: "center" });
       const below = pdf.y + H * 0.02;
       pdf.rect(B + W / 2 - W * 0.07, below, W * 0.14, 2).fill(theme.accent);
       if (doc.subtitle) {
-        pdf.fillColor(theme.ink).opacity(0.65).font("Helvetica").fontSize(W * 0.03);
+        pdf.fillColor(theme.ink).opacity(0.65).font(fonts.label).fontSize(W * 0.03);
         pdf.text(doc.subtitle.toUpperCase(), B + W * 0.1, below + H * 0.03, { width: W * 0.8, align: "center", characterSpacing: W * 0.003 });
         pdf.opacity(1);
       }
@@ -237,7 +237,7 @@ export async function composeInterior(doc: BuilderDocument, manifest: PrintManif
     if (caption && !doc.captionsHidden) {
       // golden-ratio type scale (CAPTION_SIZE in the client's data.ts); handwriting reads small
       const size = W * (doc.fontId === "script" ? 0.03 : CAPTION_SIZE);
-      pdf.font(fontFor(doc.fontId)).fontSize(size);
+      pdf.font(fonts.body).fontSize(size);
       if (page.layout === "full") {
         const tw = Math.min(pdf.widthOfString(caption) + size * 2, W * 0.86);
         const y = B + H * 0.93 - size * 1.6;
@@ -310,12 +310,12 @@ async function coverPhoto(manifest: PrintManifest, wIn: number, hIn: number): Pr
  * preview does (builder.css .bb-cover-title). Sizes follow the golden-ratio
  * scale: title 0.054 of the cover, the line under it ÷ 1.618.
  */
-function coverWords(pdf: Pdf, doc: BuilderDocument, theme: ReturnType<typeof bookTheme>, W: number, cx: number, cy: number, withRule: boolean) {
+function coverWords(pdf: Pdf, doc: BuilderDocument, fonts: PrintFonts, theme: ReturnType<typeof bookTheme>, W: number, cx: number, cy: number, withRule: boolean) {
   const title = (doc.title || "").trim();
   const sub = (doc.subtitle ?? "").trim();
   const maxW = W * 0.5;
   let size = W * (doc.fontId === "script" ? 0.07 : 0.054);
-  const titleFont = fontFor(doc.fontId, true);
+  const titleFont = fonts.head;
   pdf.font(titleFont).fontSize(size);
   while (title && pdf.heightOfString(title, { width: maxW, align: "center" }) > size * 2.5 && size > W * 0.03) {
     size *= 0.94;
@@ -339,7 +339,7 @@ function coverWords(pdf: Pdf, doc: BuilderDocument, theme: ReturnType<typeof boo
   }
   if (sub) {
     y += gap;
-    pdf.fillColor(theme.ink).font(fontFor(doc.fontId)).fontSize(subSize).text(sub, cx - maxW / 2, y, { width: maxW, align: "center", lineBreak: false, ellipsis: true });
+    pdf.fillColor(theme.ink).font(fonts.body).fontSize(subSize).text(sub, cx - maxW / 2, y, { width: maxW, align: "center", lineBreak: false, ellipsis: true });
   }
 }
 
@@ -367,6 +367,7 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
   const file = streamTo(pdf, path);
   const inch = PT_PER_IN;
   const style = doc.coverStyle;
+  const fonts = await printFonts(pdf, doc.fontId);
 
   // ── front
   addPage(pdf, W, H, B, theme.page);
@@ -380,19 +381,19 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     const y = B + m + (photoPart - side) / 2;
     if (img) pdf.image(img, x, y, { width: side, height: side });
     else pdf.rect(x, y, side, side).fill(theme.soft);
-    coverWords(pdf, doc, theme, W, B + W / 2, B + m + photoPart + (live * 0.382) / 2, true);
+    coverWords(pdf, doc, fonts, theme, W, B + W / 2, B + m + photoPart + (live * 0.382) / 2, true);
   } else if (style === "moment") {
     const border = W * 0.041667;
     const img = await coverPhoto(manifest, (W - 2 * border) / inch, (H - 2 * border) / inch);
     if (img) pdf.image(img, B + border, B + border, { width: W - 2 * border, height: H - 2 * border });
   } else if (style === "minimal") {
-    coverWords(pdf, doc, theme, W, B + W / 2, B + H * 0.382, true);
+    coverWords(pdf, doc, fonts, theme, W, B + W / 2, B + H * 0.382, true);
   } else if (style === "pattern") {
     drawPattern(pdf, patternById(doc.coverPattern), W, H, B);
     const pat = patternById(doc.coverPattern);
     const P = PATTERN_PLATE;
     pdf.rect(B + P.x * W, B + P.y * H, P.w * W, P.h * H).fill(pat.plate);
-    coverWords(pdf, doc, { ...theme, ink: pat.ink, accent: pat.ink }, W, B + (P.x + P.w / 2) * W, B + (P.y + P.h / 2) * H, true);
+    coverWords(pdf, doc, fonts, { ...theme, ink: pat.ink, accent: pat.ink }, W, B + (P.x + P.w / 2) * W, B + (P.y + P.h / 2) * H, true);
   } else {
     // older styles (Full photo, Framed, Split, Truekeeps Design): as before
     if (manifest.cover) {
@@ -407,9 +408,9 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     if (doc.title) {
       const size = W * 0.054;
       pdf.save().fillColor("#000000").opacity(0.35).rect(0, B + H * 0.72, W + 2 * B, H * 0.28 + B).fill().restore();
-      pdf.fillColor("#FFFFFF").font(fontFor(doc.fontId, true)).fontSize(size);
+      pdf.fillColor("#FFFFFF").font(fonts.head).fontSize(size);
       pdf.text(doc.title, B + W * 0.08, B + H * 0.78, { width: W * 0.84, align: "left" });
-      if (doc.subtitle) pdf.font(fontFor(doc.fontId)).fontSize(size / 1.618).text(doc.subtitle, { width: W * 0.84 });
+      if (doc.subtitle) pdf.font(fonts.body).fontSize(size / 1.618).text(doc.subtitle, { width: W * 0.84 });
     }
   }
 

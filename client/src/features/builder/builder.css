@@ -286,7 +286,8 @@
 .bb-page-full .bb-ph { position: absolute; inset: 0; border-radius: 0; }
 .bb-page-caption {
   /* golden-ratio type scale: caption = title ÷ φ² ≈ 0.021 of the page (CAPTION_SIZE in data.ts) */
-  font-family: var(--font-display); font-size: calc(var(--pw) * 0.021); line-height: 1.35; font-weight: var(--fw-medium);
+  /* the pair's body face (fonts.ts sets --bk-*); books from before the pairs keep the old face */
+  font-family: var(--bk-body, var(--font-display)); font-size: calc(var(--pw) * 0.021); line-height: 1.35; font-weight: var(--bk-body-w, var(--fw-medium));
   text-align: center; margin-top: calc(var(--pw) * 0.03); flex: none;
 }
 /* an engine page's caption: in the band its photos made room for (captionFrames, from 86% down) */
@@ -334,9 +335,9 @@
 .bb-page-collage.bb-mirror .c1 { right: auto; left: 6%; transform: rotate(-2deg); }
 .bb-page-collage.bb-mirror .c2 { left: auto; right: 22%; transform: rotate(-1.2deg); }
 .bb-page-title { align-items: center; justify-content: center; text-align: center; gap: calc(var(--pw) * 0.04); }
-.bb-page-title .t { font-family: var(--font-display); font-size: calc(var(--pw) * 0.085); font-weight: var(--fw-semibold); line-height: 1.15; letter-spacing: -0.01em; }
+.bb-page-title .t { font-family: var(--bk-head, var(--font-display)); font-size: calc(var(--pw) * 0.085); font-weight: var(--bk-head-w, var(--fw-semibold)); line-height: 1.15; letter-spacing: -0.01em; }
 .bb-page-title .rule { width: calc(var(--pw) * 0.14); height: 2px; }
-.bb-page-title .s { font-family: var(--font-body); font-size: calc(var(--pw) * 0.038); letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; }
+.bb-page-title .s { font-family: var(--bk-body, var(--font-body)); font-size: calc(var(--pw) * 0.038); letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; }
 
 /* ── Cover ─────────────────────────────────────────── */
 .bb-cover { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; overflow: hidden; }
@@ -348,8 +349,8 @@
  * 0.054 ÷ φ ≈ 0.0334. The title never runs wider than 6 in on the 12 in cover
  * (50%) and never more than two lines (TITLE_MAX in data.ts keeps it there).
  */
-.bb-cover-title { font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: calc(var(--pw) * 0.054); line-height: 1.16; letter-spacing: -0.01em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.bb-cover-sub { font-size: calc(var(--pw) * 0.0334); line-height: 1.3; opacity: 0.85; margin-top: 0.45em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bb-cover-title { font-family: var(--bk-head, var(--font-display)); font-weight: var(--bk-head-w, var(--fw-semibold)); font-size: calc(var(--pw) * 0.054); line-height: 1.16; letter-spacing: -0.01em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.bb-cover-sub { font-family: var(--bk-body, var(--font-body)); font-weight: var(--bk-body-w, 400); font-size: calc(var(--pw) * 0.0334); line-height: 1.3; opacity: 0.85; margin-top: 0.45em; max-width: 50%; margin-left: auto; margin-right: auto; overflow-wrap: anywhere; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bb-cover [contenteditable]:focus { outline: 2px dashed rgba(42,30,92,0.5); outline-offset: 4px; border-radius: 2px; }
 .bb-cover-full .bb-ph { position: absolute; inset: 0; border-radius: 0; }
 .bb-cover-full .bb-cover-text { position: absolute; left: 8%; right: 8%; bottom: 8%; z-index: 2; padding: 5% 6%; border-radius: 8px; }
@@ -769,8 +770,11 @@
 
 /* ── Book looks: typeface + photo edges (looks.ts, editor v2) ──
    Applied by class on every .bb-page / .bb-cover, so the editor, the
-   filmstrip, the 3-D preview and the order mini-book all agree. The
-   defaults (classic + clean) add nothing, which is the pre-v2 look. */
+   filmstrip, the 3-D preview and the order mini-book all agree.
+   Font pairs (.bb-font-warm … .bb-font-timeless) only set the --bk-* variables
+   read above; fonts.ts generates them from shared/fonts.ts. The rules below
+   are the four typefaces from before the pairs, kept for saved books
+   ("classic" adds nothing: it is the base face). */
 .bb-font-editorial .t, .bb-font-editorial .bb-cover-title { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: 0; }
 .bb-font-editorial .bb-page-caption { font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-weight: 400; font-size: calc(var(--pw) * 0.024); }
 .bb-font-modern .t, .bb-font-modern .bb-cover-title { font-family: 'Archivo', var(--font-body), sans-serif; font-weight: 500; letter-spacing: -0.015em; }

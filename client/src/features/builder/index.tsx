@@ -33,6 +33,7 @@ import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
 import { COPY, OCCASIONS, coverPhotoIdFor, occasionById } from "./data";
+import { pairForOccasion } from "@shared/fonts";
 import { bookTheme } from "./palette";
 import { BACK_MAP, SCREEN_CONTEXT, useBuilderState, type BuilderState } from "./state";
 import { useBuilderSync, type SyncStatus } from "./sync";
@@ -61,7 +62,7 @@ import { WhatsAppHelpButton, useSupportContext } from "@/features/support/WhatsA
 function seedFromUrl(): Partial<BuilderState> {
   const occasion = new URLSearchParams(window.location.search).get("occasion");
   if (occasion && OCCASIONS.some((o) => o.id === occasion)) {
-    return { occasion, title: occasionById(occasion).suggestedTitle, screen: "upload" };
+    return { occasion, title: occasionById(occasion).suggestedTitle, fontId: pairForOccasion(occasion), screen: "upload" };
   }
   return {};
 }

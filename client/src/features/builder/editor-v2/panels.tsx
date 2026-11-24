@@ -48,7 +48,7 @@ import {
   type DensityId,
   type PageLayoutId,
 } from "../data";
-import { FONTS, LOOK_ORDER, lookDefaults, type EdgeId, type FontId } from "../looks";
+import { LOOK_ORDER, fontById, lookDefaults, pickerFonts, type EdgeId, type FontId } from "../looks";
 import { THEME_COLOUR, relativeLuminance, resolvePageHex } from "../palette";
 import { SPREAD_PRESETS, type BookSlice } from "./book-ops";
 
@@ -381,9 +381,10 @@ const COLOR_GROUPS = [
 ];
 const same = (a: string | null, b: string | null) => Boolean(a && b && a.toUpperCase() === b.toUpperCase());
 
-function LookCard({ theme, on, photo, onClick }: { theme: BookTheme; on: boolean; photo: BuilderPhoto | undefined; onClick: () => void }) {
+function LookCard({ theme, on, photo, fontId, onClick }: { theme: BookTheme; on: boolean; photo: BuilderPhoto | undefined; fontId: FontId; onClick: () => void }) {
   const d = lookDefaults(theme.id);
-  const font = FONTS.find((f) => f.id === d.font)!;
+  // a look keeps the book's font pair, so the card shows it in that pair
+  const font = fontById(fontId);
   return (
     <button className={"tke-look" + (on ? " on" : "")} onClick={onClick} aria-pressed={on}>
       <span className="tke-look-spread">
@@ -490,7 +491,7 @@ export function StylePanel({
   const d = lookDefaults(book.themeId);
   const bookHex = resolvePageHex(book.pageColor) ?? theme.page;
   const current = scope === "spread" ? resolvePageHex(spreadBg) ?? bookHex : bookHex;
-  const customized = book.pageColor !== THEME_COLOUR || book.fontId !== d.font || book.edge !== d.edge;
+  const customized = book.pageColor !== THEME_COLOUR || book.edge !== d.edge;
   // one row: six swatches, the current colour always among them
   const quick = COLOR_QUICK.slice(0, 6).some((c) => same(c, current)) ? COLOR_QUICK.slice(0, 6) : [current, ...COLOR_QUICK.slice(0, 5)];
   const pick = (c: string) => onColour(c, scope);
@@ -505,7 +506,7 @@ export function StylePanel({
       <Section label="Look" right={customized ? <button className="tke-link" onClick={() => onLook(book.themeId)}>Reset</button> : null}>
         <div className="tke-looks">
           {shown.map((t, i) => (
-            <LookCard key={t.id} theme={t} on={book.themeId === t.id && !customized} photo={sample[i % Math.max(1, sample.length)]} onClick={() => onLook(t.id)} />
+            <LookCard key={t.id} theme={t} on={book.themeId === t.id && !customized} photo={sample[i % Math.max(1, sample.length)]} fontId={book.fontId} onClick={() => onLook(t.id)} />
           ))}
         </div>
         <button className="tke-more" onClick={() => setAllLooks(!allLooks)}>
@@ -616,8 +617,8 @@ export function TextPanel({
   const fontPairs = (
     <Section label="Font pair" hint="Titles and captions change together. Text turns dark or light by itself to stay readable on your page colour.">
       <div className="tke-pairs" role="radiogroup" aria-label="Font pair">
-        {FONTS.map((f) => (
-          <button key={f.id} role="radio" aria-checked={book.fontId === f.id} className={book.fontId === f.id ? "on" : ""} onClick={() => onFont(f.id)}>
+        {pickerFonts(book.fontId).map((f) => (
+          <button key={f.id} role="radio" aria-checked={book.fontId === f.id} className={book.fontId === f.id ? "on" : ""} onClick={() => onFont(f.id)} title={f.bestFor}>
             <span className="tke-pair-t" style={{ fontFamily: f.display, fontWeight: f.weight, fontSize: f.id === "script" ? 26 : f.id === "editorial" ? 24 : 19 } as CSSProperties}>
               Our day
             </span>

@@ -69,7 +69,7 @@ that the warning was shown.
   selectable font for third-party users to create… their own content" and
   redistribution (the repo is public). The live "Classic" lettering uses Clash
   Display from Fontshare and has the same problem. Needs the owner's call: a
-  commercial licence from ITF, or open-licence (OFL) look-alikes.
+  commercial licence from ITF, or open-licence (OFL) look-alikes. (Built 2026-11-24 on the free licence for the prototype: ADR 020.)
 - **Deleting photos 30 days after printing, and unfinished books after 30
   days.** Irreversible; needs its own careful build. The FAQ and policies don't
   promise it until it exists.

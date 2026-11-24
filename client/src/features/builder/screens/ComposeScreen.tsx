@@ -27,7 +27,7 @@ import { ArrowRight, Check, Info, X } from "lucide-react";
 import { CoverFace, Ph } from "../book";
 import { bookPhotos, coverHasPhoto, coverPhotoIdFor, generatePages, occasionById, FEEL_CHOICES, isFeelChoice, LINE_MAX, TITLE_MAX, type CopyVoice } from "../data";
 import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
-import { FONTS } from "../looks";
+import { pickerFonts } from "../looks";
 import "../flow.css";
 import { bookTheme } from "../palette";
 import type { BuilderState } from "../state";
@@ -316,10 +316,10 @@ export function ComposeScreen({
               <div className="ck-field">
                 <span id="ck-lettering">Lettering</span>
                 <div className="ck-fonts" role="radiogroup" aria-labelledby="ck-lettering">
-                  {FONTS.map((f) => {
+                  {pickerFonts(state.fontId).map((f) => {
                     const on = state.fontId === f.id;
                     return (
-                      <button key={f.id} type="button" role="radio" aria-checked={on} className={"ck-font" + (on ? " on" : "")} onClick={() => set({ fontId: f.id })}>
+                      <button key={f.id} type="button" role="radio" aria-checked={on} className={"ck-font" + (on ? " on" : "")} title={f.bestFor} onClick={() => set({ fontId: f.id })}>
                         <b style={{ fontFamily: f.display, fontWeight: f.weight }}>{f.name}</b>
                         <i style={{ fontFamily: f.caption, fontWeight: f.captionWeight, fontStyle: f.captionItalic ? "italic" : "normal" }}>{previewTitle}</i>
                       </button>

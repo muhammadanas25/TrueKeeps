@@ -29,6 +29,7 @@ import { useEffect, useReducer, useRef } from "react";
 import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
 import { normalizeMediaUrl } from "@shared/media";
 import type { EdgeId, FontId } from "./looks";
+import { DEFAULT_PAIR } from "@shared/fonts";
 import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageFrame, type PageLayoutId } from "./data";
 
 export type BuilderScreen =
@@ -106,7 +107,11 @@ export interface BuilderState {
   /** paper finish, chosen on the order screen */
   finish: FinishId;
   /* ── editor v2 style (looks.ts) ── */
-  /** typeface for titles/captions; defaults reproduce the pre-v2 look */
+  /**
+   * Font pair for titles and captions (shared/fonts.ts). Starts on the
+   * occasion's pair (pairForOccasion, set when the occasion is picked);
+   * older drafts keep the typeface they were made with.
+   */
   fontId: FontId;
   /** photo edge treatment on non-bleed slots */
   edge: EdgeId;
@@ -142,7 +147,7 @@ export const DEFAULT_STATE: BuilderState = {
   qty: 1,
   binding: "hardcover",
   finish: DEFAULT_FINISH,
-  fontId: "classic",
+  fontId: DEFAULT_PAIR,
   edge: "clean",
   subtitle: null,
   captionsHidden: false,

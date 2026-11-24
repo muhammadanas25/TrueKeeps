@@ -11,6 +11,7 @@ import { ArrowRight, Baby, Cake, Heart, Plane, Sparkles } from "lucide-react";
 import { MiniBook } from "../book";
 import { BOOK_IMAGES } from "@/features/landing/book-images";
 import { OCCASIONS, occasionById, themeById, type CopyVoice } from "../data";
+import { pairForOccasion } from "@shared/fonts";
 import { INCLUDED_PAGES, STARTING_PRICE_MINOR, formatPKR } from "@shared/pricing";
 import "../flow.css";
 import type { BuilderState } from "../state";
@@ -49,7 +50,9 @@ export function QuizScreen({
 }) {
   const { occasion, title } = state;
   const pick = (id: string) => {
-    set({ occasion: id, title: title || occasionById(id).suggestedTitle });
+    // the font pair follows the occasion until the customer picks one themselves (step 4 or the editor)
+    const fontId = state.fontId === pairForOccasion(occasion) ? pairForOccasion(id) : state.fontId;
+    set({ occasion: id, title: title || occasionById(id).suggestedTitle, fontId });
     setTimeout(onDone, 260);
   };
   const occ = occasionById(occasion);

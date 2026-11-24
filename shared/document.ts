@@ -17,6 +17,7 @@
  */
 
 import { PATTERN_IDS } from "./patterns";
+import { BOOK_FONT_IDS } from "./fonts";
 import { z } from "zod";
 import { FINISH_IDS } from "./pricing";
 
@@ -115,7 +116,8 @@ export const builderDocumentSchema = z.object({
    */
   pageColor: z.string().max(24).optional(),
   /* editor v2 style — all optional so older documents still validate */
-  fontId: z.enum(["classic", "editorial", "modern", "script"]).optional(),
+  /** a font pair id, or one of the four typefaces from before the pairs (shared/fonts.ts) */
+  fontId: z.enum(BOOK_FONT_IDS).optional(),
   edge: z.enum(["clean", "soft", "shadow", "border"]).optional(),
   subtitle: z.string().max(120).nullable().optional(),
   captionsHidden: z.boolean().optional(),

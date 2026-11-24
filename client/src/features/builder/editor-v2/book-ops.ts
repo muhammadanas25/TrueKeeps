@@ -383,13 +383,12 @@ export function reflow(b: BookSlice, density: DensityId, photos: BuilderPhoto[])
 
 /* ── style ─────────────────────────────────────────────────────── */
 
-/** Apply a look: theme + its default typeface and edges; clears custom colours. */
+/** Apply a look: theme + its default edges; clears custom colours. The font pair stays (it follows the occasion). */
 export function applyLook(b: BookSlice, themeId: string): BookSlice {
   const d = lookDefaults(themeId);
   return {
     ...b,
     themeId,
-    fontId: d.font,
     edge: d.edge,
     pageColor: THEME_COLOUR,
     pages: b.pages.map((p) => (p.bg ? { ...p, bg: null } : p)),
