@@ -28,7 +28,7 @@
  *    required before checkout (SignInSheet, intent "order")
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Check, ChevronLeft, CloudOff, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import "./builder.css";
@@ -47,6 +47,8 @@ import { ComposeScreen } from "./screens/ComposeScreen";
 import { uploadEngine } from "./upload/engine";
 import { UploadProvider } from "./upload/UploadContext";
 import { UploadHairline, UploadPill } from "./upload/UploadStatus";
+import { StepsBar } from "./StepsBar";
+import { albumKey, stepOf } from "./steps";
 import "./upload/upload.css";
 import { BookScreen } from "./screens/BookScreen";
 import { PreviewScreen } from "./screens/PreviewScreen";
@@ -105,7 +107,6 @@ export default function BookBuilder() {
   useEffect(() => {
     if (state.screen === "customize" && state.customized === "none") set({ customized: "looked" });
   }, [state.screen, state.customized]); // eslint-disable-line react-hooks/exhaustive-deps
-  const uploadsBusy = useSyncExternalStore(uploadEngine.subscribe, () => uploadEngine.getSnapshot().active);
   const { loading: sessionLoading, isMember } = useSession();
   const [editorVersion, setEditorVersion] = useEditorVersion();
 
@@ -114,8 +115,8 @@ export default function BookBuilder() {
   // resolved once here; every cover in the builder reads it from the look
   const coverPhotoId = coverPhotoIdFor(state);
   const look = useMemo<PageLook>(
-    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden, coverPhotoId, coverPattern: state.coverPattern }),
-    [state.fontId, state.edge, state.subtitle, state.captionsHidden, coverPhotoId, state.coverPattern],
+    () => ({ fontId: state.fontId, edge: state.edge, subtitle: state.subtitle, captionsHidden: state.captionsHidden, coverPhotoId, coverPattern: state.coverPattern, coverFrame: state.coverFrame }),
+    [state.fontId, state.edge, state.subtitle, state.captionsHidden, coverPhotoId, state.coverPattern, state.coverFrame],
   );
   const v2Customize = state.screen === "customize" && editorVersion === "v2";
 
@@ -150,11 +151,13 @@ export default function BookBuilder() {
     // re-entering the questions lands on the last one, not the first
     if (to) set({ screen: to, ...(to === "compose" ? { qstep: 1 as const } : null) });
   };
-  // steps 3 and 4 share a screen, so the header names the one on show
-  const context = state.screen === "compose" ? `Step ${state.qstep + 3} of 7` : SCREEN_CONTEXT[state.screen] || "";
-  // Phones hide the header's step label for room, so they get a thin bar of
-  // seven under the header instead (owner, 2026-11-21).
-  const stepNo = ({ quiz: 1, upload: 2, compose: 3 + state.qstep, book: 5, preview: 6, order: 7 } as Partial<Record<string, number>>)[state.screen] ?? 0;
+  const stepNo = stepOf(state);
+  // the step bar under the header names the step (StepsBar), so the header only labels screens outside the seven
+  const context = stepNo ? "" : SCREEN_CONTEXT[state.screen] || "";
+  // remember the furthest step reached, so the step bar can jump back to it
+  useEffect(() => {
+    if (stepNo > (state.reached ?? 0)) set({ reached: stepNo });
+  }, [stepNo, state.reached]); // eslint-disable-line react-hooks/exhaustive-deps
   // the help button carries the book and the step, so the team can find it
   useSupportContext({ bookId: state.projectId, where: state.screen === "customize" ? "Making changes" : stepNo ? `Step ${stepNo} of 7` : state.screen });
 
@@ -190,7 +193,7 @@ export default function BookBuilder() {
       <header className="bb-nav">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {BACK_MAP[state.screen] ? (
-            <button className="bb-btn bb-btn-ghost" onClick={goBack} aria-label="Back" style={{ padding: "8px 10px" }}>
+            <button type="button" className="bb-back" onClick={goBack} aria-label="Back">
               <ChevronLeft size={18} />
             </button>
           ) : null}
@@ -201,11 +204,9 @@ export default function BookBuilder() {
         <div className="bb-nav-right">
           <span className="bb-nav-context">{context}</span>
           <WhatsAppHelpButton />
-          {/* while uploading, the counter says more than "Saved" and phones only fit one */}
-          <span className={uploadsBusy ? "ck-save-while-busy" : undefined} style={{ display: "contents" }}>
-            <SavePill status={syncStatus} />
-          </span>
-          <UploadPill onRepick={state.screen === "upload" ? undefined : () => set({ screen: "upload" })} />
+          {/* the upload counter no longer sits here (website copy v1), so "Saved" stays */}
+          <SavePill status={syncStatus} />
+          <UploadPill counter={false} onRepick={state.screen === "upload" ? undefined : () => set({ screen: "upload" })} />
           {state.screen !== "quiz" ? (
             <button className="bb-btn bb-btn-ghost" onClick={reset}>
               <RotateCcw size={15} /> <span className="bb-nav-label">Start over</span>
@@ -214,16 +215,7 @@ export default function BookBuilder() {
           <AccountMenu />
         </div>
       </header>
-      {stepNo ? (
-        <div className="bb-steps" role="progressbar" aria-valuemin={1} aria-valuemax={7} aria-valuenow={stepNo} aria-label={`Step ${stepNo} of 7`}>
-          <span className="bb-steps-bars" aria-hidden="true">
-            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-              <i key={i} className={i <= stepNo ? "on" : ""} />
-            ))}
-          </span>
-          <span className="bb-steps-label">Step {stepNo} of 7</span>
-        </div>
-      ) : null}
+      <StepsBar state={state} set={set} />
 
       <main className="bb-main">
         {state.screen === "quiz" ? <QuizScreen key="quiz" state={state} set={set} copy={copy} onDone={() => set({ screen: "upload" })} /> : null}
@@ -242,7 +234,7 @@ export default function BookBuilder() {
           />
         ) : null}
         {state.screen === "preview" ? (
-          <PreviewScreen key="preview" state={state} set={set} copy={copy} onOrder={() => set({ screen: "order" })} onCustomize={() => set({ screen: "customize" })} />
+          <PreviewScreen key="preview" state={state} set={set} copy={copy} onOrder={() => set({ screen: "order", approvedKey: albumKey(state) })} onCustomize={() => set({ screen: "customize" })} />
         ) : null}
         {state.screen === "customize" ? (
           <>

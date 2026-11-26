@@ -135,6 +135,12 @@ export const builderDocumentSchema = z.object({
   customized: z.enum(["none", "looked", "changed"]).optional(),
   /** the pattern on a "pattern" cover (shared/patterns.ts); optional: older documents have none */
   coverPattern: z.enum(PATTERN_IDS).optional(),
+  /**
+   * How the cover photo sits in its frame (moved, zoomed, straightened in the
+   * editor, 2026-11-26). Applies only while `photoId` is the cover photo; the
+   * print crops the cover with it (server/print/pdf.ts coverPhoto).
+   */
+  coverFrame: placementSchema.nullable().optional(),
   voice: z.enum(["warm", "concise"]),
   qty: z.number().int().min(1).max(20),
   binding: z.string().max(40),

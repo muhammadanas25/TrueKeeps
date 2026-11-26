@@ -34,7 +34,7 @@
 /* Headings are Indigo. The wide display face is reserved for each screen's H1;
    its word spaces are narrow, so they're opened up wherever it's used. */
 .bb-shell h1, .bb-shell h2, .bb-shell h3 { color: var(--heading); }
-.bb-shell h1 { word-spacing: 0.1em; text-wrap: balance; }
+.bb-shell h1 { word-spacing: normal; text-wrap: balance; }
 
 /* ── Shell chrome ──────────────────────────────────── */
 .bb-nav {
@@ -133,7 +133,7 @@
 
 .bb-title-input {
   width: 100%; max-width: 480px; text-align: left;
-  font-family: var(--font-display); font-size: clamp(22px, 2.8vw, 30px); font-weight: var(--fw-medium); word-spacing: 0.1em;
+  font-family: var(--font-display); font-size: clamp(22px, 2.8vw, 30px); font-weight: var(--fw-medium); word-spacing: normal;
   background: transparent; border: none; border-bottom: 2px solid var(--line-input);
   padding: 8px 2px 14px; transition: border-color var(--duration-base);
 }
@@ -259,6 +259,11 @@
   transition: transform var(--duration-flip) var(--ease-default);
 }
 .bb-book.closed { transform: translateX(calc(var(--pw) * -0.5)); }
+/* turned over at the end: the back cover centred, as the front is at the start */
+.bb-book.closed-back { transform: translateX(calc(var(--pw) * 0.5)); }
+/* the back cover (book.tsx BackCoverFace): logo a third of the width, 1/12 up from the bottom, as printed */
+.bb-back-cover { position: absolute; inset: 0; }
+.bb-back-logo { position: absolute; left: 33.333%; width: 33.333%; height: auto; bottom: 8.333%; }
 .bb-book-shadow { position: absolute; left: 6%; right: 6%; bottom: -26px; height: 30px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(60,60,59,0.22), transparent 70%); }
 .bb-static { position: absolute; top: 0; width: var(--pw); height: var(--pw); }
 .bb-static.left  { left: 0; border-radius: 8px 0 0 8px; box-shadow: var(--shadow-lg); }
@@ -689,6 +694,9 @@
 /* small print under a price row: what the book price covers, the remote-area charge */
 .bb-price-note { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; line-height: 1.45; color: var(--color-fg2); margin: -2px 0 6px; }
 .bb-price-note svg { flex: none; margin-top: 2px; }
+.bb-price-note a { color: inherit; font-weight: 600; white-space: nowrap; }
+/* a link-styled button inside a sentence ("See which ones") */
+.bb-inline-link { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: inherit; text-decoration: underline; cursor: pointer; }
 
 /* ── Confirm ───────────────────────────────────────── */
 .bb-confirm { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; gap: 10px; }

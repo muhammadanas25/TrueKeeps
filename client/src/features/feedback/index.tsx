@@ -152,7 +152,7 @@ export default function FeedbackPage() {
             <p>It reached us.{contact.trim() ? " We'll use the details you left if we need to get back to you." : ""}</p>
             <div className="fb-thanks-actions">
               <Link href={BUILDER_PATH} className="lp-btn lp-btn-main">
-                Make my book <ArrowRight size={17} />
+                Start my album <ArrowRight size={17} />
               </Link>
               <Link href="/" className="lp-link">
                 Back to home

@@ -62,7 +62,9 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { CoverFace, PageFace } from "../book";
-import { bookPhotos, firstMovablePage, hasTitlePage, occasionById, pageNumber, prettyCaption, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
+import { bookPhotos, coverPhotoIdFor, firstMovablePage, hasTitlePage, occasionById, pageNumber, prettyCaption, type BookPage, type BuilderPhoto, type CopyVoice, type Placement } from "../data";
+import { hasImage } from "../upload/previews";
+import { CoverAdjustBar, CoverAdjustButton, CoverDragLayer, coverFrameFor, coverPhotoInches } from "./CoverAdjust";
 import { PageLookContext, usePageLook, type EdgeId, type FontId } from "../looks";
 import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
@@ -145,6 +147,8 @@ export function EditorV2({
   const [dir, setDir] = useState(0);
   const [sel, setSel] = useState<Sel>(null);
   const [crop, setCrop] = useState(false);
+  // adjusting the front cover's photo (CoverAdjust.tsx)
+  const [coverCrop, setCoverCrop] = useState(false);
   const [tool, setTool] = useState<Tool | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [arrange, setArrange] = useState(false);
@@ -277,6 +281,31 @@ export function EditorV2({
     clearSel();
   };
   const spreadPageIds = onCover ? [] : (shown.map((s) => s.page?.id).filter(Boolean) as string[]);
+
+  // The cover photo can be moved, zoomed and straightened on the two styles that show one.
+  const coverPhoto = photos.find((p) => p.id === coverPhotoIdFor(state));
+  const coverInches = coverPhotoInches(state.coverStyle);
+  const canAdjustCover = Boolean(onCover && coverInches && coverPhoto && hasImage(coverPhoto));
+  const coverFrame = coverPhoto ? coverFrameFor(state.coverFrame, coverPhoto.id) : null;
+  const setCoverFrame = (patch: Partial<Placement>) => {
+    if (!coverPhoto || !coverFrame) return;
+    set({ coverFrame: { ...coverFrame, ...patch, photoId: coverPhoto.id }, customized: "changed" });
+  };
+  useEffect(() => {
+    if (!canAdjustCover) setCoverCrop(false);
+  }, [canAdjustCover]);
+  const coverBar =
+    coverCrop && canAdjustCover && coverPhoto && coverFrame && coverInches ? (
+      <CoverAdjustBar
+        photo={coverPhoto}
+        frame={coverFrame}
+        inches={coverInches}
+        mobile={isMobile}
+        onFrame={setCoverFrame}
+        onReset={() => set({ coverFrame: null, customized: "changed" })}
+        onDone={() => setCoverCrop(false)}
+      />
+    ) : null;
   const spreadBg = shown.find((s) => s.page?.bg)?.page?.bg ?? null;
 
   /* ── actions ────────────────────────────────────────────────── */
@@ -748,7 +777,7 @@ export function EditorV2({
             </div>
           </div>
           <div className="tke-top-r">
-            <UploadPill />
+            <UploadPill counter={false} />
             <button className="tke-iconbtn" onClick={undo} disabled={!hist.current.past.length} aria-label="Undo" title="Undo (⌘Z)">
               <Undo2 size={18} />
             </button>
@@ -842,8 +871,15 @@ export function EditorV2({
               <div className="tke-spread-wrap" ref={spreadRef} style={{ width: isMobile || onCover ? pw : pw * 2 }}>
                 {onCover ? (
                   <div key="cover" className={"tke-spread tke-cover" + (dir > 0 ? " in-r" : dir < 0 ? " in-l" : "")}>
-                    <div className="tke-pagebox" style={{ width: pw, height: pw, "--pw": pw + "px" } as CSSProperties}>
-                      <CoverFace theme={theme} coverStyle={state.coverStyle} title={state.title} occasion={occ} photos={photos} editable onTitle={A.title} />
+                    <div className={"tke-pagebox" + (coverCrop ? " is-cover-cropping" : "")} style={{ width: pw, height: pw, "--pw": pw + "px" } as CSSProperties}>
+                      <CoverFace theme={theme} coverStyle={state.coverStyle} title={state.title} occasion={occ} photos={photos} editable={!coverCrop} onTitle={A.title} />
+                      {canAdjustCover && coverPhoto && coverFrame ? (
+                        coverCrop ? (
+                          <CoverDragLayer photo={coverPhoto} frame={coverFrame} onFrame={setCoverFrame} />
+                        ) : (
+                          <CoverAdjustButton onClick={() => setCoverCrop(true)} />
+                        )
+                      ) : null}
                     </div>
                   </div>
                 ) : (
@@ -895,6 +931,7 @@ export function EditorV2({
                 ) : null}
               </div>
               {!isMobile && crop ? cropBar : null}
+              {!isMobile && coverBar ? coverBar : null}
             </div>
             <Filmstrip
               pages={pages}
@@ -915,6 +952,8 @@ export function EditorV2({
           <div className="tke-mbar">
             {crop && selSlot ? (
               cropBar
+            ) : coverBar ? (
+              coverBar
             ) : sel ? (
               <div className="tke-actions">
                 {actions.map(({ id, label, Icon, on }) => (

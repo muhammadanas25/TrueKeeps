@@ -79,7 +79,8 @@ export const themeById = (id: string | null | undefined): BookTheme =>
   BOOK_THEMES.find((t) => t.id === id) ?? BOOK_THEMES[0];
 
 /** Looks no longer offered to new books, still drawn for books that use them. */
-const RETIRED_THEMES = new Set(["cobalt"]);
+// owner, 2026-11-26: four looks left in the editor (Gallery White, Soft Blush, Sage Garden, Golden Hour)
+const RETIRED_THEMES = new Set(["cobalt", "ivory", "indigo", "midnight", "kraft"]);
 
 /**
  * The looks to offer in a picker: everything current, plus the book's own look
@@ -103,23 +104,23 @@ export interface Occasion {
 
 export const OCCASIONS: Occasion[] = [
   {
-    id: "wedding", label: "Our wedding", icon: "Heart", suggestedTitle: "The Day We Said Yes", subtitle: "June, twenty twenty-six",
+    id: "wedding", label: "Weddings", icon: "Heart", suggestedTitle: "The Day We Said Yes", subtitle: "June, twenty twenty-six",
     photoLabels: ["getting ready", "the first look", "walking down", "the vows", "ring exchange", "the first kiss", "family portrait", "golden hour", "the speeches", "first dance", "cake cutting", "on the dance floor", "quiet moment", "the send-off", "the details", "her bouquet"],
   },
   {
-    id: "baby", label: "A new baby", icon: "Baby", suggestedTitle: "Hello, Little One", subtitle: "The first year",
+    id: "baby", label: "New baby", icon: "Baby", suggestedTitle: "Hello, Little One", subtitle: "The first year",
     photoLabels: ["coming home", "tiny toes", "first yawn", "nap time", "little hands", "bath time", "first smile", "with grandma", "the nursery", "sunday morning", "first steps", "messy lunch", "story time", "fast asleep", "first birthday", "family of three"],
   },
   {
-    id: "travel", label: "A trip we took", icon: "Plane", suggestedTitle: "The Long Way Home", subtitle: "An adventure in pictures",
+    id: "travel", label: "Travel", icon: "Plane", suggestedTitle: "The Long Way Home", subtitle: "An adventure in pictures",
     photoLabels: ["the departure", "street market", "morning coffee", "mountain pass", "local faces", "the old town", "sunset point", "roadside stop", "hidden beach", "night lights", "the long road", "last evening", "window seat", "city rooftops", "the harbour", "souvenirs"],
   },
   {
-    id: "birthday", label: "Birthday or grad", icon: "Cake", suggestedTitle: "What a Day It Was", subtitle: "A celebration to keep",
+    id: "birthday", label: "Birthdays", icon: "Cake", suggestedTitle: "What a Day It Was", subtitle: "A celebration to keep",
     photoLabels: ["the setup", "guests arriving", "party hats", "make a wish", "the candles", "best friends", "the big laugh", "gift opening", "group photo", "the cake", "confetti", "dancing", "quiet smiles", "the toast", "one more slice", "goodnight"],
   },
   {
-    id: "mix", label: "A bit of everything", icon: "Sparkles", suggestedTitle: "The Good Days", subtitle: "Moments worth keeping",
+    id: "mix", label: "Your own mix", icon: "Sparkles", suggestedTitle: "The Good Days", subtitle: "Moments worth keeping",
     photoLabels: ["sunday breakfast", "at the lake", "her birthday", "first snow", "the new house", "summer evening", "road trip", "family dinner", "the garden", "game night", "morning walk", "the recital", "holiday lights", "lazy afternoon", "the reunion", "home again"],
   },
 ];
@@ -147,7 +148,7 @@ export const VIBES: Vibe[] = [
 export type CoverStyleId = "full" | "framed" | "minimal" | "split" | "classic" | "moment" | "signature" | "pattern";
 export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
   { id: "classic", name: "Minimal" },
-  { id: "moment", name: "Full Picture" },
+  { id: "moment", name: "Photo cover" },
   { id: "minimal", name: "Just text" },
   // a patterned front with the title on a plate (2026-11-22; shared/patterns.ts)
   { id: "pattern", name: "Pattern" },
@@ -162,7 +163,8 @@ export const COVER_STYLES: Array<{ id: CoverStyleId; name: string }> = [
  * (owner). It still draws, so books saved with it print as they were, and a
  * picker shows it only to a book that already uses it.
  */
-const RETIRED_COVERS = new Set<CoverStyleId>(["signature"]);
+// Pattern is hidden for now (owner, 2026-11-26); an album that already has one keeps it and still sees it listed
+const RETIRED_COVERS = new Set<CoverStyleId>(["signature", "pattern"]);
 export const pickableCoverStyles = (current?: CoverStyleId | null) =>
   COVER_STYLES.filter((c) => !RETIRED_COVERS.has(c.id) || c.id === current);
 
@@ -173,7 +175,7 @@ export const pickableCoverStyles = (current?: CoverStyleId | null) =>
  */
 export const FEEL_CHOICES: Array<{ id: CoverStyleId; name: string; line: string }> = [
   { id: "classic", name: "Minimal", line: "A small photo and your title." },
-  { id: "moment", name: "Full Picture", line: "One photo fills the cover. Title on the spine." },
+  { id: "moment", name: "Photo cover", line: "One big photo, your title on the spine." },
   { id: "minimal", name: "Just text", line: "Your title and a line. No photo." },
 ];
 
@@ -224,7 +226,7 @@ const SIGNATURES: Record<string, SignatureArt> = {
     size: "auto",
   },
   mix: {
-    name: "Keepsake",
+    name: "Everyday",
     ground: "#2A1E5C",
     pattern: "repeating-linear-gradient(45deg, #595080 0 2px, transparent 2px 10px), repeating-linear-gradient(-45deg, #595080 0 2px, transparent 2px 10px)",
     size: "auto",
@@ -245,7 +247,7 @@ export type DensityId = "minimal" | "balanced" | "collage";
 export const DENSITIES: Array<{ id: DensityId; name: string; blurb: string }> = [
   { id: "minimal", name: "Story", blurb: "1 to 2 photos a page" },
   { id: "balanced", name: "Classic", blurb: "2 to 4 photos a page" },
-  { id: "collage", name: "Family Album", blurb: "4 to 6 photos a page" },
+  { id: "collage", name: "Gallery", blurb: "4 to 6 photos a page" },
 ];
 
 export interface Binding {
@@ -293,29 +295,29 @@ export interface CopyVoice {
 
 export const COPY: Record<"warm" | "concise", CopyVoice> = {
   warm: {
-    occasionSub: "Pick one, add your photos, and we do the rest.",
+    occasionSub: "Tap the one that fits best. You can always come back and change it.",
     quizHello: "Let's make your book",
     quizSub: "Two small things while your photos upload. Then you pick your book.",
-    qOccasion: "What are we celebrating?",
+    qOccasion: "Let's start with the occasion.",
     qVibe: "Pick a feel for your book",
     qTitle: "What should we call it?",
-    titleHint: "You can change this anytime — even on the cover.",
-    uploadTitle: "Now, your photos",
+    titleHint: "Not sure? Try a few. Your cover updates live as you tap.",
+    uploadTitle: "Let's add your photos",
     uploadSub: "Don't worry about the order or the layout. That's our job.",
-    uploadCta: "Add photos",
+    uploadCta: "Select photos",
     uploadMore: "Add more",
     generating: ["Looking through your photos…", "Arranging your moments…", "Laying out your pages…", "Adding the finishing touches…"],
     revealTitle: "Here is your book — three ways",
     revealSub: "Same photos, three feels. Pick the one that feels like you.",
     ourPick: "Our pick for you",
     openBook: "Open this book",
-    previewHint: "Click the right-hand page to turn — just like a real book.",
+    previewHint: "Use the arrows to turn the pages.",
     orderCta: "I love it, order my book",
     customizeCta: "Make it mine",
     customizeTitle: "Make it yours",
     customizeSub: "Tap any page to change it. Nothing can go wrong.",
-    orderTitle: "Almost there",
-    orderSub: "Check the details — then we print, bind, and ship it.",
+    orderTitle: "Let's get it to you",
+    orderSub: "A few details and your album goes to print.",
     placeOrder: "Continue to secure payment",
     confirmTitle: "It's on its way to print",
     confirmSub: "We'll email you the moment it ships. Your book is saved here — come back anytime.",

@@ -91,7 +91,8 @@ async function main() {
   expect(order.status === "pending_payment" && order.paymentProvider === "bank_transfer" && !order.providerRef, "pending, bank_transfer, no gateway session");
   const held = (order.expiresAt!.getTime() - t0) / (24 * 3600 * 1000);
   expect(Math.abs(held - BANK_TRANSFER_WINDOW_DAYS) < 0.01, `held for ${BANK_TRANSFER_WINDOW_DAYS} days (${held.toFixed(2)})`);
-  expect(order.totalMinor === 5_690_00, "priced by the server: Rs 5,690");
+  // Lahore: Rs 200 delivery since 2026-11-26 (shared/pricing.ts deliveryFor)
+  expect(order.totalMinor === 6_690_00 && order.shippingMinor === 200_00, "priced by the server: Rs 6,490 + Rs 200 delivery");
   const again = await createOrder(user, body("bank_transfer", "key-bank-0001"));
   expect(again.order.id === order.id, "the same key returns the same order");
   await rejects(checkoutUrlFor(order), "BANK_TRANSFER", "a bank transfer order can't open a card checkout");

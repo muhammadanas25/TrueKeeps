@@ -39,14 +39,39 @@
 .pr-arrow:focus-visible { outline: 2px solid var(--tk-rose-400, #F26C88); outline-offset: 2px; }
 .pr-where { min-width: 160px; text-align: center; font-size: 14px; line-height: 20px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
 
-/* ── Phone step bar (index.tsx): seven parts under the header ── */
-.bb-steps { display: none; }
+/* The top bar's back button: a plain round button (owner, 2026-11-26, from canvas Round 7 C) */
+.bb-back { flex: none; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; border: 1px solid var(--color-border); background: #fff; color: var(--heading); cursor: pointer; transition: border-color var(--duration-base, 160ms), background-color var(--duration-base, 160ms); }
+.bb-back:hover { border-color: var(--heading); background: var(--selected-bg); }
+.bb-back:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
+
+/* ── Step bar (StepsBar.tsx): seven named steps you can jump between ──
+   Direction A with the line broken into steps (owner, 2026-11-26). Done
+   steps are Indigo and tappable, the current one Rose, the rest Mist.
+   No names on the segments: each screen's heading names the step. */
+.bb-steps { display: flex; align-items: center; gap: 12px; padding: 10px 32px 8px; background: var(--surface-page); border-bottom: 1px solid var(--color-border); }
+.bb-steps-line { flex: 1; min-width: 0; max-width: 980px; margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.bb-step { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.bb-step:disabled { cursor: default; }
+.bb-step i { display: block; width: 100%; height: 4px; border-radius: 2px; background: var(--tk-mist-300); transition: background-color var(--duration-base, 160ms); }
+.bb-step.done i { background: var(--heading); }
+.bb-step.now i { background: var(--tk-rose-600); }
+.bb-step.done:hover i { background: var(--tk-indigo-400, #595080); }
+.bb-step:focus-visible { outline: 2px solid var(--selected); outline-offset: 3px; border-radius: 4px; }
+/* "Back to Check": small and right beside the line it belongs to */
+.bb-steps-back { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--heading); background: #fff; color: var(--heading); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.bb-steps-back:hover { background: var(--selected-bg); }
+.bb-steps-back:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
+.bb-steps-label { flex: none; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--color-fg2); white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) {
-  .bb-steps { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 16px; background: var(--surface-page); border-bottom: 1px solid var(--color-border); }
-  .bb-steps-bars { flex: 1; display: flex; gap: 3px; }
-  .bb-steps-bars i { flex: 1; height: 3px; border-radius: 2px; background: var(--tk-mist-400); }
-  .bb-steps-bars i.on { background: var(--heading); }
-  .bb-steps-label { flex: none; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--heading); font-variant-numeric: tabular-nums; }
+  .bb-steps { gap: 10px; padding: 0 16px; }
+  /* one row on a phone: while "Back to …" shows, it takes the step count's place */
+  .bb-steps-label.behind { display: none; }
+  .bb-steps-back { height: 28px; padding: 0 10px; font-size: 12px; }
+  .bb-steps-line { gap: 3px; }
+  /* the whole segment is the button: a taller tap area than the 4px line it draws */
+  .bb-step { padding: 10px 0; }
+  /* Continue stays in reach on the long questions (Direction A) */
+  .ck-actions { position: sticky; bottom: 0; z-index: 5; margin-left: -16px; margin-right: -16px; padding: 12px 16px 14px; background: var(--surface-page); box-shadow: 0 -12px 16px -14px rgba(42, 30, 92, 0.35); }
 }
 
 /* ── Shared bits ──────────────────────────────────────────── */
@@ -192,6 +217,10 @@
 .pv-actions { display: flex; flex-direction: column; gap: 8px; }
 .pv-actions .bb-btn-primary { justify-content: center; width: 100%; }
 .pv-hint { font-size: 13px; line-height: 18px; color: var(--color-fg2); text-align: center; }
+.pv-stagewrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* step 6: "Open the editor" as a full-width outline button under Approve (2026-11-26) */
+.pv-editor-btn { width: 100%; justify-content: center; gap: 8px; }
+.pv-links { display: block; }
 .pv-link { align-self: center; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 8px; color: var(--heading); font-weight: 600; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 .pv-panel .bk-seg > button { flex: 1 1 auto; padding: 0 12px; white-space: nowrap; }
 
@@ -272,10 +301,22 @@
 .up-status { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--selected-bg); color: var(--heading); font-size: 15px; line-height: 22px; font-weight: 600; }
 .up-status svg { flex: none; margin-top: 2px; }
 .up-need { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--heading); }
+/* step 2 drop box: computer words vs phone words (website copy v1) */
+.up-phone { display: none; }
+@media (max-width: 760px) { .up-desk { display: none; } .up-phone { display: inline; } }
+.up-safe { display: block; }
+/* .bb-shell svg is display: block in builder.css, which can load after this file */
+.bb-shell .up-safe svg { display: inline-block; vertical-align: -2px; margin-right: 4px; }
+/* the doc's longer example ("e.g. A date, a place, or a few words") fits the field at a smaller size */
+.ck-field .bb-title-input::placeholder { font-size: 0.72em; }
 .up-status.ok { background: var(--success-bg); color: var(--success-fg); }
 /* a few photos may print soft (quality.ts): amber, informative, not an error */
 .up-status.warn { background: #FFF4D6; color: #5C4200; font-weight: 500; }
 .up-status.warn b { font-weight: 700; }
+/* step 3: the same amber note under the upload progress, with "See and replace" (website copy v1) */
+.ck-lowq { position: relative; z-index: 2; display: flex; align-items: flex-start; gap: 8px; width: min(100%, 370px); margin: 12px auto 0; padding: 10px 12px; border-radius: 12px; background: #FFF4D6; color: #5C4200; font-size: 14px; line-height: 20px; text-align: left; }
+.ck-lowq svg { flex: none; margin-top: 2px; }
+@media (max-width: 760px) { .ck-lowq { order: 2; width: min(100% - 32px, 460px); margin: -16px auto 24px; } }
 /* remove button on each photo: always visible (phones can't hover), 32px circle on a 44px hit area */
 .ck-tile-x { position: absolute; top: 0; right: 0; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
 .ck-tile-x::before { content: ""; position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 50%; background: rgba(27, 23, 54, 0.72); }

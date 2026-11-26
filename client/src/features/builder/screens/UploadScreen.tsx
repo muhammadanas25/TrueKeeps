@@ -133,7 +133,11 @@ export function UploadScreen({
               }}
             >
               <ImagePlus size={40} strokeWidth={1.4} />
-              <p>Drop your photos here, or browse your device</p>
+              {/* website copy v1: different words on a computer and a phone (upload.css .up-desk / .up-phone) */}
+              <p>
+                <span className="up-desk">Drag your photos here, or choose from your computer</span>
+                <span className="up-phone">Choose photos from your gallery</span>
+              </p>
               <button
                 type="button"
                 className="bb-btn bb-btn-primary"
@@ -145,8 +149,11 @@ export function UploadScreen({
                 {copy.uploadCta}
               </button>
               {/* the minimum, before they pick rather than after (owner, 2026-11-21) */}
-              <span className="up-need">Pick at least {MIN_PHOTOS}. 30 to 50 make a fuller book.</span>
-              <span className="bb-formats">JPG, PNG, and HEIC. We handle the rest.</span>
+              <span className="up-need">You'll need at least {MIN_PHOTOS} photos. 30 to 50 works best.</span>
+              <span className="bb-formats">Upload from any device. We handle the rest.</span>
+              <span className="bb-formats up-safe">
+                <Lock size={13} /> Your memories are safe: encrypted and never shared.
+              </span>
             </div>
             <TipLine className="ck-before" lineFor={(n) => BEFORE_TIPS[n % BEFORE_TIPS.length]} />
           </>
@@ -169,7 +176,7 @@ export function UploadScreen({
               <div className="ck-rejected" role="alert">
                 <p>
                   We couldn't open {snapshot.rejected.length === 1 ? snapshot.rejected[0] : `${snapshot.rejected.length} files`}, so{" "}
-                  {snapshot.rejected.length === 1 ? "it isn't" : "they aren't"} in your book.
+                  {snapshot.rejected.length === 1 ? "it isn't" : "they aren't"} in your album.
                 </p>
                 <button type="button" aria-label="Dismiss" onClick={() => uploadEngine.dismissRejected()}>
                   <X size={15} />
@@ -178,15 +185,15 @@ export function UploadScreen({
             ) : null}
             {!enough ? (
               <p className="up-status lock" role="status">
-                <Lock size={17} /> Add at least {MIN_PHOTOS} photos to make your book. You have {photos.length} so far.
+                <Lock size={17} /> Add at least {MIN_PHOTOS} photos to make your album. You have {photos.length} so far.
               </p>
             ) : photos.length < FULL_BOOK ? (
               <p className="up-status" role="status">
-                <Info size={17} /> You can go on with {photos.length}. We recommend 30 to 50 photos for a fuller book.
+                <Info size={17} /> You can go on with {photos.length}. 30 to 50 photos works best.
               </p>
             ) : (
               <p className="up-status ok" role="status">
-                <CheckCircle2 size={17} /> {photos.length} photos added. That makes a full book.
+                <CheckCircle2 size={17} /> {photos.length} photos added. That makes a full album.
               </p>
             )}
             {flags.size ? (
@@ -196,7 +203,7 @@ export function UploadScreen({
                   <b>
                     {flags.size} {flags.size === 1 ? "photo" : "photos"} may print soft.
                   </b>{" "}
-                  We'll keep {flags.size === 1 ? "it" : "them"} small in your book. You can also remove {flags.size === 1 ? "it" : "them"} and add a sharper copy.
+                  We'll keep {flags.size === 1 ? "it" : "them"} small in your album. You can also remove {flags.size === 1 ? "it" : "them"} and add a sharper copy.
                 </span>
               </p>
             ) : null}
@@ -226,7 +233,7 @@ export function UploadScreen({
               <span className="bb-upload-count">
                 <CheckCircle2 size={17} />
                 {photos.length} {photos.length === 1 ? "photo" : "photos"}
-                {enough ? `, a ${estPages}-page book` : ""}
+                {enough ? `, a ${estPages}-page album` : ""}
               </span>
               <button type="button" className="bb-btn bb-btn-ghost" onClick={openPicker}>
                 <Plus size={16} /> {copy.uploadMore}

@@ -1,7 +1,7 @@
 /**
  * Price list + quote math — the ONE place prices live.
  *
- * What: the PKR book price, the extra-sheet rate, the remote-area delivery
+ * What: the PKR book price, the extra-sheet rate, the delivery
  * charge, and `quote()`, which turns (binding, qty, printed pages, address)
  * into unit price / subtotal / delivery / total.
  *
@@ -13,11 +13,12 @@
  * here and a deploy; old orders keep the price they were placed at.
  *
  * The pricing model (owner, 2026-11-11; docs/adr/012):
- *  - every binding costs the same: Rs 5,690 a book
+ *  - one binding, hardcover (owner, 2026-11-26): Rs 6,490 an album. Softcover
+ *    and layflat stay in the list only so older orders still read
  *  - that includes 5 sheets inside the book (the cover is not a sheet); one sheet is two pages
  *  - each sheet beyond that is Rs 550 (charged per sheet, never per page)
- *  - shipping is free, except Rs 500 for Gilgit-Baltistan, Azad Jammu and
- *    Kashmir, and Balochistan outside Quetta
+ *  - delivery by city (owner, 2026-11-26): free in Karachi, Rs 200 flat
+ *    anywhere else in Pakistan (the Rs 500 remote-area charge is gone)
  *
  * Money is integer PAISA (1 rupee = 100 paisa) everywhere — no floats.
  * Safepay v3 also takes amounts in paisa, so the order total goes to the
@@ -37,15 +38,17 @@ export interface BindingOption {
 
 export const PRICE_LIST = {
   /** bump whenever any number below changes; stored on every order */
-  version: "pkr-2026-11-11",
-  /** price of one book in any binding, in paisa; includes `includedSheets` */
-  bookMinor: 5_690_00,
+  version: "pkr-2026-11-26b",
+  /** price of one album (hardcover), in paisa; includes `includedSheets` */
+  bookMinor: 6_490_00,
   /** sheets inside the book that the book price covers */
   includedSheets: 5,
   /** each sheet beyond `includedSheets`, per copy, in paisa */
   extraSheetMinor: 550_00,
-  /** delivery charge for remote areas (see isRemoteArea), once per order, in paisa */
-  remoteDeliveryMinor: 500_00,
+  /** delivery anywhere outside Karachi, once per order, in paisa */
+  standardDeliveryMinor: 200_00,
+  /** the one binding offered; quote() prices every order as this */
+  offeredBinding: "hardcover" as BindingId,
   bindings: [
     { id: "softcover", name: "Softcover", blurb: "Flexible cover" },
     { id: "hardcover", name: "Hardcover", blurb: "Rigid board cover" },
@@ -99,22 +102,15 @@ export const sheetsFor = (printedPages: number): number => Math.ceil(Math.max(0,
 /* ── Delivery ───────────────────────────────────────────────── */
 
 /**
- * Remote areas pay Rs 500 for delivery: all of Gilgit-Baltistan and Azad
- * Jammu and Kashmir, and Balochistan except Quetta. Province names match
- * PK_PROVINCES in shared/orders.ts. The address form only has a free-text
- * city, so "Quetta" is matched as a word ("Quetta Cantt" counts as Quetta).
- * No address yet means no charge shown yet.
+ * Karachi delivers free. The address form has a free-text city, so "Karachi"
+ * is matched as a word ("Karachi East", "karachi" count; "Karachiwala" does
+ * not). The province isn't checked: a Karachi city is Karachi.
  */
-export function isRemoteArea(address?: { province?: string | null; city?: string | null } | null): boolean {
-  switch (address?.province) {
-    case "Gilgit-Baltistan":
-    case "Azad Jammu and Kashmir":
-      return true;
-    case "Balochistan":
-      return !/\bquetta\b/i.test(address.city ?? "");
-    default:
-      return false;
-  }
+export const isKarachi = (address?: { city?: string | null } | null): boolean => /\bkarachi\b/i.test(address?.city ?? "");
+
+/** Delivery charge for an address, in paisa: Karachi free, everywhere else Rs 200. */
+export function deliveryFor(address: { province?: string | null; city?: string | null }): number {
+  return isKarachi(address) ? 0 : PRICE_LIST.standardDeliveryMinor;
 }
 
 /* ── Quote ──────────────────────────────────────────────────── */
@@ -131,8 +127,13 @@ export interface Quote {
   /** price of one copy, extra sheets included */
   unitMinor: number;
   subtotalMinor: number;
-  remoteArea: boolean;
-  /** delivery charge (0, or the remote-area charge) */
+  /**
+   * false until the address has a city: the charge depends on it, so the
+   * checkout shows "Add your city to see" and leaves delivery out of the
+   * total until then. The server always quotes with the full address.
+   */
+  deliveryKnown: boolean;
+  /** delivery charge, once per order (deliveryFor); 0 while not known */
   shippingMinor: number;
   totalMinor: number;
   freeShipping: boolean;
@@ -150,7 +151,8 @@ export function bindingById(id: string): BindingOption {
  *     included 5
  *  2. one copy = book price + extras × sheet price (same for every binding)
  *  3. qty clamped to 1..maxQty (the UI clamps too; this is the guard)
- *  4. delivery is free, except the remote-area charge, once per order
+ *  4. delivery by city, once per order (deliveryFor); none until a city is given
+ *  5. always hardcover, whatever binding an older draft carries
  */
 export function quote(input: {
   binding: string;
@@ -158,15 +160,15 @@ export function quote(input: {
   printedPages: number;
   address?: { province?: string | null; city?: string | null } | null;
 }): Quote {
-  const b = bindingById(input.binding);
+  const b = bindingById(PRICE_LIST.offeredBinding);
   const qty = Math.min(PRICE_LIST.maxQty, Math.max(1, Math.floor(input.qty || 1)));
   const printedPages = Math.max(0, Math.floor(input.printedPages || 0));
   const sheets = sheetsFor(printedPages);
   const extraSheets = Math.max(0, sheets - PRICE_LIST.includedSheets);
   const unitMinor = PRICE_LIST.bookMinor + extraSheets * PRICE_LIST.extraSheetMinor;
   const subtotalMinor = unitMinor * qty;
-  const remoteArea = isRemoteArea(input.address);
-  const shippingMinor = remoteArea ? PRICE_LIST.remoteDeliveryMinor : 0;
+  const deliveryKnown = Boolean(input.address?.city?.trim());
+  const shippingMinor = deliveryKnown && input.address ? deliveryFor(input.address) : 0;
   return {
     currency: CURRENCY,
     binding: b.id,
@@ -176,10 +178,10 @@ export function quote(input: {
     extraSheets,
     unitMinor,
     subtotalMinor,
-    remoteArea,
+    deliveryKnown,
     shippingMinor,
     totalMinor: subtotalMinor + shippingMinor,
-    freeShipping: shippingMinor === 0,
+    freeShipping: deliveryKnown && shippingMinor === 0,
     priceListVersion: PRICE_LIST.version,
   };
 }
@@ -197,5 +199,8 @@ export function formatPKR(minor: number): string {
 /** Lowest price of a book — for "from Rs …" marketing copy. */
 export const STARTING_PRICE_MINOR = PRICE_LIST.bookMinor;
 
-/** The remote-area rule in words, for the FAQ, price pages and checkout. */
-export const REMOTE_AREAS_TEXT = "Gilgit-Baltistan, Azad Kashmir and Balochistan outside Quetta";
+/** The delivery rule in one sentence (website copy v1), for the FAQ, price pages and checkout. */
+export const DELIVERY_RULE = `Delivery is free in Karachi. Everywhere else in Pakistan it's ${formatPKR(PRICE_LIST.standardDeliveryMinor)}.`;
+
+/** Delivery times (website copy v1). */
+export const DELIVERY_TIME = "We print it in 2 to 3 days. The courier brings it in 2 to 4.";

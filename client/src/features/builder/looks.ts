@@ -22,6 +22,7 @@
 import { createContext, useContext } from "react";
 import { FONT_PAIRS, LEGACY_FONT_IDS, type BookFontId } from "@shared/fonts";
 import { cssFamily, ensureBookFonts } from "./fonts";
+import type { Placement } from "./data";
 
 // every screen that draws a page imports this module; the pairs load once
 ensureBookFonts();
@@ -98,13 +99,19 @@ export const LOOK_DEFAULTS: Record<string, { edge: EdgeId }> = {
   gallery: { edge: "clean" },
   sage: { edge: "soft" },
   midnight: { edge: "clean" },
-  golden: { edge: "shadow" },
+  // no Shadow edge in the editor any more (owner, 2026-11-26), so Golden Hour starts clean
+  golden: { edge: "clean" },
   kraft: { edge: "shadow" },
 };
 export const lookDefaults = (themeId: string) => LOOK_DEFAULTS[themeId] ?? LOOK_DEFAULTS.ivory;
 
 /** Order of the look cards in the editor (first four shown, rest on "more"). */
-export const LOOK_ORDER = ["gallery", "ivory", "indigo", "blush", "sage", "midnight", "golden", "kraft"];
+/**
+ * The four looks offered (owner, 2026-11-26). Timeless Ivory, Bold Indigo,
+ * Midnight and Kraft Journal are retired: a book that uses one still shows it
+ * (the panel appends the book's own look), and it prints as it is.
+ */
+export const LOOK_ORDER = ["gallery", "blush", "sage", "golden"];
 
 export interface PageLook {
   fontId: FontId;
@@ -120,6 +127,8 @@ export interface PageLook {
   coverPhotoId?: string | null;
   /** the pattern on a "pattern" cover (shared/patterns.ts); absent = Floral */
   coverPattern?: string;
+  /** the cover photo's framing; CoverFace uses it only for the photo it names */
+  coverFrame?: Placement | null;
   /** editor-only: inline editing of text printed on the page */
   onEditTitle?: (v: string) => void;
   onEditSubtitle?: (v: string) => void;

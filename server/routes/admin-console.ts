@@ -672,8 +672,8 @@ adminConsoleRouter.post(
     const sample = {
       orderNumber: "TK-TEST01",
       title: "Sample book",
-      total: "Rs 5,690",
-      totalMinor: 569000,
+      total: "Rs 6,690",
+      totalMinor: 669000,
       book: "hardcover · 12 pages",
       city: "Lahore",
       firstName: "Test",

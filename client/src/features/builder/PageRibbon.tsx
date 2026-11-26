@@ -43,6 +43,7 @@ export function PageRibbon({
   title,
   occasion,
   cover,
+  back,
   spine,
   index,
   onIndex,
@@ -56,6 +57,8 @@ export function PageRibbon({
   occasion: Occasion;
   /** the front cover, shown first when given */
   cover?: ReactNode;
+  /** the back cover, shown last when given, standing alone like the front */
+  back?: ReactNode;
   /** the spine beside the cover: its colour and the title on it */
   spine?: { bg: string; ink: string; font?: string };
   /** which stop is showing (0 = the cover when there is one) */
@@ -90,7 +93,8 @@ export function PageRibbon({
   // The space beside a centred page is half of what the page leaves of the
   // stage, which grows when the stage is short and the page shrinks to fit.
   const coverGap = GAP + Math.ceil(Math.max(PEEK, (box.w - ps) / 2)) + 8;
-  const count = pages.length + (hasCover ? 1 : 0);
+  const hasBack = Boolean(back);
+  const count = pages.length + (hasCover ? 1 : 0) + (hasBack ? 1 : 0);
 
   /** Scroll offset at which stop i sits in the middle of the stage. */
   const stops = useMemo(() => {
@@ -98,8 +102,10 @@ export function PageRibbon({
     if (hasCover) out.push(0);
     const first = hasCover ? ps + coverGap : 0;
     for (let k = 0; k < pages.length; k++) out.push(first + k * ps + Math.floor(k / 2) * GAP);
+    // the back cover sits alone after the last page, as far off as the front sits before page 1
+    if (hasBack) out.push(pages.length ? out[out.length - 1] + ps + coverGap : first);
     return out;
-  }, [hasCover, ps, pages.length]);
+  }, [hasCover, hasBack, ps, pages.length, coverGap]);
 
   const go = useCallback(
     (i: number, smooth: boolean) => {
@@ -166,7 +172,12 @@ export function PageRibbon({
   const spreads: Array<[BookPage, BookPage | undefined]> = [];
   for (let i = 0; i < pages.length; i += 2) spreads.push([pages[i], pages[i + 1]]);
   const where =
-    hasCover && index === 0 ? "Front cover and spine" : "Page " + (hasCover ? index : index + 1) + " of " + pages.length;
+    // website copy v1: "Cover view", "Pages 1 and 2 · {p} in total" (one page at a time here)
+    hasCover && index === 0
+      ? "Cover view"
+      : hasBack && index === count - 1
+        ? "Back cover"
+        : "Page " + (hasCover ? index : index + 1) + " · " + pages.length + " in total";
   const pageStyle = { width: ps, height: ps, "--pw": ps + "px" } as CSSProperties;
 
   return (
@@ -199,6 +210,13 @@ export function PageRibbon({
                 ) : null}
               </div>
             ))}
+            {hasBack ? (
+              <div className="pr-spread pr-back" style={{ marginLeft: pages.length ? coverGap : 0 }}>
+                <div className="pr-page" style={pageStyle} aria-label="Back cover">
+                  {back}
+                </div>
+              </div>
+            ) : null}
             <div className="pr-spacer" style={{ width: pad }} aria-hidden="true" />
           </div>
         ) : null}

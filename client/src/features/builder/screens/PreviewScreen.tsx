@@ -3,9 +3,8 @@
  *
  * What: the whole book, exactly as it will print, and everything the owner's
  * flow asks to settle before paying (2026-11-15, revised 2026-11-21):
- *  - the cover style (Minimal, Full Picture, Just text); the pages stay as
- *    they are
- *  - the cover photo, for the styles that show one (CoverPhotoPicker)
+ *  - no cover choices (owner, 2026-11-26: they were made on steps 3 and 4, so
+ *    this step only checks); cover style, photo and pattern change in the editor
  *  - what prints: title, the line under it, lettering, book, photos, paper
  *  - a warning when the page count is odd (the last page would print blank),
  *    with "Add a page"
@@ -27,10 +26,8 @@ import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Han
 import { STATUS_LABEL } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
 import { flaggedPhotos } from "../quality";
-import { Book3D, CoverFace, type Book3DApi } from "../book";
-import { CoverPhotoPicker, CoverPhotoRow } from "../CoverPhotoPicker";
-import { CoverPatternPicker } from "../CoverPatternPicker";
-import { DENSITIES, FEEL_CHOICES, bookPhotos, coverHasPhoto, coverPhotoIdFor, isFeelChoice, occasionById, toSpreads, type CopyVoice } from "../data";
+import { BackCoverFace, Book3D, CoverFace, type Book3DApi } from "../book";
+import { DENSITIES, bookPhotos, occasionById, toSpreads, type CopyVoice } from "../data";
 import { addPage, sliceOf } from "../editor-v2/book-ops";
 import { fontById } from "../looks";
 import { bookTheme } from "../palette";
@@ -38,10 +35,11 @@ import { PageRibbon } from "../PageRibbon";
 import type { BuilderState } from "../state";
 import { useNarrow } from "../useNarrow";
 import { spineOf } from "./BookScreen";
-import { finishName, formatPKR, printedPageCount, quote } from "@shared/pricing";
+import { finishName, printedPageCount } from "@shared/pricing";
 import "../flow.css";
 
-export const APPROVAL_TEXT = "I have checked the names, spellings, fonts and colours. I understand the book will be printed exactly as shown.";
+/** The approval tick (website copy v1, 2026-11-26; matches Policies v1: screen vs paper colour is not covered). */
+export const APPROVAL_TEXT = "I've checked the names, spellings, photos and layout. I understand colours on paper may look slightly different from my screen.";
 
 export function PreviewScreen({
   state,
@@ -64,7 +62,6 @@ export function PreviewScreen({
   const api = useRef<Book3DApi | null>(null);
   const [approved, setApproved] = useState(false);
   const { ordered } = useOrdered(state.projectId);
-  const [picking, setPicking] = useState(false);
   const [index, setIndex] = useState(0);
   // the "click to turn" hint hides forever after the first flip
   const [flippedOnce, setFlippedOnce] = useState(state.pos > 0);
@@ -92,13 +89,6 @@ export function PreviewScreen({
   const photoCount = new Set(state.pages.flatMap((p) => p.slots.map((s) => s.photoId))).size;
   const title = state.title.trim() || occ.suggestedTitle;
   const line = state.subtitle ?? occ.subtitle;
-  const coverId = coverPhotoIdFor(state);
-  const coverPhoto = state.photos.find((p) => p.id === coverId);
-  // An older book may have a cover style from before the three; show it as none of them picked.
-  // step 6 offers the three feels plus Pattern (2026-11-22); step 3 keeps the three
-  const coverChoices = [...FEEL_CHOICES, { id: "pattern" as const, name: "Pattern", line: "" }];
-  const coverChoice = isFeelChoice(state.coverStyle) || state.coverStyle === "pattern" ? state.coverStyle : null;
-  const price = formatPKR(quote({ binding: state.binding, qty: state.qty, printedPages: printed }).subtotalMinor);
 
   // A book prints on sheets of two pages: an odd count leaves the last page blank.
   const odd = printed % 2 === 1;
@@ -107,26 +97,10 @@ export function PreviewScreen({
     if (r) set({ pages: r.book.pages });
   };
 
-  const coverSwitch = (
-    <div className="pv-cover">
-      <span className="pv-cover-label">Cover</span>
-      <div className="bk-seg bk-seg-wide" role="radiogroup" aria-label="Cover">
-        {coverChoices.map((f) => (
-          <button key={f.id} type="button" role="radio" aria-checked={coverChoice === f.id} className={coverChoice === f.id ? "on" : ""} onClick={() => set({ coverStyle: f.id })}>
-            {f.name}
-          </button>
-        ))}
-      </div>
-      {coverHasPhoto(state.coverStyle) ? (
-        <CoverPhotoRow photo={coverPhoto} chosen={state.coverPhotoId !== null} theme={theme} onOpen={() => setPicking(true)} compact={narrow} />
-      ) : null}
-      {state.coverStyle === "pattern" ? <CoverPatternPicker value={state.coverPattern} onPick={(id) => set({ coverPattern: id })} /> : null}
-    </div>
-  );
   const oddNote = odd ? (
     <div className="pv-odd" role="status">
       <p>
-        <AlertTriangle size={16} /> Your book has {printed} pages, so the last page prints blank.
+        <AlertTriangle size={16} /> Your album has {printed} pages, so the last page prints blank.
       </p>
       <button type="button" className="bb-btn bb-btn-secondary" onClick={addOnePage}>
         <Plus size={15} /> Add a page
@@ -135,11 +109,11 @@ export function PreviewScreen({
   ) : null;
   const rows: Array<[string, string]> = [
     ["Title", title],
-    ["Line under it", line || "None"],
-    ["Lettering", font.name],
-    ["Book", `${arrangement}, ${pageCount} pages`],
+    ["Date or place", line || "Not added"],
+    ["Font style", font.name],
+    ["Layout", `${arrangement}, ${pageCount} pages`],
     ["Photos", String(photoCount)],
-    ["Paper", finishName(state.finish)],
+    ["Finish", finishName(state.finish)],
   ];
   const detailRows = (
     <dl className="pv-rows">
@@ -156,7 +130,7 @@ export function PreviewScreen({
     <div className="pv-ordered" role="status">
       <CheckCircle2 size={20} />
       <span>
-        <b>You've ordered this book.</b> Order {ordered.orderNumber} · {STATUS_LABEL[ordered.status]}
+        <b>You've ordered this album.</b> Order {ordered.orderNumber} · {STATUS_LABEL[ordered.status]}
       </span>
       <a className="bb-btn bb-btn-primary" href={`/orders/${ordered.id}`}>
         See my order <ArrowRight size={16} />
@@ -171,7 +145,7 @@ export function PreviewScreen({
     <p className="pv-soft" role="note">
       <AlertTriangle size={16} />
       <span>
-        {softCount === 1 ? "1 photo" : `${softCount} photos`} in your book may print soft (marked on the photos step). Approving keeps {softCount === 1 ? "it" : "them"} as {softCount === 1 ? "it is" : "they are"}.
+        {softCount === 1 ? "1 photo" : `${softCount} photos`} in your album may print soft (marked on the photos step). Approving keeps {softCount === 1 ? "it" : "them"} as {softCount === 1 ? "it is" : "they are"}.
       </span>
     </p>
   ) : null;
@@ -181,25 +155,11 @@ export function PreviewScreen({
       <span>{APPROVAL_TEXT}</span>
     </label>
   );
-  const picker = picking ? (
-    <CoverPhotoPicker
-      photos={state.photos}
-      removedPhotoIds={state.removedPhotoIds}
-      current={state.coverPhotoId}
-      coverStyle={state.coverStyle}
-      theme={theme}
-      onPick={(id) => {
-        set({ coverPhotoId: id });
-        setPicking(false);
-      }}
-      onClose={() => setPicking(false)}
-    />
-  ) : null;
-
   /* ── Phone: dark stage with the cover and pages, a short white sheet below ── */
   if (narrow) {
     return (
       <div className="bb-screen pv-phone">
+        <div className="pv-stagewrap">
         <PageRibbon
           pages={state.pages}
           photos={state.photos}
@@ -207,15 +167,16 @@ export function PreviewScreen({
           title={title}
           occasion={occ}
           cover={<CoverFace theme={theme} coverStyle={state.coverStyle} title={title} occasion={occ} photos={state.photos} />}
+          back={<BackCoverFace theme={theme} coverStyle={state.coverStyle} />}
           spine={spineOf(state)}
           index={index}
           onIndex={setIndex}
-          label="Your book, cover first"
+          label="Your album, cover first"
         />
+        </div>
         <div className="bk-sheet">
           <span className="bk-grip" aria-hidden="true" />
-          <h1 className="pv-title">Check your book</h1>
-          {coverSwitch}
+          <h1 className="pv-title">Here's your album</h1>
           {/* the same details as desktop, as a table (owner, 2026-11-22: not as prominent on the phone) */}
           {detailRows}
           {oddNote}
@@ -224,23 +185,18 @@ export function PreviewScreen({
             <>
               {approve}
               <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" disabled={!approved} onClick={onOrder}>
-                {approved ? (
-                  <>
-                    Approve and pay {price} <ArrowRight size={18} />
-                  </>
-                ) : (
-                  "Tick the box to approve"
-                )}
+                Approve and continue <ArrowRight size={18} />
               </button>
+              {!approved ? <span className="pv-hint">Tick the box once you're happy.</span> : null}
             </>
           )}
           <div className="pv-links">
-            <button type="button" className="pv-link" onClick={onCustomize}>
-              <PenLine size={15} /> Make changes
+            {/* a real button under Approve (owner, 2026-11-26: the Edit pill on the album was easy to tap by mistake) */}
+            <button type="button" className="bb-btn bb-btn-secondary pv-editor-btn" onClick={onCustomize}>
+              <PenLine size={15} /> Open the editor
             </button>
           </div>
         </div>
-        {picker}
       </div>
     );
   }
@@ -248,8 +204,10 @@ export function PreviewScreen({
   /* ── Wide screens: the book left, what to check and approve right ── */
   const indicator =
     state.pos === 0
-      ? "Front cover and spine"
-      : "Pages " + (state.pos * 2 - 1) + (spreads[state.pos - 1] && spreads[state.pos - 1].right ? " and " + state.pos * 2 : "") + " of " + pageCount;
+      ? "Cover view"
+      : state.pos === n + 1
+        ? "Back cover"
+        : "Pages " + (state.pos * 2 - 1) + (spreads[state.pos - 1] && spreads[state.pos - 1].right ? " and " + state.pos * 2 : "") + " of " + pageCount;
 
   return (
     <div className="bb-screen pv-wide">
@@ -271,7 +229,7 @@ export function PreviewScreen({
             editableTitle={true}
             onTitle={(t) => set({ title: t })}
           />
-          <button className="bb-arrow" disabled={state.pos >= n} onClick={() => api.current?.next()} aria-label="Next">
+          <button className="bb-arrow" disabled={state.pos >= n + 1} onClick={() => api.current?.next()} aria-label="Next">
             <ChevronRight size={22} />
           </button>
         </div>
@@ -283,10 +241,9 @@ export function PreviewScreen({
 
       <div className="pv-panel">
         <div className="pv-head">
-          <h1>Check your book</h1>
-          <p>Turn every page. This is exactly what we print.</p>
+          <h1>Here's your album</h1>
+          <p>Check every page carefully. What you approve is what we print.</p>
         </div>
-        {coverSwitch}
         {detailRows}
         {oddNote}
         {ordered ? null : softNote}
@@ -296,17 +253,16 @@ export function PreviewScreen({
           {ordered ? null : (
             <>
               <button className="bb-btn bb-btn-primary bb-btn-lg" disabled={!approved} onClick={onOrder}>
-                Approve and pay {price} <ArrowRight size={18} />
+                Approve and continue <ArrowRight size={18} />
               </button>
-              {!approved ? <span className="pv-hint">Tick the box above to approve your book.</span> : null}
+              {!approved ? <span className="pv-hint">Tick the box once you're happy.</span> : null}
             </>
           )}
-          <button type="button" className="pv-link" onClick={onCustomize}>
-            <PenLine size={15} /> Make changes
+          <button type="button" className="bb-btn bb-btn-secondary pv-editor-btn" onClick={onCustomize}>
+            <PenLine size={15} /> Open the editor
           </button>
         </div>
       </div>
-      {picker}
     </div>
   );
 }

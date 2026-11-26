@@ -22,7 +22,7 @@
  * dark stage one page at a time (PageRibbon) and the choices sit in a white
  * sheet under it, as the same picture cards as desktop (2026-11-22).
  *
- * The laid-out pages are written to the book only on "Preview my book". If
+ * The laid-out pages are written to the book only on "Continue". If
  * the customer changed pages by hand (Customize) and came back here, their
  * pages are kept until they change a choice, and a note says so.
  */
@@ -39,6 +39,12 @@ import { PageRibbon } from "../PageRibbon";
 import type { BuilderState } from "../state";
 import { useNarrow } from "../useNarrow";
 import "../flow.css";
+
+/** The line under "Pick a finish" (website copy v1, 2026-11-26). */
+const FINISH_LINE: Record<string, string> = {
+  matte: "A soft, classic look. No reflections. Same price.",
+  glossy: "Bright and shiny. Both cost the same.",
+};
 
 /** A typical spread of each arrangement (engine templates L1+P1, L1S3+PLL3, P6+L6), as page fractions. */
 const f = (x: number, y: number, w: number, h: number): PageFrame => ({ x, y, w, h });
@@ -134,7 +140,8 @@ export function BookScreen({
 
   // The open spread can't be past the end of a book that just got shorter.
   useEffect(() => {
-    if (pos > spreads.length) setPos(Math.max(1, spreads.length));
+    // spreads.length + 1 is the back cover (Book3D's last stop)
+    if (pos > spreads.length + 1) setPos(Math.max(1, spreads.length));
   }, [spreads.length, pos]);
 
   const choose = (patch: Partial<BuilderState>) => {
@@ -144,7 +151,6 @@ export function BookScreen({
   };
   const pick = (id: ArrangementId) => choose({ density: densityOf(id), sheets: null });
   const fits = arrangementThatFits(n);
-  const finish = FINISHES.find((f) => f.id === state.finish) ?? FINISHES[0];
   const price = formatPKR(unitPrice(sheets));
 
   const putBack = () => {
@@ -164,7 +170,7 @@ export function BookScreen({
         <ImagePlus size={36} strokeWidth={1.5} />
         <h1>Add a few more photos</h1>
         <p>
-          The smallest book has {MIN_PHOTOS} pages, so it needs at least {MIN_PHOTOS} photos. You have {n} so far.
+          The smallest album has {MIN_PHOTOS} pages, so it needs at least {MIN_PHOTOS} photos. You have {n} so far.
         </p>
         <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={onPhotos}>
           Add photos <ArrowRight size={18} />
@@ -176,8 +182,8 @@ export function BookScreen({
   const fitLine = (id: ArrangementId) => {
     const r = sheetRange(n, id);
     const sh = id === style ? sheets : r.min;
-    if (r.holds < n) return { text: `Our biggest book holds ${r.holds} of your ${n} photos this way`, warn: true };
-    return { text: `Your ${n} photos on ${sh * 2} pages`, warn: false };
+    if (r.holds < n) return { text: `Our biggest album holds ${r.holds} of your ${n} photos this way`, warn: true };
+    return { text: `Fits your ${n} photos in ${sh * 2} pages`, warn: false };
   };
   const leftover = !keepHandEdits && plan.leftover > 0;
   const current = ARRANGEMENTS.find((a) => a.id === style)!;
@@ -219,7 +225,7 @@ export function BookScreen({
 
   const handNote = keepHandEdits ? (
     <p className="bk-note">
-      <Info size={16} /> You changed some pages by hand, so this shows your pages. Picking an option here lays the book out again.
+      <Info size={16} /> You changed some pages by hand, so this shows your pages. Picking an option here lays the album out again.
     </p>
   ) : null;
   // Photos taken out in an editor stay out; this says so, with the way back.
@@ -233,7 +239,7 @@ export function BookScreen({
         ))}
       </span>
       <span className="bk-out-text">
-        You took {takenOut.length === 1 ? "1 photo" : `${takenOut.length} photos`} out of the book. {takenOut.length === 1 ? "It stays" : "They stay"} out, whatever you pick here.
+        You took {takenOut.length === 1 ? "1 photo" : `${takenOut.length} photos`} out of the album. {takenOut.length === 1 ? "It stays" : "They stay"} out, whatever you pick here.
       </span>
       <button type="button" className="bb-btn bb-btn-secondary" onClick={putBack}>
         Put {takenOut.length === 1 ? "it" : "them"} back
@@ -243,7 +249,7 @@ export function BookScreen({
   // Guests can save the book to an account from here; it never pops up by itself.
   const saveLink = onSave ? (
     <p className="bk-save">
-      Save this book to come back later.{" "}
+      Save this album to come back later.{" "}
       <button type="button" onClick={onSave}>
         Sign in
       </button>
@@ -252,7 +258,7 @@ export function BookScreen({
   const leftoverNote = leftover ? (
     <div className="bk-warn" role="status">
       <p>
-        <AlertTriangle size={16} /> Our biggest book holds {plan.placed} of your {n} photos as {current.name}. The last {plan.leftover} would be left out.
+        <AlertTriangle size={16} /> Our biggest album holds {plan.placed} of your {n} photos as {current.name}. The last {plan.leftover} would be left out.
       </p>
       {fits && fits !== style ? (
         <button type="button" className="bb-btn bb-btn-secondary" onClick={() => pick(fits)}>
@@ -284,12 +290,12 @@ export function BookScreen({
           index={index}
           onIndex={setIndex}
           resetKey={bookKey}
-          label="Your book, page by page"
+          label="Your album, page by page"
         />
         <div className="bk-sheet">
           <span className="bk-grip" aria-hidden="true" />
           <div className="bk-sheet-head">
-            <h1>Pick your book</h1>
+            <h1>How should your photos sit?</h1>
             <span className="bk-price" aria-live="polite">
               {price}
             </span>
@@ -303,13 +309,13 @@ export function BookScreen({
           {leftoverNote}
           <div className="bk-row bk-paper">
             <span>
-              <b>Paper</b>
-              <small>Both cost the same</small>
+              <b>Pick a finish</b>
+              <small>{FINISH_LINE[state.finish]}</small>
             </span>
             {finishes}
           </div>
           <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={commit}>
-            Preview my book <ArrowRight size={18} />
+            Continue <ArrowRight size={18} />
           </button>
           {saveLink}
         </div>
@@ -318,13 +324,14 @@ export function BookScreen({
   }
 
   /* ── Wide screens: choices left, the book right ── */
-  const indicator = pos === 0 ? "Front cover" : `Pages ${pos * 2 - 1} and ${Math.min(pos * 2, pages.length)} of ${pages.length}`;
+  const indicator =
+    pos === 0 ? "Front cover" : pos === spreads.length + 1 ? "Back cover" : `Pages ${pos * 2 - 1} and ${Math.min(pos * 2, pages.length)} · ${pages.length} in total`;
   return (
     <div className="bb-screen bk-wide">
       <div className="bk-choices">
         <div className="bk-choices-inner">
-          <h1>Pick your book</h1>
-          <p className="bb-sub">Every book is 12 x 12 in. Choose how full the pages feel. You can add pages after.</p>
+          <h1>How should your photos sit?</h1>
+          <p className="bb-sub">Choose the look. We'll work out the pages for you.</p>
           {handNote}
           {outNote}
           <div className="bk-cards" role="radiogroup" aria-label="How full the pages feel">
@@ -333,13 +340,13 @@ export function BookScreen({
           {unlockNote}
           {leftoverNote}
           <div className="bk-field">
-            <span className="bk-label">Paper finish</span>
+            <span className="bk-label">Pick a finish</span>
             {finishes}
-            <span className="bk-help">{finish.blurb}. Both cost the same.</span>
+            <span className="bk-help">{FINISH_LINE[state.finish]}</span>
           </div>
           <div className="bk-actions">
             <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" onClick={commit}>
-              Preview my book <ArrowRight size={18} />
+              Continue <ArrowRight size={18} />
             </button>
             {saveLink}
           </div>
@@ -352,7 +359,7 @@ export function BookScreen({
           </button>
           <Book3D
             spreads={spreads}
-            pos={Math.min(pos, spreads.length)}
+            pos={Math.min(pos, spreads.length + 1)}
             onPos={setPos}
             apiRef={api}
             theme={theme}
@@ -361,20 +368,14 @@ export function BookScreen({
             occasion={occ}
             photos={photos}
           />
-          <button className="bb-arrow" disabled={pos >= spreads.length} onClick={() => api.current?.next()} aria-label="Next pages">
+          <button className="bb-arrow" disabled={pos >= spreads.length + 1} onClick={() => api.current?.next()} aria-label="Next pages">
             <ChevronRight size={22} />
           </button>
         </div>
         <p className="bk-where" aria-live="polite">
           {indicator}
         </p>
-        {!keepHandEdits ? (
-          <p className="bk-facts">
-            {plan.placed} photos on {pages.length} pages. Every photo sits in a slot of its own shape, and none loses more than{" "}
-            {Math.round(Math.max(plan.stats.maxCrop, 0.01) * 100)}% at its edges.
-            {plan.stats.shrunk ? ` ${plan.stats.shrunk === 1 ? "One small photo is" : `${plan.stats.shrunk} small photos are`} printed smaller to stay sharp.` : ""}
-          </p>
-        ) : null}
+        {!keepHandEdits ? <p className="bk-facts">Tap each style above and flip through to compare how your photos look.</p> : null}
       </div>
     </div>
   );

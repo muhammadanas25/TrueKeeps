@@ -33,7 +33,7 @@
 /* The wide display face is for H1 and H2 only. It reads loud when large and
    tight, and its word spaces are narrow, so it stays at the kit's sizes with
    opened tracking and wider word spacing. */
-.lp h1, .lp-h2, .lp-page-h2 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.005em; word-spacing: 0.1em; color: var(--heading); text-wrap: balance; }
+.lp h1, .lp-h2, .lp-page-h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.005em; word-spacing: normal; color: var(--heading); text-wrap: balance; }
 .lp h3, .lp h4 { font-family: var(--font-body); font-weight: 700; color: var(--heading); }
 .lp-eyebrow { font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-fg2); display: inline-flex; align-items: center; gap: 10px; }
 .lp-eyebrow::before { content: ''; width: 22px; height: 2px; background: var(--highlight); }
@@ -45,10 +45,14 @@
 /* The signature highlight: a Rose block behind the one most emotional phrase.
    Headlines only, at most once per screen. White on Rose 500 is 3.75:1, which
    the kit allows for big bold text only. */
-.lp-mark { background: var(--highlight); color: #fff; padding: 0 0.14em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* The pink highlight. An inline background is as tall as the font's own ascent
+   and descent, which for Mukta (tall Devanagari metrics) ran up into the line
+   above (2026-11-26). As an inline block with its own line height it is as tall
+   as the letters, whatever the font. */
+.lp-mark { display: inline-block; background: var(--highlight); color: #fff; line-height: 1; padding: 0.06em 0.14em 0.04em; }
 
 /* dark surfaces flip the keyboard focus ring to white */
-.lp-hero, .lp-showcase, .lp-cta, .lp-footer { --focus: #fff; }
+.lp-hero, .lp-cta, .lp-footer { --focus: #fff; }
 
 /* ── sticky nav ─────────────────────────────── */
 .lp-nav { position: sticky; top: 0; z-index: 50; height: 70px; display: flex; align-items: center; background: rgba(251, 246, 240, 0.92); backdrop-filter: blur(14px); border-bottom: 1px solid transparent; transition: border-color .2s; }
@@ -100,6 +104,9 @@
 .lp-trust-item { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 22px; }
 .lp-trust-item b { color: #fff; font-weight: 600; }
 .lp-trust-item svg { color: var(--tk-rose-300); flex: none; }
+/* the WhatsApp item is a link (website copy v1); it looks like its neighbours */
+a.lp-trust-item { color: inherit; text-decoration: none; }
+a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px; }
 .lp-trust-rule { width: 1px; height: 22px; background: rgba(255, 255, 255, 0.18); }
 
 /* ── how it works ───────────────────────────── */
@@ -124,30 +131,39 @@
 .lp-art-check { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--selected); color: #fff; }
 .lp-art-box { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--tk-mist-800); }
 
-/* ── the book: full-bleed photo, copy on a frosted panel ── */
-/* Banner 02 fills the section. An Indigo 900 fade on the left carries the
-   heading and stops before the baby, and the features sit on a frosted Indigo
-   panel. This is the owner's preferred pre-kit layout, recoloured
-   (2026-11-11). */
-.lp-showcase { position: relative; overflow: hidden; background: var(--surface-darkest); color: #fff; min-height: clamp(560px, 46vw, 800px); display: flex; align-items: center; }
-/* On wide screens the photo starts 16% in and fades in from the left, so the
-   baby clears the frosted panel instead of sitting blurred under it. Phones
-   reset this when the section stacks. */
-.lp-showcase .lp-banner-photo { left: 16%; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%); mask-image: linear-gradient(90deg, transparent, #000 24%); }
-.lp-showcase .lp-banner-photo img { object-position: 38% 50%; }
-.lp-showcase::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, rgba(22, 20, 41, 0.86) 0%, rgba(22, 20, 41, 0.64) 36%, rgba(22, 20, 41, 0.1) 60%, transparent 72%); }
-.lp-showcase .lp-wrap { position: relative; z-index: 2; padding: clamp(64px, 8vw, 120px) 0; }
-.lp-showcase-copy { max-width: 520px; }
-.lp-showcase .lp-eyebrow { color: rgba(255, 255, 255, 0.86); }
-.lp-showcase .lp-h2 { color: #fff; }
-.lp-showcase .lp-lede { color: rgba(255, 255, 255, 0.9); max-width: 44ch; }
-.lp-quality { display: flex; flex-direction: column; margin-top: 30px; background: rgba(22, 20, 41, 0.4); -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: var(--radius-lg); padding: 6px 22px; box-shadow: 0 20px 50px rgba(22, 20, 41, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
-.lp-qrow { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid rgba(255, 255, 255, 0.14); }
-.lp-qrow:first-child { border-top: none; }
-.lp-qart { flex: none; width: 52px; height: 52px; }
-.lp-qart svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 10px rgba(22, 20, 41, 0.24)); }
-.lp .lp-qrow h4 { font-family: var(--font-display); font-weight: 600; font-size: 17px; line-height: 24px; letter-spacing: -0.005em; word-spacing: 0.1em; margin: 0 0 4px; color: #fff; }
-.lp-qrow p { font-size: 15px; line-height: 23px; color: rgba(255, 255, 255, 0.84); margin: 0; }
+/* ── Know your album (owner's design export, 2026-11-26) ──
+   Paper section, facts in white cards on the left (max 420px), photos on the
+   right. Values are the design's: Figtree 800 headings, Mist 200 card lines,
+   12px radii, 16px gaps. Replaces the old full-bleed "What you get" banner. */
+.lp-know { background: var(--tk-paper); color: var(--tk-ink-500); padding: 64px 0 72px; }
+.lp-know .lp-wrap { display: flex; flex-direction: column; gap: 32px; }
+.lp-know-head { display: flex; flex-direction: column; gap: 10px; }
+.lp-know-eyebrow { font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tk-rose-700); }
+.lp .lp-know h2 { margin: 0; font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 800; letter-spacing: 0; word-spacing: normal; color: var(--tk-brand); }
+.lp-know-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch; }
+.lp-know-facts { flex: 1 1 320px; max-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+.lp-know-card { background: #fff; border: 1px solid var(--tk-mist-200); border-radius: 12px; }
+.lp-know-price { padding: 24px 24px 20px; display: flex; flex-direction: column; gap: 10px; }
+.lp .lp-know-price h3 { margin: 0; font-family: var(--font-display); font-size: 24px; line-height: 32px; font-weight: 800; color: var(--tk-brand); }
+.lp-know-price p { margin: 0; font-size: 16px; line-height: 24px; color: var(--tk-ink-400); }
+.lp-know-price strong { color: var(--tk-brand); }
+.lp-know-price .lp-know-small { font-size: 14px; line-height: 22px; color: var(--tk-indigo-400); }
+.lp-know-rows { padding: 4px 24px; }
+.lp-know-rows > div { padding: 14px 0; border-bottom: 1px solid var(--tk-mist-300); font-size: 16px; line-height: 24px; color: var(--tk-ink-500); }
+.lp-know-rows > div:last-child { border-bottom: 0; }
+.lp-know-rows > .strong { font-weight: 700; }
+.lp-know-why { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.lp-know-why p { margin: 0; font-size: 16px; line-height: 26px; color: #2B2F2D; }
+.lp-know-why hr { height: 1px; margin: 0; border: 0; background: var(--tk-mist-300); }
+.lp-know-why .lp-know-lead { line-height: 24px; font-weight: 700; color: var(--tk-brand); margin-bottom: 6px; }
+.lp-know-why ul { margin: 0; padding-left: 20px; list-style: disc; font-size: 16px; line-height: 24px; color: #2B2F2D; }
+.lp-know-why li { margin: 0 0 6px; }
+.lp-btn.lp-know-btn { align-self: flex-start; min-height: 48px; padding: 0 28px; font-size: 16px; }
+.lp-know-photos { flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.lp-know-photos img { display: block; width: 100%; border-radius: 12px; object-fit: cover; background: var(--tk-mist-200); }
+.lp-know-main { flex: 1 1 auto; min-height: 400px; height: 100%; }
+.lp-know-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.lp-know-pair img { aspect-ratio: 4 / 3; height: auto; }
 
 /* ── occasions ──────────────────────────────── */
 /* 7 book types: 4 across, the last row centred (flex-wrap, not grid). No card
@@ -160,6 +176,7 @@
 .lp .lp-occ-card h4, .lp .lp-occ-card h3 { font-size: 16px; line-height: 24px; margin: 0 0 2px; }
 .lp-occ-card:hover h4, .lp-occ-card:hover h3 { text-decoration: underline; text-underline-offset: 4px; }
 .lp-occ-card p { font-size: 14px; line-height: 22px; color: var(--color-fg2); margin: 0; }
+.lp-lede a { color: var(--heading); font-weight: 600; text-underline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .lp-occ-img img { transition: none; } .lp-occ-card:hover .lp-occ-img img { transform: none; } }
 
 /* ── plain facts (home) ─────────────────────── */
@@ -181,6 +198,16 @@
 .lp .lp-price-card h3 { font-size: 14px; line-height: 22px; font-weight: 600; margin: 0 0 4px; color: var(--color-fg2); }
 .lp-price-card p { font-weight: 700; font-size: 22px; line-height: 28px; color: var(--heading); margin: 0; }
 .lp-page-note { font-size: 14px; line-height: 22px; color: var(--color-fg2); margin: 16px 0 0; max-width: 62ch; }
+/* Prices page (website copy v1, section 5) */
+.lp-page-text { font-size: 17px; line-height: 27px; color: var(--color-fg1); margin: 0; max-width: 62ch; }
+.lp-layout-card h3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lp .lp-layout-card h3 { font-size: 18px; line-height: 26px; color: var(--heading); }
+.lp-price-card.lp-layout-card p { font-size: 15px; line-height: 23px; font-weight: 400; color: var(--color-fg2); }
+.lp-badge { font-size: 11px; line-height: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; background: var(--selected-bg); color: var(--heading); }
+.lp-included { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 32px; max-width: 760px; }
+.lp-included li { display: flex; align-items: flex-start; gap: 10px; font-size: 16px; line-height: 24px; }
+.lp-included svg { flex: none; margin-top: 3px; color: var(--success-fg, #1f7a66); }
+.lp-delivery-table { max-width: 640px; }
 .lp-page-steps { margin: 0; padding-left: 22px; max-width: 62ch; list-style: decimal; }
 .lp-page-steps li { margin-bottom: 10px; }
 .lp-page-ideas { margin: 0; padding-left: 20px; list-style: disc; columns: 2; column-gap: 40px; max-width: 760px; }
@@ -214,11 +241,16 @@
 
 /* ── footer ─────────────────────────────────── */
 .lp-footer { background: var(--surface-darkest); color: var(--on-dark-soft); padding: 64px 0 32px; }
-.lp-footer .lp-wrap { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 32px; }
+.lp-footer .lp-wrap { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 32px; }
 .lp-footer-brand p { font-size: 14px; line-height: 22px; margin: 18px 0 0; max-width: 32ch; color: var(--on-dark-soft); }
 .lp-fcol h5 { font-size: 12px; line-height: 18px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--on-dark-faint); margin: 0 0 16px; font-weight: 600; }
 .lp-fcol a { display: block; font-size: 14px; line-height: 22px; color: var(--on-dark-soft); text-decoration: none; text-underline-offset: 4px; margin-bottom: 10px; }
 .lp-fcol a:hover { color: #fff; text-decoration: underline; }
+/* bottom bar: copyright left; policies and Instagram right (website copy v1) */
+.lp-footer-legal { display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap; }
+.lp-footer-legal a { color: var(--on-dark-soft); text-decoration: none; text-underline-offset: 4px; }
+.lp-footer-legal a:hover { color: #fff; text-decoration: underline; }
+.lp-footer-ig { display: inline-grid; place-items: center; }
 .lp-footer-bar { grid-column: 1 / -1; border-top: 1px solid rgba(255, 255, 255, 0.14); margin-top: 44px; padding-top: 22px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 14px; line-height: 22px; color: var(--on-dark-faint); }
 
 /* ── swipe rails + sticky CTA (activated on phones below) ─ */
@@ -238,15 +270,8 @@
   .lp-occ-card { flex-basis: calc((100% - 24px) / 2); }
   .lp-footer .lp-wrap { grid-template-columns: 1fr 1fr; }
   .lp-nav-links { display: none; }
-}
-/* Below 1200px wide: the frosted panel would cover the baby's face, so
-   "What you'll hold" stacks here (16:10 photo, then copy on Indigo 900, joined
-   by a short fade). Phones switch the photo to the square crop below. */
-@media (max-width: 1199px) {
-  .lp-showcase { display: block; min-height: 0; }
-  .lp-showcase .lp-banner-photo { position: relative; display: block; left: 0; width: 100%; aspect-ratio: 16 / 10; max-height: 560px; -webkit-mask-image: none; mask-image: none; }
-  .lp-showcase::before { inset: auto 0 auto 0; top: calc(min(62.5vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
-  .lp-showcase .lp-wrap { padding: 8px 0 64px; }
+  /* Know your album wraps to one column here: facts use the full width */
+  .lp-know-facts { max-width: none; }
 }
 /* Phones: shorter page and thumb-sized targets. Steps and occasions become
    native scroll-snap rails; the next card peeks in to signal there is more.
@@ -278,6 +303,10 @@
   .lp .lp-price-card h3 { margin: 0; }
   .lp-price-card p { font-size: 20px; }
   .lp-page-ideas { columns: 1; }
+  .lp-included { grid-template-columns: 1fr; }
+  /* layout cards keep their two lines stacked (the price cards sit side by side) */
+  .lp-price-card.lp-layout-card { display: block; }
+  .lp-footer-legal { gap: 0 18px; }
   .lp-page-grid { grid-template-columns: 1fr 1fr; gap: 20px 12px; }
   .lp-crumbs a { display: inline-block; padding: 12px 0; }
   .lp-crumbs { padding-top: 6px; }
@@ -293,15 +322,19 @@
   .lp-sticky-cta.on { transform: none; visibility: visible; }
   .lp-sticky-cta .lp-btn { width: 100%; }
 
-  /* Hero and "What you'll hold" stack: the square photo on top, copy below on
-     Indigo 900, joined by a short fade across the seam. */
-  .lp-hero, .lp-showcase { display: block; min-height: 0; }
-  .lp-hero .lp-banner-photo, .lp-showcase .lp-banner-photo { position: relative; display: block; aspect-ratio: 1; max-height: 560px; }
+  /* Hero stacks: the square photo on top, copy below on Indigo 900, joined by
+     a short fade across the seam. */
+  .lp-hero { display: block; min-height: 0; }
+  /* full width at every phone size: between 560 and 720 px a 560 px cap on a square left a dark strip on the right */
+  .lp-hero .lp-banner-photo { position: relative; display: block; width: 100%; aspect-ratio: 1; max-height: 560px; }
   .lp-banner-photo img { object-position: 50% 50%; }
-  .lp-hero::before, .lp-showcase::before { inset: auto 0 auto 0; top: calc(min(100vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
+  .lp-hero::before { inset: auto 0 auto 0; top: calc(min(100vw, 560px) - 120px); height: 121px; background: linear-gradient(180deg, transparent, var(--surface-darkest)); }
   .lp-hero .lp-wrap { width: calc(100% - 32px); padding: 8px 0 44px; }
-  .lp-showcase .lp-wrap { width: calc(100% - 32px); padding: 8px 0 52px; }
-  .lp-quality { padding: 4px 18px; }
+  /* Know your album: one column, facts first; the big photo keeps a sensible height */
+  .lp-know { padding: 48px 0 56px; }
+  .lp .lp-know h2 { font-size: 28px; line-height: 36px; }
+  .lp-know-facts { max-width: none; }
+  .lp-know-main { min-height: 0; height: auto; aspect-ratio: 16 / 9; }
   .lp-hero-actions .lp-btn { width: 100%; }
 
   .lp-nav .tk-logo { --tk-logo-h: 28px !important; }

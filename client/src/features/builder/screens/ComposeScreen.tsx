@@ -35,18 +35,16 @@ import { TKLogo } from "@/features/landing/primitives";
 import { uploadEngine } from "../upload/engine";
 import { LiveBook } from "../upload/LiveBook";
 import { hasImage, photoSrc } from "../upload/previews";
-import { formatEta, noticeLines, tipFor } from "../upload/tips";
+import { noticeLines, tipFor } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
+import { flaggedPhotos } from "../quality";
 import { TipLine } from "../upload/UploadStatus";
 
-/** The stage's opening line for each occasion, from the owner's mock and tips. */
-const STAGE_LINES: Record<string, { line: string; small: string }> = {
-  travel: { line: "The trip is over. The story doesn't have to be.", small: "Bring every stop home, in one book you can hold." },
-  birthday: { line: "They'll only be this little once.", small: "Keep this year somewhere they can hold it, not buried in your phone." },
-  baby: { line: "The first year goes by so fast.", small: "Hold on to the tiny days. One book, for them to open when they're grown." },
-  wedding: { line: "Someday, someone small will point at a photo and ask, “Who's that?”", small: "Put your day in one place you can open, again and again." },
-  mix: { line: "Remember Nani's old albums? You're making the next one.", small: "The stories behind these photos deserve to outlive our phones." },
-};
+/** The stage's opening line: the same for every occasion (website copy v1, 2026-11-26). */
+const STAGE = { line: "Your photos, finally in one place.", small: "Keep going. Your album is almost ready to preview." };
+
+/** "{n} letters left" under the step 4 fields (website copy v1). */
+const lettersLeft = (n: number) => (n <= 0 ? "That's the most that fits." : `${n} ${n === 1 ? "letter" : "letters"} left`);
 
 /** Thin at the start, approaching the width the finished book's page count gives it. */
 function bookThickness(pages: number, fraction: number): number {
@@ -106,74 +104,62 @@ function useArrivals(stageRef: React.RefObject<HTMLDivElement | null>, thumbFor:
   }, [enabled, stageRef, thumbFor]);
 }
 
-/** What's happening with the upload, in plain words, under the book. */
+/**
+ * What's happening with the upload, in plain words, under the book.
+ *
+ * Only what the customer did: how many of their photos are in the album.
+ * The full-quality copies we print from keep uploading in the background
+ * without a status of their own (owner, 2026-11-26); checkout waits for them
+ * and says so there, the one place it matters.
+ */
 function UploadProgressNote() {
   const { progress, snapshot } = useUploads();
-  const { total, inBook, hdDone } = progress;
+  const { total, inBook } = progress;
   const allIn = inBook >= total;
-  const allHd = hdDone >= total;
   const notices = useMemo(() => {
     const lines = noticeLines(snapshot.notices);
     if (snapshot.duplicates) {
-      lines.push(snapshot.duplicates === 1 ? "One photo was already in your book, so we left it out." : `${snapshot.duplicates} photos were already in your book, so we left them out.`);
+      lines.push(snapshot.duplicates === 1 ? "One photo was already in your album, so we left it out." : `${snapshot.duplicates} photos were already in your album, so we left them out.`);
     }
     return lines;
   }, [snapshot.notices, snapshot.duplicates]);
 
   // Screen readers get a milestone rather than every single photo.
-  const milestone = allHd
-    ? "All your photos are saved."
-    : allIn
-      ? "All your photos are in your book. Saving full-quality copies."
-      : `${Math.floor((inBook / Math.max(1, total)) * 10) * 10} percent of your photos are in.`;
+  const milestone = allIn ? "All your photos are added." : `${Math.floor((inBook / Math.max(1, total)) * 10) * 10} percent of your photos are in.`;
 
   return (
     <div className="ck-progress">
       <span className="ck-sr" role="status">
         {milestone}
       </span>
-      {allHd ? (
+      {allIn ? (
         <p className="ck-count done">
-          <Check size={16} strokeWidth={2.6} /> All {total} photos are safely saved, ready to print.
+          <Check size={16} strokeWidth={2.6} /> Done. All {total} photos added.
         </p>
       ) : (
         <>
-          <p className={"ck-count" + (allIn ? " done" : "")}>
-            {allIn ? (
-              <>
-                <Check size={16} strokeWidth={2.6} /> All {total} photos are in your book
-              </>
-            ) : (
-              <>
-                <b>{inBook}</b> of {total} photos are in your book
-              </>
-            )}
+          <p className="ck-count">
+            <b>{inBook}</b> of {total} photos added
           </p>
           <div className="ck-rail" aria-hidden="true">
-            <i style={{ transform: `scaleX(${(allIn ? hdDone : inBook) / Math.max(1, total)})` }} />
+            <i style={{ transform: `scaleX(${inBook / Math.max(1, total)})` }} />
           </div>
-          {allIn && !snapshot.offline ? (
-            <p className="ck-hd">
-              Saving the full-quality copies we print from: <b>{hdDone}</b> of {total}
-              {snapshot.etaSeconds !== null ? `, ${formatEta(snapshot.etaSeconds)} left` : ""}
-            </p>
-          ) : null}
-          {snapshot.offline ? (
-            <p className="ck-hd warn">
-              Waiting for a connection. We'll carry on by ourselves.{" "}
-              <button type="button" onClick={() => uploadEngine.retryNow()}>
-                Try now
-              </button>
-            </p>
-          ) : null}
-          <TipLine lineFor={(n) => tipFor(n, progress.fraction, notices)} />
+          <TipLine lineFor={(n) => tipFor(n, inBook / Math.max(1, total), notices)} />
         </>
       )}
+      {snapshot.offline ? (
+        <p className="ck-hd warn">
+          Waiting for a connection. We'll carry on by ourselves.{" "}
+          <button type="button" onClick={() => uploadEngine.retryNow()}>
+            Try now
+          </button>
+        </p>
+      ) : null}
       {snapshot.rejected.length ? (
         <div className="ck-rejected" role="alert">
           <p>
             We couldn't open {snapshot.rejected.length === 1 ? snapshot.rejected[0] : `${snapshot.rejected.length} files`}, so{" "}
-            {snapshot.rejected.length === 1 ? "it isn't" : "they aren't"} in your book.
+            {snapshot.rejected.length === 1 ? "it isn't" : "they aren't"} in your album.
           </p>
           <button type="button" aria-label="Dismiss" onClick={() => uploadEngine.dismissRejected()}>
             <X size={15} />
@@ -217,7 +203,8 @@ export function ComposeScreen({
   const pageCount = useMemo(() => generatePages(bookPhotos(state), state.density).length, [state.photos, state.removedPhotoIds, state.density]);
   // only photos that are ready: an empty placeholder among them looks broken
   const prints = state.photos.filter(hasImage).slice(0, 4);
-  const stage = STAGE_LINES[state.occasion ?? "mix"] ?? STAGE_LINES.mix;
+  const stage = STAGE;
+  const flagged = useMemo(() => flaggedPhotos(state.photos).size, [state.photos]);
 
   const next = () => {
     if (step < 1) set({ qstep: 1 });
@@ -237,8 +224,8 @@ export function ComposeScreen({
       <div className="ck-questions">
         <div className="ck-questions-inner">
           {/* the question is the heading (owner, 2026-11-21) */}
-          <h1>{step === 0 ? "Pick the feel of your book" : "Name your book"}</h1>
-          <p className="bb-sub">{step === 0 ? "This is your cover. You can change it before you pay." : "This goes on your cover and spine."}</p>
+          <h1>{step === 0 ? "Pick a cover style" : "Give your album a name"}</h1>
+          <p className="bb-sub">{step === 0 ? "Pick the one that feels right. You can always switch later." : "This is how your album will be known on the shelf."}</p>
 
           {step === 0 ? (
             <div className="bb-qstep" key="feel">
@@ -286,7 +273,7 @@ export function ComposeScreen({
           {step === 1 ? (
             <div className="bb-qstep" key="name">
               <label className="ck-field">
-                <span>Book title</span>
+                <span>Album title</span>
                 <input
                   className="bb-title-input"
                   value={title}
@@ -298,23 +285,26 @@ export function ComposeScreen({
                   placeholder={occ.suggestedTitle}
                 />
                 <span className={"ck-count" + (title.length >= TITLE_MAX ? " full" : "")} aria-live="polite">
-                  {title.length >= TITLE_MAX ? "That's the most that fits on the cover. Put the rest in the line under it." : `Up to 2 lines on the cover · ${title.length} / ${TITLE_MAX}`}
+                  {lettersLeft(TITLE_MAX - title.length)}
                 </span>
               </label>
               <label className="ck-field">
                 <span>
-                  A line under the title <i>(optional)</i>
+                  Add a date or place <i>(optional)</i>
                 </span>
                 <input
                   className="bb-title-input"
                   value={subtitle}
                   maxLength={LINE_MAX}
                   onChange={(e) => set({ subtitle: e.target.value })}
-                  placeholder="Lahore, March 2026"
+                  placeholder="e.g. A date, a place, or a few words"
                 />
+                <span className={"ck-count" + (subtitle.length >= LINE_MAX ? " full" : "")} aria-live="polite">
+                  {lettersLeft(LINE_MAX - subtitle.length)}
+                </span>
               </label>
               <div className="ck-field">
-                <span id="ck-lettering">Lettering</span>
+                <span id="ck-lettering">Pick a font style</span>
                 <div className="ck-fonts" role="radiogroup" aria-labelledby="ck-lettering">
                   {pickerFonts(state.fontId).map((f) => {
                     const on = state.fontId === f.id;
@@ -339,7 +329,7 @@ export function ComposeScreen({
 
           <div className="ck-actions">
             <button type="button" className="bb-btn bb-btn-primary bb-btn-lg" disabled={step === 0 ? !picked : !title.trim()} onClick={next}>
-              {step === 1 ? "Pick your book" : "Next"} <ArrowRight size={18} />
+              Continue <ArrowRight size={18} />
             </button>
             <div className="bb-dots" aria-label={`Question ${step + 1} of 2`}>
               {([0, 1] as const).map((i) => (
@@ -380,6 +370,18 @@ export function ComposeScreen({
           </div>
         )}
         <UploadProgressNote />
+        {flagged ? (
+          <p className="ck-lowq" role="status">
+            <Info size={16} />
+            <span>
+              {flagged === 1 ? "1 photo is" : `${flagged} photos are`} low in quality and may not print sharp.{" "}
+              {/* step 2 shows which ones, with a remove button on each */}
+              <button type="button" className="bb-inline-link" onClick={() => set({ screen: "upload" })}>
+                See and replace
+              </button>
+            </span>
+          </p>
+        ) : null}
       </div>
       {picking ? (
         <CoverPhotoPicker

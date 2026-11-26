@@ -61,6 +61,8 @@ export const sliceOf = (s: BuilderState): BookSlice => ({
 });
 
 let seq = 0;
+/** Photos on a page added to hold a layout change's extra photos (a calm Classic-like page). */
+const NEW_PAGE_PHOTOS = 4;
 const newPageId = () => "pg-" + Date.now().toString(36) + "-" + (seq++).toString(36);
 
 const mapPage = (b: BookSlice, id: string, fn: (p: BookPage) => BookPage): BookSlice => ({
@@ -130,8 +132,10 @@ export interface LayoutChange {
   pulled: number;
   /** photos moved off this page onto later pages */
   pushed: number;
-  /** photos that found no room on a later page and are now "Not in book" */
+  /** photos taken out of the book by the change: always 0 since 2026-11-26 (kept for callers) */
   out: number;
+  /** new pages added right after this one to hold photos the next page had no room for */
+  added: number;
   /** >0 when the change was refused: this many more photos would be needed */
   short: number;
 }
@@ -150,9 +154,11 @@ export interface LayoutChange {
  *     changes and `short` says how many photos are missing: a photo is never
  *     repeated.
  *  2. A layout with FEWER slots keeps the first photos and moves the rest to
- *     the front of the following pages that have room (up to each page's
- *     capacity). Whatever finds no room leaves the book and shows under "Not
- *     in book" in the Photos panel (trackRemovals in state.ts records it).
+ *     the NEXT page, up to its capacity. Whatever doesn't fit goes on a new
+ *     page added right after this one (up to NEW_PAGE_PHOTOS a page). A photo
+ *     never leaves the book because of a layout change (owner, 2026-11-26:
+ *     "move remaining pictures to next, not out of the book by default"); only
+ *     taking it out does that.
  *  3. Slots that stay keep their framing; moved photos keep theirs too.
  *
  * `photos` must be the book's photos (bookPhotos(state)): photos the customer
@@ -169,7 +175,7 @@ export function changeLayout(
   photos: BuilderPhoto[],
 ): LayoutChange {
   const i = b.pages.findIndex((p) => p.id === pageId);
-  const none: LayoutChange = { book: b, pulled: 0, pushed: 0, out: 0, short: 0 };
+  const none: LayoutChange = { book: b, pulled: 0, pushed: 0, out: 0, added: 0, short: 0 };
   if (i < 0 || b.pages[i].layout === "title") return none;
   const page = b.pages[i];
   const want = "template" in target ? target.n : LAYOUT_SLOTS[target.layout];
@@ -177,7 +183,7 @@ export function changeLayout(
   let slots = page.slots.slice();
   let pulled = 0;
   let pushed = 0;
-  let out = 0;
+  let added = 0;
 
   if (slots.length < want) {
     // 1a. borrow from later pages, never leaving one empty
@@ -202,19 +208,34 @@ export function changeLayout(
     }
     if (slots.length < want) return { ...none, short: want - slots.length };
   } else if (slots.length > want) {
-    // 2. move the extra photos forward
+    // 2a. the extra photos go to the front of the next page, as far as it has room
     const extra = slots.slice(want);
     slots = slots.slice(0, want);
-    for (let j = i + 1; j < pages.length && extra.length; j++) {
-      const pj = pages[j];
-      if (pj.layout === "title") continue;
+    const j = i + 1;
+    const pj = pages[j];
+    if (pj && pj.layout !== "title") {
       const room = pageCapacity(pj) - pj.slots.length;
-      if (room <= 0) continue;
-      const take = extra.splice(0, room);
-      pages[j] = reshapePage(pj, [...take, ...pj.slots], photos, j) ?? pj;
-      pushed += take.length;
+      if (room > 0) {
+        const take = extra.splice(0, room);
+        pages[j] = reshapePage(pj, [...take, ...pj.slots], photos, j) ?? pj;
+        pushed += take.length;
+      }
     }
-    out = extra.length;
+    // 2b. the rest on new pages right after this one, never out of the book
+    let at = i + 1;
+    while (extra.length) {
+      const chunk = extra.splice(0, NEW_PAGE_PHOTOS);
+      const blank: BookPage = { id: newPageId(), layout: "grid", slots: chunk, caption: "" };
+      const shaped = reshapePage(blank, chunk, photos, at);
+      if (shaped) {
+        pages.splice(at++, 0, shaped);
+      } else {
+        // the engine had no template for this count: one framed photo a page
+        for (const s of chunk) pages.splice(at++, 0, { id: newPageId(), layout: "single", slots: [s], caption: "" });
+      }
+      added = at - (i + 1);
+      pushed += chunk.length;
+    }
   }
 
   const next =
@@ -222,7 +243,7 @@ export function changeLayout(
       ? relayoutPage(page, slots, photos, i, target.template)
       : { ...page, layout: target.layout, slots, frames: undefined, mirror: target.layout === "collage" ? page.mirror : undefined };
   pages[i] = next ?? page;
-  return { book: { ...b, pages }, pulled, pushed, out, short: 0 };
+  return { book: { ...b, pages }, pulled, pushed, out: 0, added, short: 0 };
 }
 
 /** One side of a spread preset: a named layout or an engine template. */
@@ -247,7 +268,7 @@ export function applySpreadPreset(b: BookSlice, leftId: string, rightId: string,
   if (l.short) return l;
   const r = changeLayout(l.book, rightId, preset.right, photos);
   if (r.short) return { ...r, book: b };
-  return { book: r.book, pulled: l.pulled + r.pulled, pushed: l.pushed + r.pushed, out: l.out + r.out, short: 0 };
+  return { book: r.book, pulled: l.pulled + r.pulled, pushed: l.pushed + r.pushed, out: l.out + r.out, added: l.added + r.added, short: 0 };
 }
 
 /** The line the editor shows after a layout change (null: nothing worth saying). */
@@ -255,7 +276,7 @@ export function layoutChangeNote(r: LayoutChange): string | null {
   if (r.short) return `This layout needs ${r.short} more ${r.short === 1 ? "photo" : "photos"}. Add photos, or pick a smaller layout.`;
   const parts: string[] = [];
   if (r.pulled) parts.push(`${r.pulled} ${r.pulled === 1 ? "photo" : "photos"} moved here from the next pages`);
-  if (r.pushed) parts.push(`${r.pushed} moved to the next pages`);
+  if (r.pushed) parts.push(r.added ? `${r.pushed} moved to the next ${r.added === 1 ? "page, which we added" : `${r.added} pages, which we added`}` : `${r.pushed} moved to the next page`);
   if (r.out) parts.push(`${r.out} moved to "Not in book"`);
   return parts.length ? parts.join(", ") : null;
 }

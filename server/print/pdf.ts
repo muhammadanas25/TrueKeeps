@@ -40,7 +40,7 @@ import { PATTERN_COVER_UNITS, PATTERN_PLATE, patternById, type CoverPattern } fr
 import { CAPTION_SIZE } from "../../client/src/features/builder/data";
 import { mediaStore } from "../media";
 import { printFonts, type PrintFonts } from "./fonts";
-import type { PrintManifest } from "./render";
+import { renderSlot, type PrintManifest } from "./render";
 
 const PT_PER_IN = 72;
 const MM = PT_PER_IN / 25.4;
@@ -294,8 +294,14 @@ export function logoColourOn(pageHex: string): string {
 }
 
 /** The cover photo cut to w × h inches at 300 DPI (cover-fit, centred), or null. */
-async function coverPhoto(manifest: PrintManifest, wIn: number, hIn: number): Promise<Buffer | null> {
+async function coverPhoto(manifest: PrintManifest, wIn: number, hIn: number, doc?: BuilderDocument): Promise<Buffer | null> {
   if (!manifest.cover) return null;
+  // framed in the editor (CoverAdjust.tsx): cut it exactly as page photos are cut
+  const frame = doc?.coverFrame;
+  if (frame && frame.photoId === manifest.cover.photoId) {
+    const r = await renderSlot(await mediaStore.get(manifest.cover.originalKey), { w: wIn, h: hIn }, frame);
+    return r.jpeg;
+  }
   return sharp(await mediaStore.get(manifest.cover.originalKey))
     .rotate()
     .resize(Math.round(wIn * 300), Math.round(hIn * 300), { fit: "cover", position: "centre", withoutEnlargement: false })
@@ -376,7 +382,7 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     const live = H - 2 * m;
     const photoPart = live * 0.618;
     const side = photoPart * 0.92;
-    const img = await coverPhoto(manifest, side / inch, side / inch);
+    const img = await coverPhoto(manifest, side / inch, side / inch, doc);
     const x = B + (W - side) / 2;
     const y = B + m + (photoPart - side) / 2;
     if (img) pdf.image(img, x, y, { width: side, height: side });
@@ -384,7 +390,7 @@ export async function composeCover(doc: BuilderDocument, manifest: PrintManifest
     coverWords(pdf, doc, fonts, theme, W, B + W / 2, B + m + photoPart + (live * 0.382) / 2, true);
   } else if (style === "moment") {
     const border = W * 0.041667;
-    const img = await coverPhoto(manifest, (W - 2 * border) / inch, (H - 2 * border) / inch);
+    const img = await coverPhoto(manifest, (W - 2 * border) / inch, (H - 2 * border) / inch, doc);
     if (img) pdf.image(img, B + border, B + border, { width: W - 2 * border, height: H - 2 * border });
   } else if (style === "minimal") {
     coverWords(pdf, doc, fonts, theme, W, B + W / 2, B + H * 0.382, true);

@@ -101,7 +101,7 @@
 
 /* ── Account pages (/books, /account) ───────────────── */
 .au-page { flex: 1; width: 100%; max-width: 1040px; margin: 0 auto; padding: 36px clamp(16px, 4vw, 40px) 80px; }
-.au-page h1 { font-family: var(--font-display); font-size: clamp(26px, 3.2vw, 32px); line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight); word-spacing: 0.1em; color: var(--heading); margin: 6px 0 6px; }
+.au-page h1 { font-family: var(--font-display); font-size: clamp(26px, 3.2vw, 32px); line-height: 1.25; font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight); word-spacing: normal; color: var(--heading); margin: 6px 0 6px; }
 .au-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 28px; }
 .au-page-sub { margin: 0; color: var(--color-fg2); font-size: 15px; }
 

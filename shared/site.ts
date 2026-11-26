@@ -16,14 +16,15 @@
  * Truth rule (PRODUCT.md, "Evidence on Hand"): nothing here may claim reviews,
  * ratings, customer counts or delivery times until they are real. That is why
  * the Product data has offers but no aggregateRating. The owner confirmed on
- * 2026-11-05: the 12×12 inch size on every binding, glossy or matte finish, the
- * Love-it guarantee (wording still to come) and help on WhatsApp (no hours promised).
- * Prices and the free-shipping rule (owner, 2026-11-11) come from shared/pricing.ts.
+ * 2026-11-05: the 12×12 inch size on every binding, glossy or matte finish and
+ * help on WhatsApp. The Love-it guarantee was dropped in website copy v1
+ * (2026-11-26). Prices and delivery by city come from shared/pricing.ts.
  * No page may claim a paper certification, such as FSC, without printer proof.
  */
 
 import { FAQ_GROUPS, POLICIES, type PolicyPage } from "./info-pages";
-import { formatPKR, INCLUDED_PAGES, PRICE_LIST, REMOTE_AREAS_TEXT } from "./pricing";
+import { DELIVERY_RULE, formatPKR, INCLUDED_PAGES, PRICE_LIST } from "./pricing";
+import { SUPPORT_HOURS } from "./payments";
 
 export const SITE = {
   url: "https://thetruekeeps.com",
@@ -43,7 +44,7 @@ export interface BookType {
   slug: string;
   /** Short label for cards and links */
   label: string;
-  /** Card subline on the homepage */
+  /** Card subline on the homepage (website copy v1) */
   blurb: string;
   /** Builder quiz answer this type starts from (see builder/data.ts OCCASIONS) */
   occasion: "wedding" | "baby" | "travel" | "birthday" | "mix";
@@ -62,7 +63,7 @@ export const BOOK_TYPES: BookType[] = [
   {
     slug: "wedding",
     label: "Weddings",
-    blurb: "The day, start to last dance",
+    blurb: "Your big day, all in one place",
     occasion: "wedding",
     productName: "Wedding photo book",
     title: "Wedding Photo Books & Albums in Pakistan | TrueKeeps",
@@ -77,7 +78,7 @@ export const BOOK_TYPES: BookType[] = [
   {
     slug: "baby",
     label: "New baby",
-    blurb: "First smiles to first steps",
+    blurb: "Tiny hands, big moments",
     occasion: "baby",
     productName: "Baby photo book",
     title: "Baby Photo Books in Pakistan: Your Baby's First Year | TrueKeeps",
@@ -92,7 +93,7 @@ export const BOOK_TYPES: BookType[] = [
   {
     slug: "birthday",
     label: "Birthdays",
-    blurb: "Parties, cakes & big days",
+    blurb: "One more year to remember",
     occasion: "birthday",
     productName: "Birthday photo book",
     title: "Birthday Photo Books & Gifts in Pakistan | TrueKeeps",
@@ -107,7 +108,7 @@ export const BOOK_TYPES: BookType[] = [
   {
     slug: "school",
     label: "School days",
-    blurb: "First days and proud milestones",
+    blurb: "The moments that made you proud",
     occasion: "mix",
     productName: "School memories photo book",
     title: "School Memory Photo Books in Pakistan | TrueKeeps",
@@ -152,7 +153,7 @@ export const BOOK_TYPES: BookType[] = [
   {
     slug: "anniversary",
     label: "Anniversaries",
-    blurb: "Your story, year after year",
+    blurb: "A gift they'll keep forever",
     occasion: "wedding",
     productName: "Anniversary photo book",
     title: "Anniversary Photo Books & Gifts in Pakistan | TrueKeeps",
@@ -170,51 +171,42 @@ export const bookTypeBySlug = (slug: string) => BOOK_TYPES.find((b) => b.slug ==
 
 /* ── FAQ ────────────────────────────────────────────────────── */
 
-const bindingNames = PRICE_LIST.bindings.map((b) => b.name.toLowerCase());
 
-/** Shipping rule in one sentence, straight from the checkout price list. */
-export const SHIPPING_LINE = `Shipping is free anywhere in Pakistan, except ${REMOTE_AREAS_TEXT}, where delivery is ${formatPKR(PRICE_LIST.remoteDeliveryMinor)}.`;
+/** Delivery rule in one sentence, straight from the checkout price list (shared/pricing.ts). */
+export const SHIPPING_LINE = DELIVERY_RULE;
 const shippingLine = SHIPPING_LINE;
 
 /** One-line price summary shared by the homepage, hub page and llms.txt. */
 export const PRICE_SUMMARY =
-  `A book is ${formatPKR(PRICE_LIST.bookMinor)} in any binding (${bindingNames.slice(0, -1).join(", ")} or ${bindingNames.at(-1)}) ` +
-  `and includes ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}`;
+  `An album is ${formatPKR(PRICE_LIST.bookMinor)}, a 12x12 inch hardcover with ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}`;
 
-/** Rendered visibly on the page AND as FAQPage data, so the two always match. */
+/**
+ * The price questions on /photo-books (website copy v1, 5.1, 2026-11-26).
+ * Rendered visibly on the page AND as FAQPage data, so the two always match.
+ * Left out until they are true: different prices per layout, cheaper extra
+ * copies, and deleting photos 30 days after printing. The price answer keeps
+ * today's real prices (owner: price copy stays until the layout prices are set).
+ */
 export const FAQS: Array<{ q: string; a: string }> = [
   {
-    q: "How much does a photo book cost in Pakistan?",
-    a: `${PRICE_SUMMARY}. ${shippingLine}`,
+    q: "How much does an album cost?",
+    a: `${PRICE_SUMMARY}. You'll see the exact price before you pay.`,
   },
   {
-    q: "How much is delivery?",
+    q: "Do I pay for delivery?",
     a: shippingLine,
   },
   {
-    q: "What size is the book?",
-    a: "12×12 inches, with large square pages that give your photos plenty of room.",
+    q: "Why can't I pay cash on delivery?",
+    a: "Every Truekeeps album is made only for you, with your own photos. We start printing after you pay, and a personal album cannot be sold to anyone else. That is why we ask for payment before we print.",
   },
   {
-    q: "Is the book glossy or matte?",
-    a: "You choose. Matte is soft with no glare, glossy is bright with a shine. Both cost the same, and you pick when you order.",
+    q: "Can I cancel and get my money back?",
+    a: `Yes, within 6 support hours of paying (${SUPPORT_HOURS}). Please call us, because texts and emails can't be used to cancel. Refunds reach you in 3 to 7 working days.`,
   },
   {
-    q: "Do I need design skills?",
-    a: "No. Answer a question about the occasion, add your photos, and we lay out the whole book for you. You can change themes, layouts, captions and page order, or simply order it as it is.",
-  },
-  {
-    q: "Can I see my book before I pay?",
-    a: "Yes. It is free to start, and you can flip through every page of your book on screen. You only pay when you choose to order.",
-  },
-  {
-    q: "How do I pay?",
-    // bank transfer only while card payments are off (owner, 2026-11-22)
-    a: "By bank transfer: when you place your order we show you our bank details, and we start your book once the payment is in. Because every book is personalised and made to order, we don't offer cash on delivery.",
-  },
-  {
-    q: "Can I make my book on my phone?",
-    a: "Yes. The whole process works in your phone's browser, with no app to install. You can add your photos and finish the book right there.",
+    q: "What if my album arrives damaged, or has a print problem?",
+    a: "We're sorry if that happens. Message us on WhatsApp within 48 hours of delivery with photos of the problem and the box. Print faults get a free reprint. If it was damaged on the way, we reprint it free with your unboxing video, or at 40% off without one.",
   },
 ];
 
@@ -283,13 +275,12 @@ function product(name: string, description: string, path: string, image: string)
     image: abs(image),
     url: abs(path),
     brand: { "@type": "Brand", name: SITE.name },
-    // every binding starts at the same price; more sheets cost more, so only
-    // the lowest price is stated
+    // one binding (hardcover); more sheets cost more, so only the lowest price is stated
     offers: {
       "@type": "AggregateOffer",
       priceCurrency: "PKR",
       lowPrice: (PRICE_LIST.bookMinor / 100).toFixed(0),
-      offerCount: PRICE_LIST.bindings.length,
+      offerCount: 1,
       availability: "https://schema.org/InStock",
       url: abs(path),
     },
@@ -315,7 +306,7 @@ const HUB_META: PageMeta = {
     FAQ_PAGE,
     breadcrumbs([
       { name: "Home", path: "/" },
-      { name: "Photo books", path: "/photo-books" },
+      { name: "Prices", path: "/photo-books" },
     ]),
   ],
 };
@@ -459,7 +450,7 @@ export function llmsTxt(): string {
     `- ${PRICE_SUMMARY}. Prices are in Pakistani rupees.`,
     `- ${shippingLine}`,
     "- Free to start. You only pay when you order.",
-    "- Payment is online by card or Google Pay through Safepay. No cash on delivery.",
+    "- Payment is by bank transfer before printing. No cash on delivery.",
     "",
     "## Pages",
     "",

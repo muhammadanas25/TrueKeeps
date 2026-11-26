@@ -16,17 +16,24 @@ import { uploadEngine } from "./engine";
 import { TIP_INTERVAL_MS, type Tip, type TipKind } from "./tips";
 import { useUploads } from "./UploadContext";
 
+/** The top-edge line follows the photos being added only; full-quality copies upload unseen (2026-11-26). */
 export function UploadHairline() {
   const { progress } = useUploads();
-  if (!progress.total || progress.fraction >= 1) return null;
+  const fraction = progress.total ? progress.inBook / progress.total : 1;
+  if (!progress.total || fraction >= 1) return null;
   return (
     <div className="ck-hairline" aria-hidden="true">
-      <i style={{ transform: `scaleX(${progress.fraction})` }} />
+      <i style={{ transform: `scaleX(${fraction})` }} />
     </div>
   );
 }
 
-export function UploadPill({ onRepick }: { onRepick?: () => void }) {
+/**
+ * `counter={false}` drops the running "HD 4/13" count and keeps only the
+ * states that need the customer (no connection, photos to add again). The
+ * builder's top bar uses it: progress shows inside step 3 (website copy v1).
+ */
+export function UploadPill({ onRepick, counter = true }: { onRepick?: () => void; counter?: boolean }) {
   const { progress, snapshot } = useUploads();
   if (!progress.total) return null;
   if (snapshot.offline) {
@@ -37,6 +44,7 @@ export function UploadPill({ onRepick }: { onRepick?: () => void }) {
     );
   }
   if (progress.active) {
+    if (!counter) return null;
     const adding = progress.inBook < progress.total;
     return (
       <span className="ck-pill" title={adding ? "Adding your photos" : "Saving the full-quality copies we print from"}>

@@ -187,13 +187,13 @@ export function LiveBook({
       </div>
       <div className="ck-turn">
         <button type="button" onClick={() => goTo(FRONT)}>
-          Front
+          Front cover
         </button>
         <button type="button" onClick={() => goTo(SPINE)}>
           Spine
         </button>
         <button type="button" onClick={() => goTo(BACK)}>
-          Back
+          Back cover
         </button>
       </div>
     </div>

@@ -1,7 +1,9 @@
 /* Brand heading face — SFC Woster Sans is a licensed font and its files aren't
    in the repo yet, so headings use the next face in --font-display (Clash
-   Display). Declaring it now would cost every visitor failed requests. When the
-   files arrive, put them in client/public/fonts/ and add here:
+   Display). It is also left out of --font-display: listing it there made the
+   site look different for anyone with Woster installed on their own computer.
+   When the files arrive, put them in client/public/fonts/, add it back to the
+   front of --font-display, and add here:
      @font-face {
        font-family: 'SFC Woster Sans';
        src: url('/fonts/SFCWosterSans.woff2') format('woff2');
@@ -160,7 +162,10 @@
   /* One token for the heading face, so changing it is a one-line edit.
      The kit leaves the heading font undecided; this keeps the wide face the
      site already uses. Only H1 and H2 use it (plus customers' book covers). */
-  --font-display: 'SFC Woster Sans', 'Clash Display', system-ui, sans-serif;
+  /* Headings: Mukta from Google Fonts (owner, 2026-11-26), loaded in client/index.html.
+     Woster is NOT listed until its files are hosted: a visitor who had it installed
+     locally saw all-caps Woster headings while everyone else saw something else. */
+  --font-display: 'Mukta', system-ui, sans-serif;
   --font-body:    'Figtree', 'Archivo', system-ui, sans-serif;
 
   /* Weight / tracking primitives (design-system scale) */
@@ -211,4 +216,14 @@
   /* ── Typography helpers ── */
   .font-display { font-family: var(--font-display); }
   .font-body    { font-family: var(--font-body); }
+}
+
+/*
+ * Pinch-zoom is allowed again (website copy v1: customers zoom into their
+ * photos), so iOS Safari would zoom the page into any field set below 16px
+ * when it gets focus. This keeps fields at 16px on iOS only
+ * (-webkit-touch-callout exists only there); other browsers are unchanged.
+ */
+@supports (-webkit-touch-callout: none) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, 1em) !important; }
 }

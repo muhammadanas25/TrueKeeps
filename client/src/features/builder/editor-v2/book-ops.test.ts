@@ -11,7 +11,7 @@
 
 import { placement, type BookPage, type BuilderPhoto } from "../data";
 import { DEFAULT_LOOK } from "../looks";
-import { addPage, changeLayout, type BookSlice } from "./book-ops";
+import { addPage, changeLayout, layoutChangeNote, type BookSlice } from "./book-ops";
 
 let fails = 0;
 const expect = (ok: boolean, msg: string) => {
@@ -64,7 +64,7 @@ const noRepeats = (b: BookSlice) => new Set(all(b)).size === all(b).length;
   expect(r.short === 1 && !all(r.book).includes("p9"), "a photo taken out of the book never comes back through a layout change");
 }
 
-/* shrinking: push forward, then "Not in book" */
+/* shrinking: the next page first, then a new page right after (never out of the book) */
 {
   const b = book([page("a", 0, 1, 2), page("b", 3)]);
   const r = changeLayout(b, "a", { layout: "full" }, photos.slice(0, 4));
@@ -72,9 +72,22 @@ const noRepeats = (b: BookSlice) => new Set(all(b)).size === all(b).length;
   expect(r.pushed === 2 && r.out === 0 && noRepeats(r.book), "and none are lost");
 }
 {
+  // the next page is full: the 5 extra photos go on new pages right after page a, in order
   const b = book([page("a", 0, 1, 2, 3, 4, 5), page("b", 6, 7, 8, 9, 10, 11)]);
   const r = changeLayout(b, "a", { layout: "full" }, photos);
-  expect(r.out === 5 && ids(r.book)[1].split(",").length === 6, "photos with nowhere to go leave the book (they show under Not in book)");
+  const all = ids(r.book);
+  expect(r.out === 0 && r.added === 2 && r.pushed === 5, "nothing leaves the book: two pages are added");
+  expect(all[0] === "p0" && all[1] === "p1,p2,p3,p4" && all[2] === "p5" && all[3] === "p6,p7,p8,p9,p10,p11", "the new pages sit right after it, in reading order");
+  expect(noRepeats(r.book), "and no photo appears twice");
+}
+{
+  // the next page has room for some: those go there, the rest on one new page
+  const b = book([page("a", 0, 1, 2, 3, 4, 5), page("b", 6, 7, 8, 9)]);
+  const r = changeLayout(b, "a", { layout: "duo" }, photos);
+  const all = ids(r.book);
+  expect(r.out === 0 && all[0] === "p0,p1", "page a keeps its first two");
+  expect(r.added + 0 >= 0 && all.join(",").split(",").length === 10 && noRepeats(r.book), "all 10 photos are still in the book, once each");
+  expect(layoutChangeNote(r) !== null && !/Not in book/.test(layoutChangeNote(r)!), "the note never says Not in book");
 }
 
 /* addPage */

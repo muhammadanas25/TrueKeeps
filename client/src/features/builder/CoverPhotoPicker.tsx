@@ -58,7 +58,7 @@ export function CoverPhotoRow({
       <span className="cp-thumb">{photo ? <Ph photo={photo} theme={theme} showLabel={false} variant="thumb" /> : null}</span>
       <span className="cp-text">
         <b>Cover photo</b>
-        <span>{chosen ? "Chosen by you" : "Our pick: the photo that keeps the most of itself on the cover"}</span>
+        <span>{chosen ? "Chosen by you" : "We picked this one for you. Change it anytime."}</span>
       </span>
       <button type="button" className="bb-btn bb-btn-secondary cp-btn" onClick={onOpen}>
         Change photo

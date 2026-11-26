@@ -509,10 +509,12 @@ export function StylePanel({
             <LookCard key={t.id} theme={t} on={book.themeId === t.id && !customized} photo={sample[i % Math.max(1, sample.length)]} fontId={book.fontId} onClick={() => onLook(t.id)} />
           ))}
         </div>
-        <button className="tke-more" onClick={() => setAllLooks(!allLooks)}>
-          {allLooks ? "Fewer looks" : `${looks.length - 4} more looks`}
-          {allLooks ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
+        {looks.length > 4 ? (
+          <button className="tke-more" onClick={() => setAllLooks(!allLooks)}>
+            {allLooks ? "Fewer looks" : `${looks.length - 4} more looks`}
+            {allLooks ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+        ) : null}
       </Section>
       <Section
         label="Page colour"
@@ -560,8 +562,8 @@ export function StylePanel({
           options={[
             { v: "clean" as const, label: "Clean", icon: <Square size={15} /> },
             { v: "soft" as const, label: "Rounded", icon: <SquareDashed size={15} /> },
-            { v: "shadow" as const, label: "Shadow", icon: <Layers size={15} /> },
-            // retired: only listed for a book that already uses it
+            // retired: only listed for a book that already uses it (Shadow: owner, 2026-11-26)
+            ...(book.edge === "shadow" ? [{ v: "shadow" as const, label: "Shadow", icon: <Layers size={15} /> }] : []),
             ...(book.edge === "border" ? [{ v: "border" as const, label: "Bordered", icon: <Frame size={15} /> }] : []),
           ]}
           value={book.edge}

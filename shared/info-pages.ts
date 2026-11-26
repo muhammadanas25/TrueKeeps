@@ -5,10 +5,11 @@
  * The wording is the owner's, edited only where it disagreed with how the site
  * works, as the owner decided on 2026-11-22:
  *  - books start at 10 pages (5 sheets) and go up to 32 (16 sheets)
- *  - delivery is as checkout charges it (shared/pricing.ts), not the Karachi /
- *    rest-of-Pakistan table in the draft
- *  - a paid order goes straight to print, so it can be cancelled only until
- *    the payment is confirmed (no 6-hour window)
+ *  - delivery is as checkout charges it (shared/pricing.ts). Since 2026-11-26:
+ *    Karachi free, Rs 200 flat everywhere else (no remote-area charge)
+ *  - a paid order can be cancelled by phone within 6 support hours of paying
+ *    (restored 2026-11-26, website copy v1; from 2026-11-22 to then it went
+ *    straight to print)
  *  - bank transfer is the one way to pay for now
  *  - damage and print faults follow the refund policy (the FAQ draft disagreed)
  * Left out until they are true, as the owner's own notes say: deleting photos
@@ -19,12 +20,12 @@
  * disagree with checkout. The FAQ also feeds the FAQPage data in site.ts.
  */
 
-import { BANK_TRANSFER_WINDOW_DAYS, SUPPORT_WHATSAPP } from "./payments";
-import { formatPKR, INCLUDED_PAGES, PRICE_LIST, REMOTE_AREAS_TEXT } from "./pricing";
+import { BANK_TRANSFER_WINDOW_DAYS, SUPPORT_HOURS, SUPPORT_WHATSAPP } from "./payments";
+import { DELIVERY_RULE, formatPKR, INCLUDED_PAGES, PRICE_LIST } from "./pricing";
 
 /** The most sheets a book can have (the layout engine's MAX_SHEETS). */
 const MAX_SHEETS = 16;
-const SHIPPING = `Delivery is free anywhere in Pakistan, except ${REMOTE_AREAS_TEXT}, where it is ${formatPKR(PRICE_LIST.remoteDeliveryMinor)}.`;
+const SHIPPING = DELIVERY_RULE;
 const SUPPORT = `WhatsApp ${SUPPORT_WHATSAPP.display}, Monday to Friday, 10am to 6pm`;
 
 export interface FaqGroup {
@@ -37,7 +38,7 @@ export const FAQ_GROUPS: FaqGroup[] = [
     title: "About the book",
     items: [
       { q: "What is a Truekeeps book?", a: ["A big photobook made from the photos on your phone. You pick a design, add your photos, and we print it and send it to your door. Your memories, out of your phone and into your hands."] },
-      { q: "What size is the book?", a: ["Every Truekeeps book is 12 x 12 inches, square. Big pages give your photos the space they deserve. You choose softcover, hardcover or layflat when you order; they all cost the same."] },
+      { q: "What size is the book?", a: ["Every Truekeeps book is 12 x 12 inches, square. Big pages give your photos the space they deserve. Every book is a hardcover."] },
       { q: "Glossy or matte: which one should I pick?", a: ["Glossy pages have a shine that makes colours look bright and bold. Matte pages have a soft, smooth feel with no shine, so they show less glare and fewer fingerprints. Both look lovely, and both cost the same. Pick the feel you like best."] },
       { q: "How many pages does a book have?", a: [`Every book starts with ${INCLUDED_PAGES} pages (${INCLUDED_PAGES / 2} sheets). You can add more, up to ${MAX_SHEETS * 2} pages (${MAX_SHEETS} sheets).`] },
       { q: "Can I add extra pages?", a: [`Yes. Each extra sheet (2 pages) costs ${formatPKR(PRICE_LIST.extraSheetMinor)}, up to ${MAX_SHEETS} sheets in total.`] },
@@ -96,7 +97,13 @@ export const FAQ_GROUPS: FaqGroup[] = [
   {
     title: "Changes, cancellations and problems",
     items: [
-      { q: "Can I change or cancel my book after I order?", a: ["Yes, until your payment is confirmed, at no cost: message us on WhatsApp. Once your payment is confirmed, your book goes straight to print, and it can't be changed or cancelled, because it is made only for you."] },
+      {
+        q: "Can I cancel and get my money back?",
+        a: [
+          `Yes, within 6 support hours of paying (${SUPPORT_HOURS}). Please call us, because texts and emails can't be used to cancel. Refunds reach you in 3 to 7 working days.`,
+          "After that your book is in production, and it can't be changed or cancelled, because it is made only for you.",
+        ],
+      },
       {
         q: "I made a mistake in my book. What now?",
         a: ["We print exactly the book you approve, so please check names, dates and photos carefully in the preview. A mistake in what you chose or approved isn't a print fault, but you can order a corrected copy at 10% off."],
@@ -134,7 +141,7 @@ export const POLICIES: PolicyPage[] = [
     slug: "shipping",
     title: "Shipping Policy",
     summary: "We deliver Truekeeps photobooks all over Pakistan, usually in 4 to 7 working days after your payment is confirmed.",
-    updated: "23 November 2026",
+    updated: "26 November 2026",
     blocks: [
       { p: "We deliver Truekeeps photobooks all over Pakistan. Most books reach you in 4 to 7 working days after your payment is confirmed." },
       { h: "Where we deliver" },
@@ -157,12 +164,12 @@ export const POLICIES: PolicyPage[] = [
         table: {
           head: ["Delivery area", "Charge"],
           rows: [
-            ["Anywhere in Pakistan", "Free"],
-            [REMOTE_AREAS_TEXT.charAt(0).toUpperCase() + REMOTE_AREAS_TEXT.slice(1), formatPKR(PRICE_LIST.remoteDeliveryMinor)],
+            ["Karachi", "Free"],
+            ["Rest of Pakistan", formatPKR(PRICE_LIST.standardDeliveryMinor)],
           ],
         },
       },
-      { p: "The delivery charge, if any, is shown at checkout before you pay." },
+      { p: "The delivery charge for your address is shown at checkout before you pay." },
       { h: "Our couriers" },
       { p: "We work with TCS and Leopards. For each city, we choose the courier with the best delivery record there, so your book arrives safely." },
       { h: "Tracking your order" },
@@ -185,7 +192,7 @@ export const POLICIES: PolicyPage[] = [
     slug: "refund-and-reprint",
     title: "Refund and Reprint Policy",
     summary: "If your book has a print fault, or is lost or damaged on the way, we reprint it. Money refunds are given when an order is cancelled before printing.",
-    updated: "23 November 2026",
+    updated: "26 November 2026",
     blocks: [
       { p: "If your book has a print fault, or is lost or damaged on the way, we reprint it. Money refunds are only given when an order is cancelled before printing." },
       { h: "Why we reprint instead of refund" },
@@ -200,7 +207,7 @@ export const POLICIES: PolicyPage[] = [
             ["Damaged by the courier, without an unboxing video", "Reprint at 40% off the book price"],
             ["Parcel lost by the courier", "Free reprint"],
             ["A mistake in what you chose or approved", "No free reprint or refund. You can order a corrected copy at 10% off"],
-            ["You cancelled before your payment was confirmed", "Full refund of anything you paid"],
+            ["You cancelled within 6 support hours of paying", "Full refund"],
             ["We cancelled your order", "Full refund"],
           ],
         },
@@ -234,16 +241,32 @@ export const POLICIES: PolicyPage[] = [
   {
     slug: "cancellation",
     title: "Cancellation Policy",
-    summary: "You can cancel your order at no cost until your payment is confirmed. After that your book goes straight to print.",
-    updated: "23 November 2026",
+    summary: "You can cancel or change your order within 6 support hours of paying and get your full payment back. After that, your book goes to print.",
+    updated: "26 November 2026",
     blocks: [
-      { p: "You can cancel your order at any time before your payment is confirmed, at no cost. Once your payment is confirmed, your book goes straight to print and can't be cancelled or changed." },
-      { h: "Why we can't cancel after that" },
-      { p: "Every Truekeeps book is made only for you, with your own photos. Once it is printed, nobody else can use it. That is why we start printing as soon as your payment is confirmed." },
+      { p: "You can cancel or change your order within 6 support hours of paying, and get your full payment back. After that, your book goes to print and the order cannot be cancelled." },
+      { h: "Why there is a time limit" },
+      { p: "Every Truekeeps book is made only for you, with your own photos. Once it is printed, nobody else can use it. That is why we start printing quickly and keep the cancel window short." },
+      { h: "Your 6-hour window" },
+      { p: `The 6 hours only count during our support hours: ${SUPPORT_HOURS.replace("Mon to Fri", "Monday to Friday")}. This way, you always get a fair chance to reach us.` },
+      {
+        table: {
+          head: ["You paid on", "You can cancel or change until"],
+          rows: [
+            ["Tuesday, 11am", "Tuesday, 5pm"],
+            ["Tuesday, 3pm", "Wednesday, 1pm"],
+            ["Friday, 9pm", "Monday, 4pm"],
+          ],
+        },
+      },
       { h: "How to cancel or change your order" },
-      { p: `Message us on ${SUPPORT}, with your order number. If you paid by bank transfer, tell us before we confirm your payment.` },
+      { p: "Call us, by phone or WhatsApp call, and speak with our support team within your window. A cancellation is only confirmed once you have spoken to a real person on our team." },
+      { p: "Text messages, voice notes and emails are not accepted as a cancellation, because we need to confirm it with you directly." },
+      { p: `Phone and WhatsApp: ${SUPPORT_WHATSAPP.display}.` },
       { h: "Your refund" },
-      { p: "If you sent money for an order that was cancelled before printing, you get it all back. Refunds are sent by bank transfer within 3 to 7 working days. We will ask you for your bank account details." },
+      { p: "If you cancel in time, you get your full payment back. Refunds are sent by bank transfer within 3 to 7 working days. We will ask you for your bank account details." },
+      { h: "After your window ends" },
+      { p: "Once your window has ended, your book is in production. You cannot cancel or change it after this point, and no refund is given." },
       { h: "When Truekeeps may cancel your order" },
       { p: "We may cancel an order in these cases:" },
       {

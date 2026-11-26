@@ -13,11 +13,12 @@
 
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { ArrowRight, ChevronDown } from "lucide-react";
-import { formatPKR, INCLUDED_PAGES, PRICE_LIST } from "@shared/pricing";
+import { ArrowRight, Check, ChevronDown } from "lucide-react";
+import { DELIVERY_TIME, formatPKR, INCLUDED_PAGES, PRICE_LIST } from "@shared/pricing";
 import { BOOK_TYPES, FAQS, SHIPPING_LINE, type BookType } from "@shared/site";
 import { FAQ_GROUPS, POLICIES, type PolicyPage } from "@shared/info-pages";
 import { SUPPORT_WHATSAPP } from "@shared/payments";
+import { ARRANGEMENTS } from "@/features/builder/arrange";
 import { BOOK_IMAGES } from "./book-images";
 import { BUILDER_PATH, FinalCTA, Footer, Nav, StickyCTA } from "./sections";
 
@@ -50,7 +51,7 @@ function PriceList() {
       </h2>
       <div className="lp-price-grid">
         <div className="lp-price-card">
-          <h3>Book, any binding</h3>
+          <h3>Album, hardcover</h3>
           <p>{formatPKR(PRICE_LIST.bookMinor)}</p>
         </div>
         <div className="lp-price-card">
@@ -58,12 +59,12 @@ function PriceList() {
           <p>{formatPKR(PRICE_LIST.extraSheetMinor)}</p>
         </div>
         <div className="lp-price-card">
-          <h3>Shipping</h3>
-          <p>Free</p>
+          <h3>Delivery</h3>
+          <p>Free in Karachi</p>
         </div>
       </div>
       <p className="lp-page-note">
-        The book price covers {INCLUDED_PAGES} pages, in softcover, hardcover or layflat. A sheet is
+        The album price covers {INCLUDED_PAGES} pages. A sheet is
         2 pages. {SHIPPING_LINE} It's free to start, and you only pay when you order.
       </p>
     </section>
@@ -124,42 +125,93 @@ function BookCard({ book }: { book: BookType }) {
   );
 }
 
-/** /photo-books — prices, every book type, and the FAQ on one page. */
+/** What every album includes (website copy v1, 5). Only what is true today. */
+const INCLUDED = [
+  "12x12 inch album",
+  "Glossy or matte finish, same price",
+  "3 cover styles and 8 font styles",
+  "Automatic layout, edit anything",
+  "Live preview of every page",
+  "Low-quality photo check",
+  "WhatsApp help, Mon to Fri",
+];
+
+/**
+ * /photo-books — the Prices page (website copy v1, section 5, 2026-11-26):
+ * layouts, today's prices, what's included, delivery, paying, and the price
+ * questions. The occasions grid and the how-it-works list moved off it.
+ */
 export function PhotoBooksPage() {
   useScrollTopOnMount("hub");
   return (
     <div className="lp lp-page">
       <Nav />
       <main className="lp-wrap">
-        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Photo books" }]} />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Prices" }]} />
         <header className="lp-page-head">
-          <h1>Photo books, delivered across Pakistan</h1>
-          <p className="lp-lede">
-            Turn the photos on your phone into a printed book. Design it yourself in minutes, or let us create it for
-            you. Then hold it, share it, and keep it forever.
-          </p>
-          <div className="lp-hero-actions">
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
-              Make my book <ArrowRight size={18} />
-            </Link>
-          </div>
+          <h1>Simple, clear prices</h1>
+          <p className="lp-lede">Your price depends on how many photos go on each page. Here's how it works.</p>
         </header>
-        <PriceList />
-        <section className="lp-page-section" aria-labelledby="types">
-          <h2 className="lp-page-h2" id="types">
-            Choose your moment
+        <section className="lp-page-section" aria-labelledby="layouts">
+          <h2 className="lp-page-h2" id="layouts">
+            Three layouts
           </h2>
-          <div className="lp-page-grid">
-            {BOOK_TYPES.map((b) => (
-              <BookCard book={b} key={b.slug} />
+          <div className="lp-price-grid">
+            {ARRANGEMENTS.map((a) => (
+              <div className="lp-price-card lp-layout-card" key={a.id}>
+                <h3>
+                  {a.name}
+                  {a.id === "classic" ? <span className="lp-badge">Our pick</span> : null}
+                </h3>
+                <p>{a.line}</p>
+              </div>
             ))}
           </div>
+          <p className="lp-page-note">Want to spend less? Pick Gallery. Want more room? Pick Story.</p>
         </section>
-        <Steps />
+        <PriceList />
+        <section className="lp-page-section" aria-labelledby="included">
+          <h2 className="lp-page-h2" id="included">
+            Every album includes
+          </h2>
+          <ul className="lp-included">
+            {INCLUDED.map((item) => (
+              <li key={item}>
+                <Check size={18} strokeWidth={2.4} aria-hidden="true" /> {item}
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="lp-page-section" aria-labelledby="delivery">
+          <h2 className="lp-page-h2" id="delivery">
+            Delivery across Pakistan
+          </h2>
+          <div className="lp-doc-table lp-delivery-table">
+            <table>
+              <tbody>
+                <tr>
+                  <td>Karachi</td>
+                  <td>Free</td>
+                </tr>
+                <tr>
+                  <td>Rest of Pakistan</td>
+                  <td>{formatPKR(PRICE_LIST.standardDeliveryMinor)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="lp-page-note">{DELIVERY_TIME} In a hurry? Call us first to see if we can make it faster.</p>
+        </section>
+        <section className="lp-page-section" aria-labelledby="paying">
+          <h2 className="lp-page-h2" id="paying">
+            Paying for your album
+          </h2>
+          <p className="lp-page-text">We accept bank transfer. Cards are coming soon. Since each album is personal, we print only after payment.</p>
+          <p className="lp-page-note">Have a discount code? Add it at checkout.</p>
+        </section>
         <Faq />
       </main>
-      {/* this is the page "See designs" points to */}
-      <FinalCTA showDesigns={false} />
+      <FinalCTA showDesigns={false} heading="Start now, pay only when you order." />
       <Footer />
       <StickyCTA />
     </div>
@@ -181,7 +233,7 @@ export function BookTypePage({ book }: { book: BookType }) {
             <p className="lp-lede">{book.intro}</p>
             <div className="lp-hero-actions">
               <Link href={startHref} className="lp-btn lp-btn-main lp-btn-lg">
-                Make my book <ArrowRight size={18} />
+                Start my album <ArrowRight size={18} />
               </Link>
             </div>
           </div>

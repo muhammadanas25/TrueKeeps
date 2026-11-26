@@ -184,11 +184,11 @@ const STYLES: Record<ArrangementId, Style> = {
   family: { id: "family", max: 6, lo: 3.5, hi: 5.5, rhythm: [3, 5, 6, 4, 5, 6] },
 };
 
-/** The arrangements in the order the customer sees them. */
+/** The arrangements in the order the customer sees them (names and lines: website copy v1, 2026-11-26). */
 export const ARRANGEMENTS: Array<{ id: ArrangementId; density: DensityId; name: string; line: string }> = [
-  { id: "story", density: "minimal", name: "Story", line: "1 to 2 photos a page. Big and calm." },
-  { id: "classic", density: "balanced", name: "Classic", line: "2 to 4 photos a page. One big photo, then small groups." },
-  { id: "family", density: "collage", name: "Family Album", line: "4 to 6 photos a page. The most memories on every sheet." },
+  { id: "story", density: "minimal", name: "Story", line: "Fewer photos, bigger moments." },
+  { id: "classic", density: "balanced", name: "Classic", line: "2 to 4 photos a page. A nice mix of big and small." },
+  { id: "family", density: "collage", name: "Gallery", line: "4 to 6 photos a page. More photos, fewer pages." },
 ];
 
 /** The arrangement stored in a book's `density` field. */

@@ -35,6 +35,14 @@ export const BANK_DETAILS = {
 export const SUPPORT_WHATSAPP = { display: "+92 300 2249456", digits: "923002249456" } as const;
 
 /** A WhatsApp link that opens a chat with us, the message already typed. */
+/**
+ * Cancelling a paid order (owner, 2026-11-26, website copy v1): by phone
+ * within 6 support hours of paying. Shown at checkout; the same rule is in
+ * the cancellation policy and the price questions (shared/info-pages.ts).
+ */
+export const SUPPORT_HOURS = "Mon to Fri, 10am to 6pm";
+export const CANCEL_LINE = `Need to cancel? Call us within 6 support hours of payment (${SUPPORT_HOURS}).`;
+
 export const whatsappLink = (text: string): string => `https://wa.me/${SUPPORT_WHATSAPP.digits}?text=${encodeURIComponent(text)}`;
 
 /** How long we hold a bank transfer order for its payment (a card order: 24 hours). */

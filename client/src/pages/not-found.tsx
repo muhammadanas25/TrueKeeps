@@ -17,7 +17,7 @@ export default function NotFound() {
           <p className="lp-lede">The link may be old or mistyped. Your books and photos are safe.</p>
           <div className="lp-hero-actions">
             <Link href={BUILDER_PATH} className="lp-btn lp-btn-main">
-              Make my book
+              Start my album
             </Link>
             <Link href="/photo-books" className="lp-btn lp-btn-outline">
               See photo books

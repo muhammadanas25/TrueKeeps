@@ -39,7 +39,8 @@ import {
   type Spread,
 } from "./data";
 import { clampTilt, slotAspect, tiltCover } from "./print";
-import { deriveTheme, mix } from "./palette";
+import { contrastRatio, deriveTheme, mix } from "./palette";
+import { LOGO_PATHS, LOGO_VIEWBOX } from "@shared/logo";
 import { lookClasses, usePageLook } from "./looks";
 import { SlotHit } from "./reframe";
 import { hasImage, photoSources, type PhotoVariant } from "./upload/previews";
@@ -155,6 +156,10 @@ export function Ph({
   );
 }
 
+/** Retries for a photo whose every source failed: 3 rounds, 4 s, 8 s and 12 s apart. */
+const RETRY_ROUNDS = 3;
+const RETRY_BASE_MS = 4000;
+
 /**
  * The real photo. Split out of `Ph` purely so it can hold the one piece
  * of state `Ph` cannot: whether the image 404'd. A dropped media file
@@ -181,10 +186,34 @@ function LoadedTile({
   const sources = photoSources(photo, variant);
   const sourceKey = sources.join("|");
   const [attempt, setAttempt] = useState(0);
+  const [round, setRound] = useState(0);
+  const imgRef = useRef<HTMLImageElement>(null);
   // A new src deserves a fresh attempt — otherwise replacing a missing
   // photo would keep showing the placeholder for the photo that worked.
-  useEffect(() => setAttempt(0), [sourceKey]);
-  if (attempt >= sources.length) return fallback;
+  useEffect(() => {
+    setAttempt(0);
+    setRound(0);
+  }, [sourceKey]);
+  const failed = attempt >= sources.length;
+  // A dropped connection (a phone between towers, a server restarting) fails
+  // every candidate at once. Try the whole list again a few times, a little
+  // later each time, instead of leaving a placeholder until the page reloads.
+  useEffect(() => {
+    if (!failed || round >= RETRY_ROUNDS) return;
+    const t = window.setTimeout(() => {
+      setRound((r) => r + 1);
+      setAttempt(0);
+    }, RETRY_BASE_MS * (round + 1));
+    return () => window.clearTimeout(t);
+  }, [failed, round]);
+  // An image can fail before React's onError is listening (a cached failure,
+  // a response cut off mid-way). It then sits "complete" with no pixels and the
+  // browser paints its alt text over the page, so check once it's mounted.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el && el.complete && el.naturalWidth === 0) setAttempt((a) => a + 1);
+  }, [attempt, round, sourceKey]);
+  if (failed) return fallback;
   const { fx, fy, zoom, turn, tilt } = { ...DEFAULT_FRAMING, ...(placement ?? {}) };
   // Guard against a corrupt/old draft rather than trusting the type:
   // a NaN here would blank the photo with no clue why.
@@ -193,8 +222,12 @@ function LoadedTile({
   const z = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
   const img = (
     <img
+      ref={imgRef}
+      key={round}
       src={sources[attempt]}
-      alt={photo.label}
+      // decorative: the label is an occasion caption idea ("the send-off"), not
+      // a description, and a broken image would paint it across the page
+      alt=""
       draggable={false}
       decoding="async"
       onError={() => setAttempt((a) => a + 1)}
@@ -239,11 +272,11 @@ function LoadedTile({
 
 /**
  * The brand-striped tile. It stands in for a photo whose image is not
- * there — either not uploaded yet, or uploaded and since lost. When the
- * tile is labelled (i.e. it is a real page, not a layout wireframe) it
- * now says which of the two it is, because a silent stripe reads as a
- * design flourish and users reasonably ask why "the default" keeps
- * coming back.
+ * there — not uploaded yet, lost, or failing to load right now (the loaded
+ * tile retries by itself). When the tile is labelled (a real page, not a
+ * layout wireframe) it says "Photo didn't load", because a silent stripe
+ * reads as a design flourish. It never shows the photo's caption idea: a
+ * caption-looking word where a photo should be read as a bug (2026-11-26).
  */
 function Stripes({
   photo,
@@ -268,7 +301,7 @@ function Stripes({
       {showLabel ? (
         <small>
           <ImageOff size={11} style={{ verticalAlign: "-1.5px", marginRight: 4 }} />
-          {photo.label} — image missing
+          Photo didn't load
         </small>
       ) : null}
     </div>
@@ -734,6 +767,8 @@ export function CoverFace({
   );
   const look = usePageLook();
   const lc = lookClasses(look);
+  // the editor's framing of the cover photo, only for the photo it was made for (CoverAdjust.tsx)
+  const coverPlacement = look.coverFrame && look.coverFrame.photoId === photo.id ? look.coverFrame : null;
   // a pattern's SVG id must be unique on the page: several covers can show at once
   const patternUid = useId().replace(/:/g, "");
   const sub = <div className="bb-cover-sub">{look.subtitle ?? occasion.subtitle}</div>;
@@ -742,7 +777,7 @@ export function CoverFace({
   if (coverStyle === "classic") {
     return (
       <div className={"bb-cover bb-cover-classic" + lc} style={base}>
-        <Ph photo={photo} theme={theme} showLabel={false} />
+        <Ph photo={photo} theme={theme} showLabel={false} placement={coverPlacement} slotAspect={1} />
         <div className="bb-cover-words">
           {titleEl}
           <div className="rule" style={{ background: theme.accent }}></div>
@@ -755,7 +790,7 @@ export function CoverFace({
     // No words on purpose: the photo is the cover. The 0.5in border is 4.17% of a 12in book.
     return (
       <div className={"bb-cover bb-cover-moment" + lc} style={base}>
-        <Ph photo={photo} theme={theme} showLabel={false} />
+        <Ph photo={photo} theme={theme} showLabel={false} placement={coverPlacement} slotAspect={1} />
       </div>
     );
   }
@@ -884,6 +919,30 @@ export function MiniBook({
   );
 }
 
+/* ── Back cover ─────────────────────────────────────────────── */
+
+/**
+ * The back cover as it prints (server/print/pdf.ts composeCover, page 2):
+ * the page colour, or a pattern cover's ground, with the logo 4 in wide on
+ * the 12 in cover (a third), centred, 1 in up from the bottom edge (1/12),
+ * in Indigo where it reads (WCAG 4.5:1) and white where it doesn't. Shown as
+ * the last stop of the step 6 preview (owner, 2026-11-26).
+ */
+export function BackCoverFace({ theme, coverStyle }: { theme: BookTheme; coverStyle: CoverStyleId }) {
+  const look = usePageLook();
+  const ground = coverStyle === "pattern" ? patternById(look.coverPattern).ground : theme.page;
+  const ink = contrastRatio(ground, "#2A1E5C") >= 4.5 ? "#2A1E5C" : "#FFFFFF";
+  return (
+    <div className="bb-back-cover" style={{ background: ground }} role="img" aria-label="Back cover with the truekeeps logo">
+      <svg className="bb-back-logo" viewBox={`0 0 ${LOGO_VIEWBOX.w} ${LOGO_VIEWBOX.h}`} aria-hidden="true">
+        {LOGO_PATHS.map((d, k) => (
+          <path key={k} d={d} fill={ink} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 /* ── The 3-D flip book ──────────────────────────────────────── */
 
 export interface Book3DApi {
@@ -928,6 +987,8 @@ export function Book3D({
   const [anim, setAnim] = useState<FlipAnim | null>(null);
   const animRef = useRef<FlipAnim | null>(null);
   const n = spreads.length;
+  // the last stop: the book turned over, its back cover (owner, 2026-11-26)
+  const last = n + 1;
 
   // content helpers — what's on each face at a given position
   const rightContent = (p: number) => {
@@ -940,6 +1001,7 @@ export function Book3D({
   };
   const leftContent = (p: number) => {
     if (p === 0) return null;
+    if (p === last) return <BackCoverFace theme={theme} coverStyle={coverStyle} />;
     const s = spreads[p - 1];
     return <PageFace page={s && s.left} photos={photos} theme={theme} title={title} occasion={occasion} />;
   };
@@ -967,7 +1029,7 @@ export function Book3D({
     }, 850);
   };
   const next = () => {
-    if (animRef.current || pos >= n) return;
+    if (animRef.current || pos >= last) return;
     start({ sheet: pos, dir: "fwd", go: false });
   };
   const prev = () => {
@@ -997,16 +1059,17 @@ export function Book3D({
   const statLeftPos = anim ? (anim.dir === "fwd" ? pos : pos - 1) : pos;
   const statRightPos = anim ? (anim.dir === "fwd" ? pos + 1 : pos) : pos;
   const closed = pos === 0 && !anim;
+  const closedBack = pos === last && !anim;
   const edgeW = (p: number, total: number) => Math.max(2, Math.round((8 * p) / Math.max(1, total)));
 
   return (
-    <div className={"bb-book" + (closed ? " closed" : "")} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
+    <div className={"bb-book" + (closed ? " closed" : "") + (closedBack ? " closed-back" : "")} onPointerDown={onPointerDown} onPointerUp={onPointerUp}>
       <div className="bb-book-shadow"></div>
       {/* static left */}
       {statLeftPos > 0 ? (
         <div className="bb-static left" style={{ background: theme.page }}>
           {leftContent(statLeftPos)}
-          <div className="bb-edges-l" style={{ "--edge": edgeW(statLeftPos, n + 1) + "px" } as CSSProperties}></div>
+          {statLeftPos === last ? null : <div className="bb-edges-l" style={{ "--edge": edgeW(statLeftPos, n + 1) + "px" } as CSSProperties}></div>}
         </div>
       ) : null}
       {/* static right */}
@@ -1036,7 +1099,7 @@ export function Book3D({
         className="bb-hotspot r"
         onClick={next}
         aria-label="Next page"
-        style={{ ...(pos >= n ? { cursor: "default" } : null), ...(pos === 0 && editableTitle ? { width: "22%" } : null) }}
+        style={{ ...(pos >= last ? { cursor: "default" } : null), ...(pos === 0 && editableTitle ? { width: "22%" } : null) }}
       ></div>
     </div>
   );

@@ -28,13 +28,13 @@ const SAMPLE_BOOK: Record<string, string> = {
   mix: "anniversary",
 };
 
-/** One-line subtitle per occasion (keeps the blocks from feeling empty). */
+/** One-line subtitle per occasion, the same lines as the landing cards (website copy v1). */
 const OCC_TAGLINE: Record<string, string> = {
-  wedding: "The whole celebration",
-  baby: "Their first year",
-  travel: "Every place you went",
-  birthday: "The big day",
-  mix: "A year of moments",
+  wedding: "Your big day, all in one place",
+  baby: "Tiny hands, big moments",
+  travel: "Every place you wandered",
+  birthday: "One more year to remember",
+  mix: "Bring together photos from any time",
 };
 
 export function QuizScreen({
@@ -58,7 +58,7 @@ export function QuizScreen({
   const occ = occasionById(occasion);
   const theme = themeById(state.vibe || "ivory");
   const previewTitle = (title && title.trim()) || occ.suggestedTitle;
-  const stageCaption = occasion ? previewTitle : "Pick a moment to begin";
+  const stageCaption = occasion ? previewTitle : "Your live preview starts here";
 
   return (
     <div className="bb-screen bb-quiz">
@@ -67,7 +67,7 @@ export function QuizScreen({
           <h1>{copy.qOccasion}</h1>
           <p className="bb-sub">{copy.occasionSub}</p>
           <p className="qz-price qz-price-phone">
-            <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12 x 12 in book with {INCLUDED_PAGES} pages inside</span>
+            <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12x12 inch album with {INCLUDED_PAGES} pages inside</span>
           </p>
 
           <div className="bb-qstep">
@@ -107,7 +107,7 @@ export function QuizScreen({
         </div>
         {/* step 1 of the owner's flow: the price before anything else is asked */}
         <p className="qz-price">
-          <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12 x 12 in book with {INCLUDED_PAGES} pages inside</span>
+          <b>Starting from {formatPKR(STARTING_PRICE_MINOR)}</b> <span>A 12x12 inch album with {INCLUDED_PAGES} pages inside</span>
         </p>
       </div>
     </div>

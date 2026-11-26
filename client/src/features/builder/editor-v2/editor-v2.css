@@ -327,3 +327,11 @@ textarea.tke-input { height: auto; padding: 10px 12px; resize: vertical; line-he
 .tke-preset:hover { border-color: var(--tk-indigo-300); }
 .tke-preset-spread { display: flex; gap: 2px; }
 .tke-preset-spread .tke-wire-pg { width: 44px; height: 44px; }
+
+/* Adjusting the cover photo (CoverAdjust.tsx): a button on the cover, then a drag surface over it */
+.tke-cover .tke-pagebox { position: relative; }
+.tke-cover-adjust { position: absolute; right: 10px; bottom: 10px; z-index: 4; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(42, 30, 92, 0.14); background: #fff; color: var(--heading, #2A1E5C); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(22, 20, 41, 0.18); }
+.tke-cover-adjust:hover { background: #F4F3F8; }
+.tke-cover-adjust:focus-visible { outline: 2px solid #2A1E5C; outline-offset: 2px; }
+.tke-cover-drag { position: absolute; inset: 0; z-index: 4; cursor: move; touch-action: none; }
+.tke-pagebox.is-cover-cropping .bb-cover .bb-ph { outline: 2px solid #CA3A58; outline-offset: 2px; }

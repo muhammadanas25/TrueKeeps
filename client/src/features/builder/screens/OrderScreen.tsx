@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Check, CheckCircle2, Copy, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { MiniBook } from "../book";
-import { BINDINGS, DENSITIES, coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
+import { DENSITIES, coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
 import { lowQualityPageCount, photosAwaitingOriginal } from "../print";
 import { uploadEngine } from "../upload/engine";
@@ -30,11 +30,11 @@ import { formatEta } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
-import { finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote, REMOTE_AREAS_TEXT } from "@shared/pricing";
+import { DELIVERY_TIME, finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote } from "@shared/pricing";
 import { PK_PROVINCES, STATUS_LABEL, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
 import { discountFor } from "@shared/promo";
-import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
+import { BANK_TRANSFER_WINDOW_DAYS, CANCEL_LINE, SUPPORT_WHATSAPP, type PaymentMethod } from "@shared/payments";
 import "../flow.css";
 import { useSession } from "@/features/auth/useSession";
 
@@ -306,7 +306,7 @@ export function OrderScreen({
     <div className="bb-screen bb-order">
       <div className="bb-order-inner">
         <div style={{ textAlign: "center" }}>
-          <div className="bb-kicker">Last step</div>
+          <div className="bb-kicker">Final step</div>
           <h1>{copy.orderTitle}</h1>
           <p className="bb-sub">{copy.orderSub}</p>
         </div>
@@ -328,42 +328,32 @@ export function OrderScreen({
 
           <div className="bb-order-specs">
             <div className="bb-spec-row">
-              <b>Book</b>
+              <b>Album</b>
               <span style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}>{state.title}</span>
             </div>
             <div className="bb-spec-row">
               <b>Details</b>
-              <span>12 x 12 in · {state.pages.length} pages · {arrangementName}</span>
+              <span>12x12 inch hardcover · {state.pages.length} pages · {arrangementName}</span>
             </div>
             {/* chosen with the book on step 5, so here it is a fact, not a question */}
             <div className="bb-spec-row">
-              <b>Paper</b>
+              <b>Finish</b>
               <span>{finishName(state.finish)}</span>
             </div>
             {softPages > 0 ? (
               <div className="bb-spec-row bb-spec-warn">
                 <b>Heads up</b>
                 <span>
-                  {softPages === 1 ? "1 page uses a photo" : `${softPages} pages use photos`} that may look soft in
-                  print. You can still order — or go back and zoom out a little.
+                  Some photos may not print sharp. You can still order.{" "}
+                  <button type="button" className="bb-inline-link" onClick={onBack}>
+                    See which ones
+                  </button>
                 </span>
               </div>
             ) : null}
-            <div>
-              <div className="bb-panel-label" style={{ marginBottom: 8 }}>
-                Binding
-              </div>
-              <div className="bb-bindings">
-                {BINDINGS.map((b) => (
-                  <button type="button" key={b.id} className={"bb-binding" + (q.binding === b.id ? " on" : "")} onClick={() => set({ binding: b.id })}>
-                    <b>{b.name}</b>
-                    <i>{b.blurb}</i>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* one binding now, hardcover (owner, 2026-11-26): no binding choice */}
             <div className="bb-spec-row" style={{ alignItems: "center" }}>
-              <b>Quantity</b>
+              <b>Copies</b>
               <div className="bb-qty">
                 <button type="button" onClick={() => set({ qty: Math.max(1, state.qty - 1) })} aria-label="Fewer">
                   <Minus size={15} />
@@ -376,7 +366,7 @@ export function OrderScreen({
             </div>
 
             <fieldset className="bb-ship" disabled={busy}>
-              <legend className="bb-panel-label">Deliver to</legend>
+              <legend className="bb-panel-label">Delivery details</legend>
               {user?.email ? (
                 <p className="bb-ship-email">
                   Order updates go to <b>{user.email}</b>
@@ -390,7 +380,7 @@ export function OrderScreen({
               <label className="bb-ship-field wide">
                 <span>Mobile number</span>
                 <input type="tel" inputMode="tel" autoComplete="tel" placeholder="0300 1234567" {...field("phone")} />
-                {fieldErrors.phone ? <em>{fieldErrors.phone}</em> : <small>The courier calls this number to deliver.</small>}
+                {fieldErrors.phone ? <em>{fieldErrors.phone}</em> : <small>For the courier and your order updates.</small>}
               </label>
               <label className="bb-ship-field wide">
                 <span>Address</span>
@@ -432,7 +422,7 @@ export function OrderScreen({
             <div className="bb-price-rows">
               <div className="bb-spec-row">
                 <b>
-                  {q.qty === 1 ? "Book" : `Books (${q.qty} × ${formatPKR(q.unitMinor)})`}
+                  {q.qty === 1 ? "Album" : `Albums (${q.qty} × ${formatPKR(q.unitMinor)})`}
                 </b>
                 <span>{formatPKR(q.subtotalMinor)}</span>
               </div>
@@ -442,14 +432,17 @@ export function OrderScreen({
                   : `Includes up to ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}.`}
               </span>
               <div className="bb-spec-row">
-                <b>Shipping</b>
-                <span>{q.remoteArea ? formatPKR(q.shippingMinor) : "Free"}</span>
+                <b>Delivery</b>
+                <span>{!q.deliveryKnown ? "Add your city to see" : q.shippingMinor ? formatPKR(q.shippingMinor) : "Free"}</span>
               </div>
-              {q.remoteArea ? (
-                <span className="bb-price-note">
-                  <Truck size={14} /> Delivery to {REMOTE_AREAS_TEXT} is {formatPKR(PRICE_LIST.remoteDeliveryMinor)}.
+              {/* website copy v1 (2026-11-26): Karachi free, Rs 200 elsewhere, Rs 500 remote (shared/pricing.ts deliveryFor) */}
+              <span className="bb-price-note">
+                <Truck size={14} />
+                <span>
+                  Delivery cost depends on your city. {DELIVERY_TIME} In a hurry? Call us first to see if we can make it
+                  faster: <a href={`tel:+${SUPPORT_WHATSAPP.digits}`}>{SUPPORT_WHATSAPP.display}</a>
                 </span>
-              ) : null}
+              </span>
               {promo ? (
                 <div className="bb-spec-row bb-promo-line">
                   <b>
@@ -551,7 +544,7 @@ export function OrderScreen({
 
             <fieldset className="pay-methods" disabled={busy}>
               <legend className="bb-panel-label">How would you like to pay?</legend>
-              <p className="pay-note">Each book is printed just for you, so we print once your payment is in. No cash on delivery.</p>
+              <p className="pay-note">Each album is printed just for you, so we print once your payment is in. No cash on delivery.</p>
               {methods.card && methods.bankTransfer ? (
                 <div className="pay-choices" role="radiogroup" aria-label="How to pay">
                   {(
@@ -572,12 +565,14 @@ export function OrderScreen({
               ) : null}
               {bank ? (
                 <ol className="pay-steps">
-                  <li>Place your order. We save it and show you our bank details.</li>
-                  <li>Transfer {formatPKR(totalMinor)} from your bank app.</li>
-                  <li>Send us the payment screenshot on WhatsApp.</li>
-                  <li>We check it and email you that your order is confirmed. Then we print.</li>
+                  <li>Place your order to see our bank details.</li>
+                  <li>Pay {formatPKR(totalMinor)} by bank transfer.</li>
+                  {/* the doc's "Upload your receipt" waits for receipt upload to be built */}
+                  <li>WhatsApp your receipt to us.</li>
+                  <li>Once we confirm it, your album goes to print.</li>
                 </ol>
               ) : null}
+              <p className="pay-note">{CANCEL_LINE}</p>
             </fieldset>
 
             <button type="submit" className="bb-btn bb-btn-primary bb-btn-lg" disabled={disabled}>
@@ -585,7 +580,7 @@ export function OrderScreen({
                 bank ? "Placing your order…" : "Opening secure payment…"
               ) : bank ? (
                 <>
-                  Place order, pay by bank transfer <ArrowRight size={17} />
+                  Order now <ArrowRight size={17} />
                 </>
               ) : (
                 <>
@@ -595,7 +590,7 @@ export function OrderScreen({
             </button>
             <p className="bb-pay-trust">
               {bank ? (
-                <>Nothing is charged now. We hold your order for {BANK_TRANSFER_WINDOW_DAYS} days while you pay.</>
+                <>We'll save your order for {BANK_TRANSFER_WINDOW_DAYS} days while you make the transfer.</>
               ) : (
                 <>
                   <ShieldCheck size={14} /> Secure checkout by Safepay. Your card details never touch our servers.

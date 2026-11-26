@@ -30,7 +30,7 @@ import { DEFAULT_FINISH, type FinishId } from "@shared/pricing";
 import { normalizeMediaUrl } from "@shared/media";
 import type { EdgeId, FontId } from "./looks";
 import { DEFAULT_PAIR } from "@shared/fonts";
-import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageFrame, type PageLayoutId } from "./data";
+import { LAYOUT_SLOTS, placement, type BookPage, type BuilderPhoto, type CoverStyleId, type DensityId, type PageFrame, type PageLayoutId, type Placement } from "./data";
 
 export type BuilderScreen =
   | "quiz"
@@ -92,6 +92,8 @@ export interface BuilderState {
   coverStyle: CoverStyleId;
   /** the pattern on a "pattern" cover (shared/patterns.ts) */
   coverPattern: PatternId;
+  /** the cover photo's framing (editor-v2/CoverAdjust.tsx); used only while it names the cover photo */
+  coverFrame: Placement | null;
   /**
    * How the book was made, for the owner's "customised vs ready-made" count
    * (2026-11-22): "none" = ordered as we laid it out, "looked" = opened the
@@ -99,6 +101,19 @@ export interface BuilderState {
    * Saved on the book, so it travels with the order.
    */
   customized: "none" | "looked" | "changed";
+  /**
+   * The furthest step (1–7) this album has reached, so the step bar can offer
+   * every step up to it (StepsBar.tsx, steps.ts). 0 on drafts from before it
+   * existed; the builder fills it in from the step they are on.
+   */
+  reached: number;
+  /**
+   * A fingerprint of the album when it was last approved on step 6
+   * (steps.ts albumKey). "Back to checkout" goes straight to checkout only
+   * while the album still matches it; after any change it goes to step 6 to
+   * be approved again, because what is approved is what prints.
+   */
+  approvedKey: string | null;
   voice: "warm" | "concise";
   /** preview position: 0 = closed cover, k = spread k−1 open */
   pos: number;
@@ -141,7 +156,10 @@ export const DEFAULT_STATE: BuilderState = {
   removedPhotoIds: [],
   coverStyle: "full",
   coverPattern: "floral",
+  coverFrame: null,
   customized: "none",
+  reached: 0,
+  approvedKey: null,
   voice: "warm",
   pos: 0,
   qty: 1,
