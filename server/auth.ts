@@ -39,6 +39,7 @@ import { log } from "./logger";
 import { memDb } from "./mem-db";
 import { storage } from "./storage";
 import { applyStaffRoleOnSignIn } from "./ops/roles";
+import { carryAffiliate } from "./affiliates/attribution";
 import * as schema from "@shared/schema";
 
 const MAGIC_LINK_MINUTES = 15;
@@ -157,6 +158,8 @@ export const auth = betterAuth({
       emailDomainName: "guest.thetruekeeps.com",
       onLinkAccount: async ({ anonymousUser, newUser }) => {
         const moved = await storage.reassignOwner(anonymousUser.user.id, newUser.user.id);
+        // an affiliate link tapped as a guest still counts once they sign in
+        await carryAffiliate(anonymousUser.user.id, newUser.user.id).catch((err) => log.warn({ err }, "[auth] affiliate not carried"));
         log.info({ from: anonymousUser.user.id, to: newUser.user.id, moved }, "[auth] guest promoted");
       },
     }),

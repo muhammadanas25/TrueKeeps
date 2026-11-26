@@ -18,7 +18,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, Bell, Home, LogOut, Package, Printer, Settings, ShieldCheck, Star, Tag } from "lucide-react";
+import { BarChart3, Bell, Handshake, Home, LogOut, Package, Printer, Settings, ShieldCheck, Star, Tag } from "lucide-react";
 import { ROLE_LABEL } from "@shared/ops";
 import { adminFetch, AdminError, STEP_UP_EVENT, useAdminQuery, type StaffMe } from "./api";
 import "./admin.css";
@@ -30,6 +30,7 @@ const NAV = [
   { href: "/analytics", label: "Analytics", icon: BarChart3, owner: true },
   { href: "/notifications", label: "Notifications", icon: Bell, owner: false },
   { href: "/promos", label: "Promo codes", icon: Tag, owner: true },
+  { href: "/affiliates", label: "Affiliates", icon: Handshake, owner: true },
   { href: "/team", label: "Team & security", icon: ShieldCheck, owner: true },
 ];
 

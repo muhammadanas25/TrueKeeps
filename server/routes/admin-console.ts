@@ -58,6 +58,7 @@ import { percentile, BUCKET_BOUNDS } from "../analytics/latency";
 import { register, schedule } from "../jobs";
 import { log } from "../logger";
 import { asyncHandler, parse } from "./helpers";
+import { orderAffiliateInfo } from "./affiliates";
 
 export const adminConsoleRouter = Router();
 const owner = requireStaff(["admin"]);
@@ -327,6 +328,8 @@ adminConsoleRouter.get(
       notifications: msgs.map((m) => ({ ...m, payload: undefined })),
       payments: isOwner(req) ? pays.map((p) => ({ ...p, raw: undefined })) : [],
       customer: { orders: num(history[0]?.orders), spentMinor: isOwner(req) ? num(history[0]?.spent) : null, since: history[0]?.first ?? null },
+      // affiliate credit and commission: money, so owner only (docs/adr/022)
+      affiliate: isOwner(req) ? await orderAffiliateInfo(order.id, order.affiliateId) : null,
       canSeeMoney: isOwner(req),
     });
   }),

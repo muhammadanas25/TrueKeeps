@@ -234,6 +234,50 @@ export function feedbackReceivedEmail(params: {
   };
 }
 
+/**
+ * An affiliate was added (Admin › Affiliates): their link, what they earn and
+ * where to see their numbers (docs/adr/022).
+ */
+export function affiliateWelcomeEmail(params: { name: string; link: string; commission: string; partnersUrl: string; windowDays: number; payoutDay: number }) {
+  const { name, link, commission, partnersUrl, windowDays, payoutDay } = params;
+  const first = escapeHtml(name.split(/\s+/)[0] || name);
+  return {
+    subject: "Your TrueKeeps partner link",
+    html: shell(
+      `Welcome, ${first}`,
+      para("Here is your TrueKeeps link. Share it anywhere: a post, a story, a WhatsApp group.") +
+        factTable([
+          ["Your link", link],
+          ["You earn", commission],
+          ["Paid", `on the ${payoutDay}th of each month`],
+        ]) +
+        para(`Anyone who taps your link and orders a book within ${windowDays} days counts for you. They pay the normal price.`) +
+        button(partnersUrl, "See your numbers") +
+        para(`<span style="color:${BRAND.soft};font-size:14px">Sign in with this email address to see visitors, orders and payouts.</span>`),
+    ),
+    text: `Welcome, ${name}\n\nYour TrueKeeps link: ${link}\nYou earn: ${commission}\nPaid on the ${payoutDay}th of each month.\n\nAnyone who taps your link and orders a book within ${windowDays} days counts for you.\n\nSee your numbers: ${partnersUrl} (sign in with this email).`,
+  };
+}
+
+/** The owner marked a monthly payout paid: the amount, the reference, the month. */
+export function affiliatePaidEmail(params: { name: string; amount: string; month: string; method: string; reference: string; partnersUrl: string }) {
+  const { name, amount, month, method, reference, partnersUrl } = params;
+  return {
+    subject: `TrueKeeps has paid you ${amount}`,
+    html: shell(
+      `${amount} is on its way`,
+      para(`Hi ${escapeHtml(name.split(/\s+/)[0] || name)}, your commission for ${escapeHtml(month)} has been sent.`) +
+        factTable([
+          ["Amount", amount],
+          ["Sent by", method],
+          ["Reference", reference],
+        ]) +
+        button(partnersUrl, "See the orders it covers"),
+    ),
+    text: `Hi ${name}, your commission for ${month} has been sent: ${amount} by ${method}, reference ${reference}.\n\nDetails: ${partnersUrl}`,
+  };
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

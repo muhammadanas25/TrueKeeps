@@ -173,6 +173,11 @@ export interface OrderDetail {
     createdAt: string;
     deliverBy: string | null;
   };
+  /** owner only: who is credited with the order and its commission lines (docs/adr/022) */
+  affiliate?: {
+    affiliate: { id: string; name: string; code: string; commission: string } | null;
+    lines: Array<{ affiliate: string; kind: string; amount: number; state: string }>;
+  } | null;
   /** flagged = photos the customer kept after the low-quality warning (refund policy) */
   book: { pages: number; photos: number; flagged?: number };
   events: Array<{ id: string; kind: string; actor: string; fromStatus: string | null; toStatus: string | null; note: string | null; createdAt: string }>;

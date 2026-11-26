@@ -49,6 +49,7 @@ import {
   boolean,
   jsonb,
   smallint,
+  date,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -88,6 +89,13 @@ export const users = pgTable(
     marketingOptOut: boolean("marketing_opt_out").notNull().default(false),
     /** E.164, collected at checkout for courier contact */
     phone: text("phone"),
+    /**
+     * The last affiliate link this person tapped and when (shared/affiliates.ts),
+     * saved onto the account so a link tapped on a phone still counts when they
+     * order from another device. Orders keep their own copy (orders.affiliate_id).
+     */
+    affiliateId: varchar("affiliate_id"),
+    affiliateAt: ts("affiliate_at"),
     lastSeenAt: ts("last_seen_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -404,6 +412,10 @@ export const orders = pgTable(
     promoCode: text("promo_code"),
     /** what the code took off the book price; totalMinor is already net of it */
     discountMinor: integer("discount_minor").notNull().default(0),
+    /** the affiliate credited with this order (docs/adr/022); null = none */
+    affiliateId: varchar("affiliate_id"),
+    /** `link` (their link, within the window) | `admin` (set by hand, audited) */
+    affiliateSource: text("affiliate_source"),
     paidAt: ts("paid_at"),
     expiresAt: ts("expires_at"),
     createdAt: createdAt(),
@@ -416,6 +428,7 @@ export const orders = pgTable(
     index("orders_user_created_idx").on(t.userId, t.createdAt),
     index("orders_status_created_idx").on(t.status, t.createdAt),
     index("orders_project_idx").on(t.projectId),
+    index("orders_affiliate_idx").on(t.affiliateId),
   ],
 );
 
@@ -506,6 +519,127 @@ export const promoCodes = pgTable(
   (t) => [uniqueIndex("promo_codes_code_unique").on(t.code)],
 );
 export type PromoCode = typeof promoCodes.$inferSelect;
+
+/* ── Affiliates (docs/adr/022, rules in shared/affiliates.ts) ──── */
+
+/**
+ * People and businesses who share a link (?ref=code) and earn a commission on
+ * the paid books it brings. Never deleted: paused instead, so old orders keep
+ * their name. `user_id` is filled the first time they sign in to /partners
+ * with this email.
+ */
+export const affiliates = pgTable(
+  "affiliates",
+  {
+    id: uuidPk(),
+    /** the link name, lower case: ?ref=mahnoor */
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    /** they sign in to /partners with this; lower case */
+    email: text("email").notNull(),
+    userId: varchar("user_id"),
+    /** where they post, for the team: "Instagram · 41k" */
+    channel: text("channel"),
+    /** `percent` (value 1–50) | `fixed` (value in minor units per order) */
+    commissionKind: text("commission_kind").notNull(),
+    commissionValue: integer("commission_value").notNull(),
+    /** `jazzcash` | `easypaisa` | `bank` */
+    payoutMethod: text("payout_method").notNull(),
+    /** wallet number or bank account/IBAN; shown masked outside the admin */
+    payoutAccount: text("payout_account"),
+    active: boolean("active").notNull().default(true),
+    note: text("note"),
+    createdBy: varchar("created_by"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("affiliates_code_unique").on(t.code), index("affiliates_email_idx").on(t.email)],
+);
+export type Affiliate = typeof affiliates.$inferSelect;
+
+/**
+ * One row per visitor per affiliate per day, from the link tap (server/affiliates/
+ * attribution.ts). "Visitors" = distinct visitor ids. No personal data: the
+ * visitor id is a random cookie.
+ */
+export const affiliateVisits = pgTable(
+  "affiliate_visits",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    affiliateId: varchar("affiliate_id").notNull(),
+    visitorId: text("visitor_id").notNull(),
+    day: date("day").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("affiliate_visits_unique").on(t.affiliateId, t.visitorId, t.day), index("affiliate_visits_day_idx").on(t.affiliateId, t.day)],
+);
+
+/**
+ * Commission lines. `earn` is the order's commission, worked out when it is
+ * paid, with the rate frozen on the row (a later rate change doesn't touch it).
+ * `clawback` is a negative line when an order whose commission was already paid
+ * out is refunded or moved to another affiliate; it comes off the next payout.
+ * States are read from the columns (shared/affiliates.ts commissionState).
+ */
+export const affiliateCommissions = pgTable(
+  "affiliate_commissions",
+  {
+    id: uuidPk(),
+    affiliateId: varchar("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "restrict" }),
+    orderId: varchar("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    /** `earn` | `clawback` */
+    kind: text("kind").notNull(),
+    /** book total the customer paid (subtotal − promo), before shipping */
+    baseMinor: integer("base_minor").notNull(),
+    /** positive for earn, negative for clawback */
+    amountMinor: integer("amount_minor").notNull(),
+    commissionKind: text("commission_kind").notNull(),
+    commissionValue: integer("commission_value").notNull(),
+    /** delivered + hold; null while waiting for delivery */
+    payableAt: ts("payable_at"),
+    reversedAt: ts("reversed_at"),
+    reversedReason: text("reversed_reason"),
+    payoutId: varchar("payout_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("affiliate_commissions_line_unique").on(t.orderId, t.affiliateId, t.kind),
+    index("affiliate_commissions_aff_idx").on(t.affiliateId, t.payableAt),
+  ],
+);
+export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
+
+/**
+ * A payout the owner made (Admin › Affiliates › Mark paid), covering every
+ * approved, unpaid line up to the end of `period`. The reference is the
+ * JazzCash/Easypaisa/bank transaction id; the affiliate sees it.
+ */
+export const affiliatePayouts = pgTable(
+  "affiliate_payouts",
+  {
+    id: uuidPk(),
+    affiliateId: varchar("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "restrict" }),
+    /** "2026-11": the month whose approved commission this pays */
+    period: text("period").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    lines: integer("lines").notNull(),
+    payoutMethod: text("payout_method").notNull(),
+    payoutAccount: text("payout_account"),
+    reference: text("reference").notNull(),
+    paidBy: text("paid_by"),
+    paidAt: ts("paid_at").defaultNow().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("affiliate_payouts_aff_idx").on(t.affiliateId, t.paidAt)],
+);
+export type AffiliatePayout = typeof affiliatePayouts.$inferSelect;
 
 export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),

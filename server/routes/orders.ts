@@ -37,6 +37,8 @@ import { mediaStore } from "../media";
 import { readManifest } from "../print/render";
 import { startPrintJob } from "../print/pipeline";
 import { notifyOrder } from "../notify/outbox";
+import { orderAffiliate } from "../affiliates/attribution";
+import { syncCommissionSoon } from "../affiliates/commissions";
 import { audit } from "../ops/audit";
 import { requireMember, requireUser, currentUser } from "../middleware/auth";
 import { isElevatedStaff, requireStaff } from "../middleware/staff";
@@ -108,7 +110,8 @@ ordersRouter.post(
     const user = await storage.getUser(currentUser(req).id);
     if (!user) return res.status(401).json({ error: "Sign-in required", code: "UNAUTHENTICATED" });
     try {
-      const { order, checkoutUrl } = await createOrder(user, body);
+      const credit = await orderAffiliate(req, { id: user.id, email: user.email, phone: body.address.phone }).catch(() => null);
+      const { order, checkoutUrl } = await createOrder(user, body, credit);
       res.status(201).json({ order: publicOrder(order), checkoutUrl });
     } catch (err) {
       sendOrderError(res, err);
@@ -416,6 +419,7 @@ ordersRouter.patch(
       const event =
         body.status === "shipped" ? "order_shipped" : body.status === "delivered" ? "order_delivered" : body.status === "cancelled" || body.status === "refunded" ? "order_cancelled" : null;
       if (event) void notifyOrder(event, updated);
+      if (updated.affiliateId) syncCommissionSoon(updated.id);
     } else {
       if (Object.keys(fields).length) {
         updated = await storage.updateOrder(order.id, fields);

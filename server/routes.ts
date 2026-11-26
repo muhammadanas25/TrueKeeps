@@ -28,6 +28,8 @@ import { staffAuthRouter } from "./routes/staff-auth";
 import { adminConsoleRouter } from "./routes/admin-console";
 import { whatsappWebhookRouter } from "./routes/webhooks-whatsapp";
 import { collectRouter } from "./analytics/collect";
+import { affiliatesRouter } from "./routes/affiliates";
+import { refAttach, refCapture } from "./affiliates/attribution";
 import { requireStaff } from "./middleware/staff";
 import rateLimit from "express-rate-limit";
 
@@ -38,6 +40,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", uptime: process.uptime() });
   });
+
+  // Affiliate links (docs/adr/022): remember a ?ref= tap on any page, and
+  // save it onto the account at the next API call. Neither ever fails a request.
+  app.use(refCapture);
+  app.use("/api", refAttach);
 
   // The staff gate (docs/adr/018): every /api/admin/* request, including any
   // added later, must be staff with the second sign-in step passed. Mounted
@@ -50,6 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(staffAuthRouter);
   app.use(adminConsoleRouter);
+  app.use(affiliatesRouter);
   app.use(collectRouter);
   app.use(whatsappWebhookRouter);
   app.use(meRouter);

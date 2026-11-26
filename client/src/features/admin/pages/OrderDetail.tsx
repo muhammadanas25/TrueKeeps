@@ -14,6 +14,8 @@
  *    the gateway, or by the bank-transfer check
  *  - Timeline: status changes, system notes and every message sent, newest
  *    first, with internal notes
+ *  - Affiliate (owner only, docs/adr/022): who is credited and the commission;
+ *    the owner can add, change or remove it, which is logged on the timeline
  */
 
 import { useState } from "react";
@@ -374,8 +376,88 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
               </div>
             ) : null}
           </section>
+
+          {q.data.affiliate ? <AffiliateCard orderId={o.id} info={q.data.affiliate} onChanged={() => void qc.invalidateQueries({ queryKey: ["order", o.id] })} /> : null}
         </div>
       </div>
     </>
+  );
+}
+
+/** Who is credited with this order, the commission, and changing it by hand. */
+function AffiliateCard({ orderId, info, onChanged }: { orderId: string; info: NonNullable<OrderDetail["affiliate"]>; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const picker = useAdminQuery<Array<{ id: string; name: string; code: string; active: boolean }>>(["admin", "affiliates-picker"], editing ? "/api/admin/affiliates-picker" : null);
+  const [pick, setPick] = useState(info.affiliate?.id ?? "");
+  const [note, setNote] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await adminFetch(`/api/admin/orders/${orderId}/affiliate`, { method: "PUT", body: { affiliateId: pick || null, note: note.trim() || undefined } });
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="oc-card" aria-labelledby="af">
+      <div className="oc-card-head">
+        <h2 id="af">Affiliate</h2>
+        {!editing ? (
+          <button className="oc-btn sm" onClick={() => setEditing(true)}>
+            {info.affiliate ? "Change" : "Add"}
+          </button>
+        ) : null}
+      </div>
+      {info.affiliate ? (
+        <div className="oc-small">
+          <Link href={`/affiliates/${info.affiliate.id}`}>
+            <b>{info.affiliate.name}</b>
+          </Link>{" "}
+          · ?ref={info.affiliate.code} · {info.affiliate.commission}
+        </div>
+      ) : (
+        <div className="oc-small">No affiliate link was used for this order.</div>
+      )}
+      {info.lines.map((l, i) => (
+        <div className="oc-small" key={i}>
+          {l.kind === "clawback" ? "Taken back" : "Commission"} {money(l.amount)} · {l.affiliate} · {l.state}
+        </div>
+      ))}
+      {editing ? (
+        <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
+          <label className="oc-field">
+            Credit this order to
+            <select value={pick} onChange={(e) => setPick(e.target.value)}>
+              <option value="">No affiliate</option>
+              {(picker.data ?? []).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} (?ref={a.code}){a.active ? "" : ", paused"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="oc-field">
+            Why <span className="oc-small">(kept in the log)</span>
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Customer said Mahnoor sent them" maxLength={300} />
+          </label>
+          <div className="oc-row">
+            <button className="oc-btn primary sm" disabled={busy} onClick={() => void save()}>
+              Save
+            </button>
+            <button className="oc-btn sm" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
+          {err ? <p className="oc-note bad">{err}</p> : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
