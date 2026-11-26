@@ -35,10 +35,13 @@ import heroM800 from "./assets/hero-mobile-800.webp";
 import heroM1200 from "./assets/hero-mobile-1200.webp";
 import stack800 from "./assets/album-stack-800.webp";
 import stack1600 from "./assets/album-stack-1600.webp";
+import stack2400 from "./assets/album-stack-2400.webp";
 import inHand480 from "./assets/album-in-hand-480.webp";
 import inHand960 from "./assets/album-in-hand-960.webp";
+import inHand1440 from "./assets/album-in-hand-1440.webp";
 import row480 from "./assets/album-row-480.webp";
 import row960 from "./assets/album-row-960.webp";
+import row1440 from "./assets/album-row-1440.webp";
 import ctaSm from "./assets/cta-1280.webp";
 import ctaLg from "./assets/cta-2400.webp";
 import ctaM800 from "./assets/cta-mobile-800.webp";
@@ -414,17 +417,17 @@ export function KnowAlbum() {
             <img
               className="lp-know-main"
               src={stack800}
-              srcSet={`${stack800} 800w, ${stack1600} 1600w`}
-              sizes="(max-width: 940px) 100vw, 760px"
+              srcSet={`${stack800} 800w, ${stack1600} 1600w, ${stack2400} 2400w`}
+              sizes="(max-width: 940px) 100vw, 840px"
               alt="A stack of four square hardcover albums"
-              width={1600}
-              height={893}
+              width={2400}
+              height={1340}
               loading="lazy"
               decoding="async"
             />
             <div className="lp-know-pair">
-              <img src={inHand480} srcSet={`${inHand480} 480w, ${inHand960} 960w`} sizes="(max-width: 940px) 50vw, 372px" alt="A hand holding a square album with a baby photo on the cover" width={960} height={720} loading="lazy" decoding="async" />
-              <img src={row480} srcSet={`${row480} 480w, ${row960} 960w`} sizes="(max-width: 940px) 50vw, 372px" alt="Three square albums standing in a row, spines showing" width={960} height={720} loading="lazy" decoding="async" />
+              <img src={inHand480} srcSet={`${inHand480} 480w, ${inHand960} 960w, ${inHand1440} 1440w`} sizes="(max-width: 940px) 50vw, 420px" alt="A hand holding a square album with a baby photo on the cover" width={1440} height={804} loading="lazy" decoding="async" />
+              <img src={row480} srcSet={`${row480} 480w, ${row960} 960w, ${row1440} 1440w`} sizes="(max-width: 940px) 50vw, 420px" alt="Three square albums standing in a row, spines showing" width={1440} height={804} loading="lazy" decoding="async" />
             </div>
           </div>
         </div>
