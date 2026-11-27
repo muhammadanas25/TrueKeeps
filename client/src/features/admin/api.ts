@@ -102,6 +102,8 @@ export interface OrderRow {
   paidAt: string | null;
   deliverBy: string | null;
   customer: string;
+  /** a gift: no price or invoice in the parcel */
+  gift?: boolean;
   phone: string;
   email: string;
   city: string;
@@ -163,7 +165,11 @@ export interface OrderDetail {
     discountMinor?: number;
     contactEmail: string;
     contactPhone: string;
-    shippingAddress: { fullName: string; phone: string; line1: string; line2?: string; city: string; province: string; postalCode?: string };
+    /** who placed it; differs from the address's name on a gift (null on older orders) */
+    contactName?: string | null;
+    /** a gift: no price or invoice in the parcel (docs/adr/025) */
+    isGift?: boolean;
+    shippingAddress: { fullName: string; phone: string; altPhone?: string; line1: string; line2?: string; city: string; province: string; postalCode?: string };
     courier: string | null;
     trackingNumber: string | null;
     livemode: boolean;

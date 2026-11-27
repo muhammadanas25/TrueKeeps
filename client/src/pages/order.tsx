@@ -213,7 +213,8 @@ export default function OrderPage() {
           </section>
 
           <section className="au-section">
-            <h2>Delivery</h2>
+            <h2>{order.isGift ? "Delivery, as a gift" : "Delivery"}</h2>
+            {order.isGift ? <p className="or-note">The parcel won't show any price or invoice.</p> : null}
             <address className="or-addr">
               <b>{a.fullName}</b>
               <span>{a.line1}</span>
@@ -222,6 +223,7 @@ export default function OrderPage() {
                 {a.city}, {a.province} {a.postalCode}
               </span>
               <span>{a.phone}</span>
+              {a.altPhone ? <span>Other number: {a.altPhone}</span> : null}
             </address>
             {order.trackingNumber ? (
               <div className="or-line">

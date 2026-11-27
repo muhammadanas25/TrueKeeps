@@ -27,6 +27,8 @@ export interface PublicOrder {
   title: string;
   occasion: string | null;
   shippingAddress: ShippingAddress;
+  /** sent as a gift: no price or invoice in the parcel (docs/adr/025) */
+  isGift?: boolean;
   contactEmail: string;
   contactPhone: string;
   livemode: boolean;

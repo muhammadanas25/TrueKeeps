@@ -92,6 +92,18 @@ export const shippingAddressSchema = z.object({
     .trim()
     .transform((s) => s.replace(/[\s-]/g, ""))
     .refine((s) => PK_MOBILE_RE.test(s), "Enter a Pakistani mobile number, e.g. 0300 1234567"),
+  /**
+   * A second number for the courier, in case the first doesn't answer
+   * (owner, 2026-11-28). Optional, and any phone, landline included.
+   */
+  altPhone: z
+    .string()
+    .trim()
+    .max(24)
+    .transform((s) => s.replace(/[\s-]/g, ""))
+    .refine((s) => s === "" || /^\+?\d{7,15}$/.test(s), "Enter a phone number, or leave this empty")
+    .optional()
+    .default(""),
   line1: z.string().trim().min(4, "Enter the street address").max(160),
   line2: z.string().trim().max(160).optional().default(""),
   city: z.string().trim().min(2, "Enter the city").max(60),
@@ -106,6 +118,21 @@ export const shippingAddressSchema = z.object({
 });
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
 
+/**
+ * The buyer, when the book is a gift sent to someone else (owner's Website
+ * Copy 4.8, "Sending this as a gift?"; docs/adr/025). The address is then the
+ * recipient's, and these are who gets the order updates.
+ */
+export const giftSenderSchema = z.object({
+  name: z.string().trim().min(2, "Enter your name").max(80),
+  phone: z
+    .string()
+    .trim()
+    .transform((s) => s.replace(/[\s-]/g, ""))
+    .refine((s) => PK_MOBILE_RE.test(s), "Enter a Pakistani mobile number, e.g. 0300 1234567"),
+});
+export type GiftSender = z.infer<typeof giftSenderSchema>;
+
 /** Body of POST /api/orders. */
 export const createOrderSchema = z.object({
   projectId: z.string().min(1).max(64),
@@ -113,6 +140,8 @@ export const createOrderSchema = z.object({
   finish: z.enum(FINISH_IDS).default(DEFAULT_FINISH),
   qty: z.number().int().min(1).max(PRICE_LIST.maxQty),
   address: shippingAddressSchema,
+  /** present when it's a gift: the buyer's own name and mobile; the address is the recipient's */
+  gift: giftSenderSchema.optional(),
   /** the exact book the customer saw — frozen onto the order for printing */
   document: builderDocumentSchema,
   /** client-generated per checkout attempt; double-clicks return one order */

@@ -240,7 +240,9 @@ function rowOf(o: Order, job: PrintJob | undefined) {
     createdAt: o.createdAt,
     paidAt: o.paidAt,
     deliverBy: deliverBy(o),
-    customer: a.fullName ?? "",
+    // the buyer; on a gift the address is the recipient's
+    customer: o.contactName ?? a.fullName ?? "",
+    gift: o.isGift,
     phone: o.contactPhone,
     email: o.contactEmail,
     city: a.city ?? "",

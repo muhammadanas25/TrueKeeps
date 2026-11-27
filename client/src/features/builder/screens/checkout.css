@@ -139,6 +139,63 @@
   gap: 12px;
 }
 
+/* "Sending this as a gift?": first in the card, before any field */
+.bb-order.co .co-tick {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--heading);
+  cursor: pointer;
+}
+
+.bb-order.co .co-tick input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--tk-indigo-500);
+  cursor: pointer;
+}
+
+.bb-order.co .co-tick small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 19px;
+  font-weight: 400;
+  color: var(--color-fg2);
+}
+
+/* "Your details" / "Their details" when it's a gift */
+.bb-order.co .co-sub {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.bb-order.co .co-sub small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-fg2);
+}
+
+.bb-order.co .co-ship + .co-ship {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
 /* ── how to pay, and the total ────────────────────────────── */
 .bb-order.co .co-pay {
   display: flex;

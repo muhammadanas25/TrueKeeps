@@ -78,6 +78,13 @@
       "when": 1795710068792,
       "tag": "0010_affiliates",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795818880541,
+      "tag": "0011_gift_orders",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,14 @@
  * and a footer holding Pay. While HD copies finish, Pay is locked and one
  * line above it says how far along they are (Option 2); nothing else is added.
  *
+ * Gifts and the city list (owner, 2026-11-28; canvas E3–E6, docs/adr/025):
+ * "Sending this as a gift?" comes first in the delivery card, before anyone
+ * types. Ticked, the buyer gives just their name and mobile (for order
+ * updates) and the address becomes the recipient's; the parcel carries no
+ * price. City is a list (the big three first, then A to Z, then "Other city
+ * or town"); a listed city fills in its province, so Province is only asked
+ * for "Other". A second number for the courier is optional.
+ *
  * Double-submit safety: each attempt carries an idempotency key derived
  * from (mount nonce + what's being bought), so a double click returns the
  * same order, while changing the quantity or address makes a new one.
@@ -37,7 +45,8 @@ import { RepickSheet } from "../upload/RepickSheet";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
 import { finishName, formatPKR, PRICE_LIST, printedPageCount, quote } from "@shared/pricing";
-import { PK_PROVINCES, STATUS_LABEL, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
+import { PK_PROVINCES, STATUS_LABEL, giftSenderSchema, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
+import { PK_CITIES, TOP_CITIES, provinceOf } from "@shared/cities";
 import { useOrdered } from "../useOrdered";
 import { discountFor } from "@shared/promo";
 import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
@@ -59,6 +68,7 @@ type AddressForm = Omit<ShippingAddress, "province"> & { province: string };
 const EMPTY_ADDRESS: AddressForm = {
   fullName: "",
   phone: "",
+  altPhone: "",
   line1: "",
   line2: "",
   city: "",
@@ -86,6 +96,9 @@ function loadAddress(): AddressForm | null {
     return null;
   }
 }
+
+/** The city list's value for "Other city or town". */
+const OTHER_CITY = "__other";
 
 /** Small stable string hash (djb2) — only used to fingerprint a checkout attempt. */
 function hash(s: string): string {
@@ -148,6 +161,39 @@ export function OrderScreen({
         phone: user?.phone ?? "",
       },
   );
+  /*
+   * A gift: the buyer's own name and mobile, kept apart from the address,
+   * which is then the recipient's. Ticking moves whatever the buyer already
+   * typed into these, so nothing is typed twice; unticking moves it back.
+   */
+  const [gift, setGift] = useState(false);
+  const [sender, setSender] = useState({ name: user?.name ?? "", phone: user?.phone ?? "" });
+  const toggleGift = (on: boolean) => {
+    setGift(on);
+    setFieldErrors({});
+    if (on) {
+      setSender({ name: addr.fullName || user?.name || "", phone: addr.phone || user?.phone || "" });
+      setAddr((a) => ({ ...a, fullName: "", phone: "", altPhone: "" }));
+    } else {
+      setAddr((a) => ({ ...a, fullName: a.fullName || sender.name, phone: a.phone || sender.phone }));
+    }
+  };
+  /** "Other city or town": the city is typed and the province chosen by hand. */
+  const [otherCity, setOtherCity] = useState(() => Boolean(addr.city.trim()) && !provinceOf(addr.city));
+  const pickCity = (value: string) => {
+    setFieldErrors((fe) => ({ ...fe, city: "", province: "" }));
+    if (value === OTHER_CITY) {
+      setOtherCity(true);
+      setAddr((a) => ({ ...a, city: "", province: "" }));
+      return;
+    }
+    setOtherCity(false);
+    setAddr((a) => ({ ...a, city: value, province: provinceOf(value) ?? "" }));
+  };
+  // listed cities are shown by their canonical spelling, whatever was saved
+  const listedCity = PK_CITIES.find((c) => c.name.toLowerCase() === addr.city.trim().toLowerCase())?.name ?? "";
+  const cityChoice = otherCity ? OTHER_CITY : listedCity;
+
   // Same quote the server will make: the pages inside the book decide the
   // extra sheets, and the address decides the remote-area delivery charge, so
   // the total updates while the customer types their city and province.
@@ -276,30 +322,35 @@ export function OrderScreen({
   });
 
   const idempotencyKey = useMemo(
-    () => `${nonce.current}-${hash(JSON.stringify([state.projectId, q.binding, state.finish, q.qty, addr]))}`,
-    [state.projectId, q.binding, state.finish, q.qty, addr],
+    () => `${nonce.current}-${hash(JSON.stringify([state.projectId, q.binding, state.finish, q.qty, addr, gift && sender]))}`,
+    [state.projectId, q.binding, state.finish, q.qty, addr, gift, sender],
   );
 
   const onPay = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     const parsed = shippingAddressSchema.safeParse(addr);
-    if (!parsed.success) {
+    const giftParsed = gift ? giftSenderSchema.safeParse(sender) : null;
+    if (!parsed.success || (giftParsed && !giftParsed.success)) {
       const fe: Record<string, string> = {};
-      for (const issue of parsed.error.issues) fe[String(issue.path[0])] ||= issue.message;
+      if (giftParsed && !giftParsed.success) for (const issue of giftParsed.error.issues) fe[issue.path[0] === "name" ? "senderName" : "senderPhone"] ||= issue.message;
+      if (!parsed.success) for (const issue of parsed.error.issues) fe[String(issue.path[0])] ||= issue.message;
+      if (!addr.city.trim()) fe.city = otherCity ? "Enter the city or town" : "Choose a city";
       if (!addr.province) fe.province = "Choose a province";
       setFieldErrors(fe);
       // take them to the first problem
       requestAnimationFrame(() => (document.querySelector('.bb-ship [aria-invalid="true"]') as HTMLElement | null)?.focus());
       return;
     }
+    if (!parsed.success) return; // unreachable: narrows the type below
     if (!state.projectId) {
       setError("This book hasn't been saved to your account yet. Go back one step and try again.");
       return;
     }
     setBusy(true);
     try {
-      localStorage.setItem(ADDRESS_KEY, JSON.stringify(parsed.data));
+      // remembered for next time, but not a gift recipient's address
+      if (!gift) localStorage.setItem(ADDRESS_KEY, JSON.stringify(parsed.data));
     } catch {
       /* private mode — fine */
     }
@@ -314,6 +365,7 @@ export function OrderScreen({
           finish: state.finish,
           qty: q.qty,
           address: parsed.data,
+          gift: giftParsed?.success ? giftParsed.data : undefined,
           document: toDocument(state),
           idempotencyKey: `${idempotencyKey}-${method}`,
           method,
@@ -348,7 +400,7 @@ export function OrderScreen({
       }
       if (!res.ok || !data.checkoutUrl) {
         setError(data.error ?? "Something went wrong. Please try again.");
-        if (data.fields) setFieldErrors(Object.fromEntries(Object.entries(data.fields).map(([k, v]) => [k.replace(/^address\./, ""), v])));
+        if (data.fields) setFieldErrors(Object.fromEntries(Object.entries(data.fields).map(([k, v]) => [k === "gift.name" ? "senderName" : k === "gift.phone" ? "senderPhone" : k.replace(/^address\./, ""), v])));
         setBusy(false);
         return;
       }
@@ -442,39 +494,121 @@ export function OrderScreen({
             <h2 className="co-h" id="co-ship-h">
               Where should we send it?
             </h2>
+            {/* first, before anyone types: whose details go below depends on it */}
+            <label className="co-tick">
+              <input type="checkbox" checked={gift} disabled={busy} onChange={(e) => toggleGift(e.target.checked)} />
+              <span>
+                Sending this as a gift?
+                {gift ? <small>The parcel won't show any price. Just add their details.</small> : null}
+              </span>
+            </label>
+            {gift ? (
+              <fieldset className="bb-ship co-ship" disabled={busy}>
+                <legend className="co-sub">
+                  Your details <small>For your order updates.</small>
+                </legend>
+                <label className="bb-ship-field wide">
+                  <span>Your name</span>
+                  <input
+                    autoComplete="name"
+                    value={sender.name}
+                    onChange={(e) => {
+                      setSender((x) => ({ ...x, name: e.target.value }));
+                      if (fieldErrors.senderName) setFieldErrors((fe) => ({ ...fe, senderName: "" }));
+                    }}
+                    aria-invalid={Boolean(fieldErrors.senderName) || undefined}
+                  />
+                  {fieldErrors.senderName ? <em>{fieldErrors.senderName}</em> : null}
+                </label>
+                <label className="bb-ship-field wide">
+                  <span>Your mobile number</span>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="0300 1234567"
+                    value={sender.phone}
+                    onChange={(e) => {
+                      setSender((x) => ({ ...x, phone: e.target.value }));
+                      if (fieldErrors.senderPhone) setFieldErrors((fe) => ({ ...fe, senderPhone: "" }));
+                    }}
+                    aria-invalid={Boolean(fieldErrors.senderPhone) || undefined}
+                  />
+                  {fieldErrors.senderPhone ? <em>{fieldErrors.senderPhone}</em> : null}
+                </label>
+              </fieldset>
+            ) : null}
             <fieldset className="bb-ship co-ship" disabled={busy} aria-labelledby="co-ship-h">
+              {gift ? <legend className="co-sub">Their details</legend> : null}
               <label className="bb-ship-field wide">
-                <span>Full name</span>
-                <input autoComplete="name" {...field("fullName")} />
+                <span>{gift ? "Their name" : "Full name"}</span>
+                <input autoComplete={gift ? "off" : "name"} {...field("fullName")} />
                 {fieldErrors.fullName ? <em>{fieldErrors.fullName}</em> : null}
               </label>
               <label className="bb-ship-field wide">
-                <span>Mobile number</span>
-                <input type="tel" inputMode="tel" autoComplete="tel" placeholder="0300 1234567" {...field("phone")} />
+                <span>{gift ? "Their mobile number" : "Mobile number"}</span>
+                <input type="tel" inputMode="tel" autoComplete={gift ? "off" : "tel"} placeholder="0300 1234567" {...field("phone")} />
                 {fieldErrors.phone ? <em>{fieldErrors.phone}</em> : null}
               </label>
               <label className="bb-ship-field wide">
+                <span>
+                  Another number <i>(optional)</i>
+                </span>
+                <input type="tel" inputMode="tel" autoComplete="off" placeholder="In case the courier can't reach the first" {...field("altPhone")} />
+                {fieldErrors.altPhone ? <em>{fieldErrors.altPhone}</em> : null}
+              </label>
+              <label className="bb-ship-field wide">
                 <span>Address</span>
-                <input autoComplete="street-address" placeholder="House, street, area, landmark" {...field("line1")} />
+                <input autoComplete={gift ? "off" : "street-address"} placeholder="House, street, area, landmark" {...field("line1")} />
                 {fieldErrors.line1 ? <em>{fieldErrors.line1}</em> : null}
               </label>
-              <label className="bb-ship-field">
+              <label className="bb-ship-field wide">
                 <span>City</span>
-                <input autoComplete="address-level2" {...field("city")} />
-                {fieldErrors.city ? <em>{fieldErrors.city}</em> : null}
-              </label>
-              <label className="bb-ship-field">
-                <span>Province</span>
-                <select autoComplete="address-level1" {...field("province")}>
-                  <option value="">Choose…</option>
-                  {PK_PROVINCES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
+                <select value={cityChoice} onChange={(e) => pickCity(e.target.value)} aria-invalid={Boolean(fieldErrors.city && !otherCity) || undefined}>
+                  <option value="" disabled>
+                    Choose your city
+                  </option>
+                  <optgroup label="Most chosen">
+                    {TOP_CITIES.map((c) => (
+                      <option key={"top-" + c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All cities">
+                    {PK_CITIES.map((c) => (
+                      <option key={c.name + c.province} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Not listed?">
+                    <option value={OTHER_CITY}>Other city or town</option>
+                  </optgroup>
                 </select>
-                {fieldErrors.province ? <em>{fieldErrors.province}</em> : null}
+                {fieldErrors.city && !otherCity ? <em>{fieldErrors.city}</em> : null}
               </label>
+              {otherCity ? (
+                <>
+                  <label className="bb-ship-field wide">
+                    <span>City or town</span>
+                    <input autoComplete={gift ? "off" : "address-level2"} {...field("city")} />
+                    {fieldErrors.city ? <em>{fieldErrors.city}</em> : null}
+                  </label>
+                  <label className="bb-ship-field wide">
+                    <span>Province</span>
+                    <select autoComplete={gift ? "off" : "address-level1"} {...field("province")}>
+                      <option value="">Choose…</option>
+                      {PK_PROVINCES.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.province ? <em>{fieldErrors.province}</em> : null}
+                  </label>
+                </>
+              ) : null}
             </fieldset>
           </section>
 

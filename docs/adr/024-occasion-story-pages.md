@@ -51,7 +51,8 @@ that "Rs xxx" means the real price.
    tick box yet. It is in the Checkout Copy doc, marked "missing in current
    build". So the question "Can I send it as a gift to the couple?" is held
    back, and the exact text sits in a comment in occasion-stories.ts. It
-   goes back in when the gift option ships.
+   goes back in when the gift option ships. Restored 2026-11-28, when the gift
+   box shipped (ADR 025).
 
 ## Consequences
 

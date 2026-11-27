@@ -399,6 +399,10 @@ export const orders = pgTable(
     shippingAddress: jsonb("shipping_address").notNull(),
     contactEmail: text("contact_email").notNull(),
     contactPhone: text("contact_phone").notNull(),
+    /** who placed it; differs from the address's name when it's a gift (null on orders before 2026-11-28) */
+    contactName: text("contact_name"),
+    /** sent to someone else as a gift: no price or invoice in the parcel (docs/adr/025) */
+    isGift: boolean("is_gift").notNull().default(false),
     /** `safepay` | `fake` (dev) */
     paymentProvider: text("payment_provider").notNull(),
     /** provider's payment session id (Safepay tracker token) */

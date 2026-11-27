@@ -110,7 +110,7 @@ ordersRouter.post(
     const user = await storage.getUser(currentUser(req).id);
     if (!user) return res.status(401).json({ error: "Sign-in required", code: "UNAUTHENTICATED" });
     try {
-      const credit = await orderAffiliate(req, { id: user.id, email: user.email, phone: body.address.phone }).catch(() => null);
+      const credit = await orderAffiliate(req, { id: user.id, email: user.email, phone: body.gift?.phone ?? body.address.phone }).catch(() => null);
       const { order, checkoutUrl } = await createOrder(user, body, credit);
       res.status(201).json({ order: publicOrder(order), checkoutUrl });
     } catch (err) {

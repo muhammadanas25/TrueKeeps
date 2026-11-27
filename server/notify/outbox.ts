@@ -44,7 +44,8 @@ type WhatsAppPayload = { kind: "whatsapp"; template: string | null; lang: string
 /** Variables every order event can use. */
 export function orderVars(order: Order): Vars {
   const addr = order.shippingAddress as { fullName?: string; city?: string } | null;
-  const firstName = (addr?.fullName ?? "").trim().split(/\s+/)[0] || "there";
+  // the buyer's name: on a gift the address is the recipient's
+  const firstName = (order.contactName ?? addr?.fullName ?? "").trim().split(/\s+/)[0] || "there";
   return {
     orderNumber: order.orderNumber,
     title: order.title,

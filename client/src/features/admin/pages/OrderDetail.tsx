@@ -70,7 +70,16 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
   const [st, stTone] = STATUS[status] ?? [status, "muted"];
   const job = printJobs[0];
   const [pr, prTone] = printTone(job?.state, job?.problems?.length ?? 0);
-  const addressText = [a.fullName, a.line1, a.line2, `${a.city}, ${a.province}${a.postalCode ? " " + a.postalCode : ""}`, a.phone].filter(Boolean).join("\n");
+  const addressText = [
+    a.fullName,
+    a.line1,
+    a.line2,
+    `${a.city}, ${a.province}${a.postalCode ? " " + a.postalCode : ""}`,
+    a.phone,
+    a.altPhone ? `Other number: ${a.altPhone}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
   const c = courier ?? o.courier ?? "";
   const t = tracking ?? o.trackingNumber ?? "";
 
@@ -124,6 +133,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
         <h1 style={{ flex: "0 1 auto" }}>{o.orderNumber}</h1>
         <Pill tone={stTone}>{st}</Pill>
         {!o.livemode ? <Pill tone="warn">TEST order: never print</Pill> : null}
+        {o.isGift ? <Pill tone="bad">GIFT: no price or invoice in the parcel</Pill> : null}
         <span className="oc-sub" style={{ flex: "1 1 auto" }}>
           "{o.title}" · {o.binding} · {o.pageCount} pages · {o.finish}
           {o.qty > 1 ? ` · ${o.qty} copies` : ""} · {money(o.totalMinor)}
@@ -245,7 +255,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
           <section className="oc-card" aria-labelledby="cu">
             <h2 id="cu">Customer</h2>
             <div>
-              <b style={{ fontSize: 16, color: "#2A1E5C" }}>{a.fullName}</b>
+              <b style={{ fontSize: 16, color: "#2A1E5C" }}>{o.contactName ?? a.fullName}</b>
               <div className="oc-sub">
                 {customer.orders > 1 ? `${customer.orders} orders` : "First order"}
                 {customer.spentMinor !== null ? ` · ${money(customer.spentMinor)} paid in total` : ""}
@@ -272,7 +282,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
             </div>
             <div style={{ padding: "10px 12px", borderRadius: 10, background: "#FBF6F0", display: "flex", flexDirection: "column", gap: 6 }}>
               <span className="oc-small" style={{ fontWeight: 700 }}>
-                SHIP TO
+                {o.isGift ? "SHIP TO (A GIFT: NO PRICE OR INVOICE IN THE PARCEL)" : "SHIP TO"}
               </span>
               <address style={{ fontStyle: "normal", fontSize: 15, lineHeight: "22px", color: "#2A1E5C", whiteSpace: "pre-line" }}>{addressText}</address>
               <div className="oc-row">

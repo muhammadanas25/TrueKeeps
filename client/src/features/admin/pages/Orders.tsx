@@ -179,7 +179,14 @@ export function OrdersPage({ me }: { me: StaffMe }) {
                         </td>
                         <td>
                           <div className="stack">
-                            <b style={{ color: "#2A1E5C", fontWeight: 600 }}>{r.customer || "—"}</b>
+                            <b style={{ color: "#2A1E5C", fontWeight: 600 }}>
+                              {r.customer || "—"}
+                              {r.gift ? (
+                                <span className="oc-small" style={{ marginLeft: 6, fontWeight: 700, color: "#A5324A" }}>
+                                  GIFT
+                                </span>
+                              ) : null}
+                            </b>
                             <a href={`tel:${r.phone}`} className="oc-small" style={{ color: "#404442" }}>
                               {r.phone}
                             </a>

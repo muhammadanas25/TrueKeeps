@@ -243,7 +243,10 @@ export async function createOrder(
           documentSnapshot: doc,
           shippingAddress: body.address,
           contactEmail: user.email,
-          contactPhone: body.address.phone,
+          // a gift goes to the recipient's address, but its updates go to the buyer
+          contactPhone: body.gift?.phone ?? body.address.phone,
+          contactName: body.gift?.name ?? body.address.fullName,
+          isGift: Boolean(body.gift),
           // a bank transfer is real money wherever the live site runs
           paymentProvider: bank ? BANK_TRANSFER_PROVIDER : paymentProvider!.name,
           livemode: bank ? config.isProd : paymentProvider!.livemode,
@@ -262,7 +265,7 @@ export async function createOrder(
   if (!order) throw new OrderError("Could not create the order, please try again", 500, "ORDER_CREATE_FAILED");
 
   // remember the phone for next time (profile convenience, not required)
-  if (!user.phone) void storage.updateUser(user.id, { phone: body.address.phone }).catch(() => undefined);
+  if (!user.phone) void storage.updateUser(user.id, { phone: body.gift?.phone ?? body.address.phone }).catch(() => undefined);
 
   // 4a. bank transfer: no gateway; the customer gets the instructions by email too
   if (bank) {

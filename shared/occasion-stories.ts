@@ -15,7 +15,8 @@
  *  - no price block (binding, extra sheets, delivery) on these pages; the price
  *    line links to /photo-books instead
  *  - truth rule (PRODUCT.md): an answer that describes something the site
- *    can't do yet stays out until it can (see the gift question below)
+ *    can't do yet stays out until it can (the gift question waited for the
+ *    gift box at checkout, docs/adr/025)
  */
 
 export interface OccasionStory {
@@ -83,10 +84,8 @@ export const OCCASION_STORIES: Partial<Record<string, OccasionStory>> = {
         q: "Can I put our names and date on the cover?",
         a: "Yes. Add your names as the title, and a date or place on the line under it.",
       },
-      // Held back until checkout has the gift tick box (Checkout Copy, Step 7:
-      // "Gift tick box — NEW: missing in current build"). Put it back, exactly:
-      //   q: "Can I send it as a gift to the couple?"
-      //   a: "Yes. Tick “Sending this as a gift?” at checkout, and we won’t put any price in the parcel."
+      // back since the gift tick box shipped (docs/adr/025)
+      { q: "Can I send it as a gift to the couple?", a: "Yes. Tick “Sending this as a gift?” at checkout, and we won’t put any price in the parcel." },
       { q: "How long does it take?", a: "We print it in 2 to 3 days, and the courier brings it in 2 to 4." },
     ],
     closing: "One day you’ll be glad you made it.",
