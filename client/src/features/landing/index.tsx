@@ -23,10 +23,10 @@ export default function LandingPage() {
       <Hero />
       <TrustStrip />
       <HowItWorks />
-      {/* the two grey chapters open with a hairline divider (owner, 2026-11-26/27) */}
+      {/* light sections alternate lavender / grey; each opens with a hairline in its own colour (owner, 2026-11-27/28) */}
       <BookDivider tone="warm" />
       <KnowAlbum />
-      <BookDivider tone="warm" />
+      <BookDivider />
       <Occasions />
       <PlainFacts />
       <FinalCTA />

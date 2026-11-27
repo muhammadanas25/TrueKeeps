@@ -99,3 +99,9 @@ out from the centre on scroll, and Know your album plus the occasions sit on
 meant the stage behind the book. The tan board (#E8DCCD) on steps 3 to 6 is
 now Paper beige (`--surface-stage`), and step 3's question side is lavender
 like every other step; the `ck-warm` exception was removed.
+
+**Revised 2026-11-28:** the light landing sections now alternate lavender
+and grey: How it works (#F7F5FF), Know your album (#F4F4F4), Occasions
+(#F7F5FF), Pakistan's Online Album Maker (#F4F4F4). The last one had used a
+third colour (`--surface-quiet`, indigo 50); it now uses `--lp-band`. Each
+hairline divider takes the colour of the section it opens.

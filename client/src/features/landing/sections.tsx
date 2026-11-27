@@ -366,7 +366,8 @@ export function HowItWorks() {
  * it single line"). The scroll observer (useScrollReveal) stamps `.in`; the
  * line is drawn and still without motion. Decorative, so aria-hidden.
  *
- * `tone` paints the band behind it to match the sections either side.
+ * `tone` paints the band behind it to match the section it opens
+ * ("warm" = the grey #F4F4F4 band, "page" = lavender).
  */
 export function BookDivider({ tone = "page" }: { tone?: "page" | "warm" }) {
   return (
@@ -462,7 +463,7 @@ export function KnowAlbum() {
 export function Occasions() {
   return (
     // the second ground (landing.css --lp-band), shared with Know your album
-    <section className="lp-section lp-warm" id="occasions">
+    <section className="lp-section" id="occasions">
       <div className="lp-wrap lp-center">
         <div className="lp-eyebrow center">Pick your occasion</div>
         <h2 className="lp-h2">

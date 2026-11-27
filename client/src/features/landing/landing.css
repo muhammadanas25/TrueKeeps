@@ -187,7 +187,8 @@ a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px
 @media (prefers-reduced-motion: reduce) { .lp-occ-img img { transition: none; } .lp-occ-card:hover .lp-occ-img img { transform: none; } }
 
 /* ── plain facts (home) ─────────────────────── */
-.lp-facts { padding: clamp(48px, 6vw, 80px) 0; background: var(--surface-quiet); }
+/* grey band: the light sections alternate lavender / #F4F4F4 (owner 2026-11-28) */
+.lp-facts { padding: clamp(48px, 6vw, 80px) 0; background: var(--lp-band); }
 .lp-facts .lp-link { margin-top: 18px; }
 
 /* ── photo-book pages (pages.tsx) ───────────── */
@@ -271,7 +272,11 @@ a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px
    One hairline, centred. Under html.motion-ok it starts at zero width and
    draws out from the middle when the scroll observer stamps .in; open and
    still otherwise (prerender, headless, reduced motion). The owner tried
-   the opening-book version and asked for a single line (2026-11-27). */
+   the opening-book version and asked for a single line (2026-11-27).
+   The light sections alternate lavender page / grey band (2026-11-28):
+   How it works (page) → Know your album (band) → Occasions (page) →
+   Online Album Maker (band). Each divider takes the colour of the section
+   it opens. */
 .lp-warm { background: var(--lp-band); }
 .lp-divider-band { padding: clamp(40px, 5vw, 64px) 0 0; }
 .lp-divider-band + .lp-know { padding-top: 40px; }
