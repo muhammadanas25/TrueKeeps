@@ -394,3 +394,79 @@ html.motion-ok .lp-divider:not(.in) { transform: scaleX(0); }
 .lp-doc-table td { padding: 10px 14px; border-top: 1px solid var(--color-border); vertical-align: top; }
 .lp-doc-table td:last-child { white-space: nowrap; font-weight: 600; }
 .lp-doc-more { margin-top: 36px !important; padding-top: 18px; border-top: 1px solid var(--color-border); font-size: 15px !important; color: var(--color-fg2) !important; }
+
+/* ── occasion story pages (occasion-story.tsx; wedding copy 2026-11-28) ──
+   Approved on the design canvas "Truekeeps: Wedding page". The light sections
+   alternate lavender page / grey band (.lp-warm), as on the homepage. All
+   rules are scoped .os-* so they can't move the other public pages. */
+.os main { padding-bottom: 0; }
+.os-hero { padding-bottom: clamp(56px, 7vw, 96px); }
+.os-hero img { aspect-ratio: 1; object-fit: cover; }
+.os-sec { padding: clamp(64px, 7vw, 104px) 0; }
+.os-sec .lp-h2 { margin-top: 0; }
+.lp-center .lp-lede { margin-left: auto; margin-right: auto; }
+
+/* why print: four white cards, bold heading + short paragraph */
+.os-why { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 48px; }
+.os-card { background: var(--surface-card); border: 1px solid var(--tk-mist-200); border-radius: var(--radius-lg); padding: 30px 32px 32px; }
+.lp .os-card h3 { font-family: var(--font-body); font-size: 19px; line-height: 27px; font-weight: 700; color: var(--heading); margin: 0 0 8px; }
+.os-card p { margin: 0; color: var(--color-fg1); }
+
+/* what to put in it: title left, ticked list right */
+.os-what { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: clamp(32px, 6vw, 96px); align-items: start; }
+.os-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-border); }
+.os-list li { display: flex; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--color-border); font-size: 18px; line-height: 26px; font-weight: 500; color: var(--heading); }
+.os-tick { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--selected-bg); color: var(--heading); }
+
+/* cover styles: each cover on the builder's beige stage */
+.os-covers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 48px; }
+.lp .os-cover-card h3 { font-family: var(--font-body); font-size: 18px; line-height: 26px; font-weight: 700; color: var(--heading); margin: 18px 0 2px; }
+.os-cover-card p { margin: 0; font-size: 15px; line-height: 24px; color: var(--color-fg2); }
+.os-stage { background: radial-gradient(60% 50% at 50% 42%, var(--surface-stage-glow) 0%, transparent 72%), var(--surface-stage); border-radius: var(--radius-lg); padding: clamp(28px, 3.4vw, 44px); }
+.os-cv { container-type: inline-size; position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 2px 5px 5px 2px; box-shadow: 0 1px 2px rgba(22, 20, 41, 0.08), 0 22px 40px -18px rgba(22, 20, 41, 0.45); }
+.os-cv::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7%; background: linear-gradient(to right, rgba(0, 0, 0, 0.16), transparent); z-index: 3; }
+.os-cv img { position: absolute; object-fit: cover; }
+.os-cv-words { position: absolute; left: 10%; right: 10%; text-align: center; }
+.os-cv-title { font-family: 'Instrument Serif', Georgia, serif; font-size: 8.4cqi; line-height: 1.1; }
+.os-cv-rule { width: 12%; height: 2px; margin: 5% auto 0; }
+.os-cv-sub { font-size: 3.6cqi; line-height: 1.3; margin-top: 4%; opacity: 0.85; letter-spacing: 0.04em; }
+.os-cv-minimal { background: #FBF8F3; color: #3B2F2A; }
+.os-cv-minimal img { left: 28%; top: 11%; width: 44%; height: 44%; }
+.os-cv-minimal .os-cv-words { top: 62%; }
+.os-cv-minimal .os-cv-rule { background: #B08A5A; }
+.os-cv-photo { background: #fff; }
+.os-cv-photo img { left: 4.17%; top: 4.17%; width: 91.66%; height: 91.66%; }
+.os-cv-text { background: #6E2639; color: #F6EBDD; }
+.os-cv-text .os-cv-words { top: 38.2%; transform: translateY(-50%); }
+.os-cv-text .os-cv-rule { background: #D9A86C; }
+/* "your title on the spine": a narrow spine strip beside the photo cover */
+.os-spine { display: flex; }
+.os-spine .os-cv { flex: 1; border-radius: 0 5px 5px 0; }
+.os-spine .os-cv::before { display: none; }
+.os-spine-strip { flex: none; width: 7%; display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl; transform: rotate(180deg); background: #E6E0D6; color: #3B2F2A; font-family: 'Instrument Serif', Georgia, serif; font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; border-radius: 0 2px 2px 0; box-shadow: 0 22px 40px -18px rgba(22, 20, 41, 0.45); }
+
+/* price line under the steps */
+.os-price { margin: 40px 0 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 14px; font-size: 18px; line-height: 28px; font-weight: 500; color: var(--heading); text-align: center; }
+
+/* other occasions: four a row, the rest centred */
+.os-occ { display: flex; flex-wrap: wrap; justify-content: center; gap: 36px 24px; margin-top: 48px; }
+.os-occ .os-occ-card { flex: 0 0 calc((100% - 72px) / 4); }
+.lp .os-occ-card h3 { font-family: var(--font-body); font-size: 16px; line-height: 24px; font-weight: 700; color: var(--heading); margin: 0; }
+
+.os-faq { margin: 40px auto 0; }
+
+@media (max-width: 960px) {
+  .os-what { grid-template-columns: 1fr; }
+  .os-occ .os-occ-card { flex-basis: calc((100% - 48px) / 3); }
+}
+@media (max-width: 720px) {
+  .os-why { grid-template-columns: 1fr; gap: 12px; margin-top: 32px; }
+  .os-card { padding: 22px 22px 24px; }
+  .os-list li { font-size: 17px; }
+  /* .os-covers is declared after .lp-rail, so its grid must be switched back to the rail here */
+  .lp-rail.os-covers { display: flex; margin-top: 32px; }
+  .lp-rail.os-covers .os-cover-card { flex: 0 0 80%; }
+  .os-occ { gap: 28px 14px; margin-top: 32px; }
+  .os-occ .os-occ-card { flex-basis: calc((100% - 14px) / 2); }
+  .os-price { font-size: 17px; }
+}

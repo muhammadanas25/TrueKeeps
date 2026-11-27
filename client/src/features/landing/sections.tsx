@@ -56,7 +56,7 @@ import { SUPPORT_WHATSAPP } from "@shared/payments";
 /** The brand's Instagram (website copy v1). */
 const INSTAGRAM = { handle: "@thetruekeeps", url: "https://www.instagram.com/thetruekeeps" };
 /** "Your own mix": no page of its own yet, so it opens the builder on that occasion. */
-const OWN_MIX_HREF = "/wizard?occasion=mix";
+export const OWN_MIX_HREF = "/wizard?occasion=mix";
 
 /** Route the marketing CTAs land on — the quiz-first book builder. */
 export const BUILDER_PATH = "/wizard";
@@ -204,7 +204,7 @@ export function TrustStrip() {
  * The dots are a decorative position cue (aria-hidden, not controls); people
  * move the rail by swiping or by keyboard scroll.
  */
-function SwipeRail({ className, label, children }: { className: string; label: string; children: ReactNode }) {
+export function SwipeRail({ className, label, children }: { className: string; label: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [overflowing, setOverflowing] = useState(false);
   const [active, setActive] = useState(0);
@@ -301,6 +301,50 @@ function PickPhotosArt() {
   );
 }
 
+/**
+ * HowSteps — the three "How it works" cards (art, number, title, line), shared
+ * by the homepage and the occasion story pages so the steps read the same
+ * everywhere (wedding page copy: "Same as the landing page").
+ */
+export function HowSteps() {
+  return (
+    <>
+      <SwipeRail className="lp-steps" label="How it works, three steps">
+        <div className="lp-step lp-reveal">
+          <div className="lp-step-vis">
+            <OccasionArt />
+          </div>
+          <h3>
+            <span className="lp-step-num">1</span>
+            Pick the moment
+          </h3>
+          <p>Wedding, new baby, birthday or a trip. Tell us the occasion and we set the look.</p>
+        </div>
+        <div className="lp-step lp-reveal">
+          <div className="lp-step-vis">
+            <PickPhotosArt />
+          </div>
+          <h3>
+            <span className="lp-step-num">2</span>
+            Add your favourites
+          </h3>
+          <p>Pick the photos you love. We make sure each photo is good enough to print.</p>
+        </div>
+        <div className="lp-step lp-reveal">
+          <div className="lp-step-vis">
+            <img src={how3} alt="A finished hardcover album" width={521} height={255} loading="lazy" />
+          </div>
+          <h3>
+            <span className="lp-step-num">3</span>
+            We do the layout
+          </h3>
+          <p>Every page is set for you. Preview it live, edit as you like, then order.</p>
+        </div>
+      </SwipeRail>
+    </>
+  );
+}
+
 export function HowItWorks() {
   return (
     <section className="lp-section" id="how">
@@ -313,38 +357,7 @@ export function HowItWorks() {
         </p>
       </div>
       <div className="lp-wrap">
-        <SwipeRail className="lp-steps" label="How it works, three steps">
-          <div className="lp-step lp-reveal">
-            <div className="lp-step-vis">
-              <OccasionArt />
-            </div>
-            <h3>
-              <span className="lp-step-num">1</span>
-              Pick the moment
-            </h3>
-            <p>Wedding, new baby, birthday or a trip. Tell us the occasion and we set the look.</p>
-          </div>
-          <div className="lp-step lp-reveal">
-            <div className="lp-step-vis">
-              <PickPhotosArt />
-            </div>
-            <h3>
-              <span className="lp-step-num">2</span>
-              Add your favourites
-            </h3>
-            <p>Pick the photos you love. We make sure each photo is good enough to print.</p>
-          </div>
-          <div className="lp-step lp-reveal">
-            <div className="lp-step-vis">
-              <img src={how3} alt="A finished hardcover album" width={521} height={255} loading="lazy" />
-            </div>
-            <h3>
-              <span className="lp-step-num">3</span>
-              We do the layout
-            </h3>
-            <p>Every page is set for you. Preview it live, edit as you like, then order.</p>
-          </div>
-        </SwipeRail>
+        <HowSteps />
         <div className="lp-steps-cta">
           <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
             Start my album <ArrowRight size={18} />
@@ -523,7 +536,23 @@ export function PlainFacts() {
  * on the /photo-books hub, where "Explore designs" would link to the page
  * itself; `heading` lets the Prices page close on its own line.
  */
-export function FinalCTA({ showDesigns = true, heading }: { showDesigns?: boolean; heading?: string }) {
+/**
+ * FinalCTA — the dark closing panel.
+ * `minimal` keeps only the heading and the button (occasion story pages, whose
+ * copy has a closing line and a button and nothing else); `href` lets the
+ * button open the builder on an occasion.
+ */
+export function FinalCTA({
+  showDesigns = true,
+  heading,
+  minimal = false,
+  href = BUILDER_PATH,
+}: {
+  showDesigns?: boolean;
+  heading?: string;
+  minimal?: boolean;
+  href?: string;
+}) {
   return (
     // Centred closing panel on Indigo 900: Banner 03 is only a faint texture
     // under two soft glows (Indigo and Rose), as in the owner's preferred
@@ -534,20 +563,22 @@ export function FinalCTA({ showDesigns = true, heading }: { showDesigns?: boolea
       <div className="lp-cta-glow rose" aria-hidden="true"></div>
       <div className="lp-wrap">
         <div className="lp-cta-inner">
-          <div className="lp-eyebrow center">It only takes a few minutes</div>
+          {minimal ? null : <div className="lp-eyebrow center">It only takes a few minutes</div>}
           <h2 className="lp-h2">{heading ?? "One day you'll be glad you printed them."}</h2>
-          <p>We do the layout, you add the love. See every page before you order.</p>
+          {minimal ? null : <p>We do the layout, you add the love. See every page before you order.</p>}
           <div className="lp-cta-actions">
-            <Link href={BUILDER_PATH} className="lp-btn lp-btn-main lp-btn-lg">
+            <Link href={href} className="lp-btn lp-btn-main lp-btn-lg">
               Start my album <ArrowRight size={18} />
             </Link>
-            {showDesigns ? (
+            {showDesigns && !minimal ? (
               <Link href="/photo-books" className="lp-btn lp-btn-outline-light lp-btn-lg">
                 Explore designs
               </Link>
             ) : null}
           </div>
-          <div className="lp-cta-sub">No design skills needed · Preview every page, live · Delivered anywhere in Pakistan</div>
+          {minimal ? null : (
+            <div className="lp-cta-sub">No design skills needed · Preview every page, live · Delivered anywhere in Pakistan</div>
+          )}
         </div>
       </div>
     </section>
@@ -566,7 +597,8 @@ export function FinalCTA({ showDesigns = true, heading }: { showDesigns?: boolea
  * right after a reload partway down the page. The hidden state uses
  * `visibility`, which also takes the link out of the tab order.
  */
-export function StickyCTA() {
+/** `href` lets an occasion page keep its occasion (the builder then skips step 1). */
+export function StickyCTA({ href = BUILDER_PATH }: { href?: string }) {
   const [pastHero, setPastHero] = useState(false);
   const [atEnd, setAtEnd] = useState(false);
 
@@ -589,7 +621,7 @@ export function StickyCTA() {
 
   return (
     <div className={"lp-sticky-cta" + (pastHero && !atEnd ? " on" : "")}>
-      <Link href={BUILDER_PATH} className="lp-btn lp-btn-main">
+      <Link href={href} className="lp-btn lp-btn-main">
         Start my album <ArrowRight size={18} />
       </Link>
     </div>

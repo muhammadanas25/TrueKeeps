@@ -21,6 +21,8 @@ import { SUPPORT_WHATSAPP } from "@shared/payments";
 import { ARRANGEMENTS } from "@/features/builder/arrange";
 import { BOOK_IMAGES } from "./book-images";
 import { BUILDER_PATH, FinalCTA, Footer, Nav, StickyCTA } from "./sections";
+import { storyFor } from "@shared/occasion-stories";
+import { OccasionStoryPage } from "./occasion-story";
 
 /** In-app links keep the old scroll position; a new page should start at the top. */
 function useScrollTopOnMount(key: string) {
@@ -218,9 +220,15 @@ export function PhotoBooksPage() {
   );
 }
 
-/** /photo-books/<slug> — one book type; App.tsx has already validated the slug. */
+/**
+ * /photo-books/<slug> — one book type; App.tsx has already validated the slug.
+ * An occasion with the owner's long-form copy (shared/occasion-stories.ts,
+ * wedding first) gets the story page; the rest keep this shorter page.
+ */
 export function BookTypePage({ book }: { book: BookType }) {
   useScrollTopOnMount(book.slug);
+  const story = storyFor(book.slug);
+  if (story) return <OccasionStoryPage book={book} story={story} />;
   const startHref = `${BUILDER_PATH}?occasion=${book.occasion}`;
   return (
     <div className="lp lp-page">

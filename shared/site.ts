@@ -25,6 +25,7 @@
 import { FAQ_GROUPS, POLICIES, type PolicyPage } from "./info-pages";
 import { DELIVERY_RULE, formatPKR, INCLUDED_PAGES, PRICE_LIST } from "./pricing";
 import { SUPPORT_HOURS } from "./payments";
+import { storyFor } from "./occasion-stories";
 
 export const SITE = {
   url: "https://thetruekeeps.com",
@@ -243,15 +244,18 @@ const WEBSITE = {
   publisher: { "@id": abs("/#organization") },
 };
 
-const FAQ_PAGE = {
+/** FAQPage structured data for questions that are shown, word for word, on the page. */
+const faqPage = (faqs: Array<{ q: string; a: string }>) => ({
   "@context": "https://schema.org",
   "@type": "FAQPage",
-  mainEntity: FAQS.map((f) => ({
+  mainEntity: faqs.map((f) => ({
     "@type": "Question",
     name: f.q,
     acceptedAnswer: { "@type": "Answer", text: f.a },
   })),
-};
+});
+
+const FAQ_PAGE = faqPage(FAQS);
 
 function breadcrumbs(items: Array<{ name: string; path: string }>) {
   return {
@@ -314,6 +318,7 @@ const HUB_META: PageMeta = {
 const bookMeta = (b: BookType): PageMeta => {
   const path = `/photo-books/${b.slug}`;
   const ogImage = `/og/${b.slug}.jpg`;
+  const story = storyFor(b.slug);
   return {
     path,
     title: b.title,
@@ -321,6 +326,8 @@ const bookMeta = (b: BookType): PageMeta => {
     ogImage,
     jsonLd: [
       product(b.productName, b.description, path, ogImage),
+      // an occasion story page (shared/occasion-stories.ts) shows its questions visibly
+      ...(story ? [faqPage(story.faqs)] : []),
       breadcrumbs([
         { name: "Home", path: "/" },
         { name: "Photo books", path: "/photo-books" },
