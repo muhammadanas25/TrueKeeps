@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { BookTypePage, PhotoBooksPage, PolicyPageView, QuestionsPage } from "@/f
 import { policyBySlug } from "@shared/info-pages";
 import { WhatsAppHelpFloating } from "@/features/support/WhatsAppHelp";
 import { startTracking, trackPage } from "@/lib/track";
+import { hasPending } from "@/features/builder/upload/pending";
 
 /*
  * Route-level code splitting: each page loads its own chunk so the
@@ -29,6 +30,8 @@ const Partners = lazy(() => import("@/features/partners"));
 const Feedback = lazy(() => import("@/features/feedback"));
 const AdminFeedback = lazy(() => import("@/pages/admin-feedback"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+const AuthDone = lazy(() => import("@/pages/auth-done"));
+const UploadNotices = lazy(() => import("@/features/builder/upload/UploadNotices"));
 
 /** Minimal, brand-neutral fallback while a route chunk loads. */
 function RouteFallback() {
@@ -126,6 +129,7 @@ function Router() {
           <Redirect to="/wizard" />
         </Route>
         {/* account area (Phase 2A) */}
+        <Route path="/auth/done" component={AuthDone} />
         <Route path="/books" component={Books} />
         <Route path="/account" component={Account} />
         {/* commerce (Phase 2B) */}
@@ -151,12 +155,33 @@ function Router() {
   );
 }
 
+/**
+ * Uploads carry on on every page (docs/adr/023), so their keep-alive and
+ * messages live here. Loaded only for visitors with photos on their way:
+ * from the first visit to the builder, or on a page load that finds photos
+ * kept on the phone from an earlier visit. Decided after mount, so the
+ * prerendered pages never touch localStorage.
+ */
+function UploadNoticesWhenNeeded() {
+  const [path] = useLocation();
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!on && (path.startsWith("/wizard") || hasPending())) setOn(true);
+  }, [path, on]);
+  return on ? (
+    <Suspense fallback={null}>
+      <UploadNotices />
+    </Suspense>
+  ) : null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Router />
+        <UploadNoticesWhenNeeded />
         {/* help on WhatsApp with the customer's context (not on the builder or admin) */}
         <WhatsAppHelpFloating />
       </TooltipProvider>

@@ -386,6 +386,10 @@ export interface BuilderPhoto {
   hd?: boolean;
   /** fingerprint of the source file, to match it again after a closed tab */
   fp?: string;
+  /** the file's name, for the re-add list */
+  name?: string;
+  /** when it was taken (EXIF), local time in ms, for the re-add list */
+  taken?: number;
 }
 
 /* ── Page generation ────────────────────────────────────────── */

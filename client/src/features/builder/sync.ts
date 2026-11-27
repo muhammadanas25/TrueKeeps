@@ -116,6 +116,8 @@ export function toDocument(s: BuilderState): BuilderDocument {
       h: p.h,
       hd: p.hd,
       fp: p.fp,
+      name: p.name,
+      taken: p.taken,
     })),
     pages: s.pages.map((pg) => ({
       id: pg.id,
@@ -169,7 +171,7 @@ export function fromDocument(d: BuilderDocument): Partial<BuilderState> {
     vibe: d.vibe,
     title: d.title,
     // normalizeMediaUrl: older books point at a public bucket that's going private
-    photos: d.photos.map((p) => ({ id: p.id, label: p.label, shade: p.shade, url: normalizeMediaUrl(p.url), w: p.w, h: p.h, hd: p.hd, fp: p.fp })),
+    photos: d.photos.map((p) => ({ id: p.id, label: p.label, shade: p.shade, url: normalizeMediaUrl(p.url), w: p.w, h: p.h, hd: p.hd, fp: p.fp, name: p.name, taken: p.taken })),
     pages: d.pages.map((pg) => ({
       id: pg.id,
       layout: pg.layout,

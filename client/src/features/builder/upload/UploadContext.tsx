@@ -2,11 +2,12 @@
  * Connects the upload engine to the builder.
  *
  * The engine lives outside React; this is the bridge. The provider sits at the
- * shell so any screen can add photos and read progress, and it owns the three
- * things that keep a long upload alive on a phone:
- *   - a screen wake lock, because a sleeping phone suspends the page
- *   - a warning before leaving with originals still to send
- *   - creating the backing project once, however many uploads ask at the same time
+ * shell so any screen can add photos and read progress, and it creates the
+ * backing project once, however many uploads ask at the same time.
+ *
+ * Keeping a long upload alive (the screen wake lock, the warning before
+ * leaving) lives in UploadNotices at the app shell instead, so it works on
+ * every page of the site, not only inside the builder.
  *
  * Progress counts come from the builder's photos where possible, so what the
  * screen says survives a reload and can't drift from the book itself.
@@ -34,7 +35,11 @@ export interface UploadProgress {
 }
 
 export interface UploadApi {
-  addFiles: (files: FileList | File[] | null) => Promise<void>;
+  /**
+   * Add photos to the book. With `onlyMissing`, only photos the book is
+   * waiting on are taken (the re-add list); the result says how many.
+   */
+  addFiles: (files: FileList | File[] | null, opts?: { onlyMissing?: boolean }) => Promise<{ added: number; resumed: number }>;
   /**
    * Delete a photo for good (the remove button on the photos step): it leaves
    * the photo list, every page it was on (that page lays itself out again, or
@@ -66,35 +71,6 @@ function cleanLabel(filename: string): string {
 }
 
 const isImageFile = (f: File) => f.type.startsWith("image/") || /\.hei[cf]$/i.test(f.name);
-
-/** Keep the screen on while there's work to do. Quietly does nothing where unsupported. */
-function useWakeLock(active: boolean) {
-  useEffect(() => {
-    if (!active || !("wakeLock" in navigator)) return;
-    let lock: WakeLockSentinel | null = null;
-    let cancelled = false;
-    const acquire = async () => {
-      try {
-        const next = await navigator.wakeLock.request("screen");
-        if (cancelled) void next.release();
-        else lock = next;
-      } catch {
-        /* refused (low battery, background tab); uploading carries on regardless */
-      }
-    };
-    // the browser drops the lock whenever the tab is hidden
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void acquire();
-    };
-    void acquire();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-      void lock?.release();
-    };
-  }, [active]);
-}
 
 export function UploadProvider({
   state,
@@ -145,26 +121,67 @@ export function UploadProvider({
     [],
   );
 
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files) return;
+  /*
+   * Uploads that finished while the builder was closed (on another page, or
+   * before a reload) never reached this book's state. Ask the server once the
+   * book is open, and once more when the photos carried over from an earlier
+   * visit have all finished, so a photo that's safe never shows blank or asks
+   * to be added again.
+   */
+  const restoredLeft = snapshot.restored?.left;
+  useEffect(() => {
+    const s = stateRef.current;
+    if (!s.projectId || !s.photos.some((p) => (p.hd === false || !p.url) && !uploadEngine.holdsFile(p.id))) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiRequest("GET", `/api/projects/${s.projectId}/photo-status`);
+        const { photos: known } = (await res.json()) as { photos: Array<{ id: string; url: string; hd: boolean }> };
+        const byId = new Map(known.map((k) => [k.id, k]));
+        if (cancelled || !byId.size) return;
+        updatePhotos((photos) =>
+          photos.map((p) => {
+            const k = byId.get(p.id);
+            if (!k) return p;
+            const patch: Partial<BuilderPhoto> = {};
+            if (!p.url && k.url.startsWith("/media/")) patch.url = k.url;
+            if (p.hd === false && k.hd) patch.hd = true;
+            return Object.keys(patch).length ? { ...p, ...patch } : p;
+          }),
+        );
+      } catch {
+        /* offline: the next open asks again */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.projectId, restoredLeft === 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addFiles = async (files: FileList | File[] | null, opts: { onlyMissing?: boolean } = {}) => {
+    const none = { added: 0, resumed: 0 };
+    if (!files) return none;
     const all = Array.from(files);
     const images = all.filter(isImageFile);
     const refused = all.filter((f) => !isImageFile(f)).map((f) => f.name);
-    if (refused.length) uploadEngine.noteRejected(refused);
-    if (!images.length) return;
+    if (refused.length && !opts.onlyMissing) uploadEngine.noteRejected(refused);
+    if (!images.length) return none;
     const occ = occasionById(stateRef.current.occasion);
-    await uploadEngine.add(
+    return uploadEngine.add(
       images,
       stateRef.current.photos,
-      (file, id, fp, n) => ({
+      (file, id, fp, n, meta) => ({
         id,
         fp,
+        name: file.name.slice(0, 255),
+        ...(meta.taken ? { taken: Math.round(meta.taken) } : null),
         // occasion labels give captions charm; filename is the fallback
         label: occ.photoLabels[n % occ.photoLabels.length] || cleanLabel(file.name),
         shade: n % 3,
         hd: false,
       }),
       (fresh) => updatePhotos((photos) => [...photos, ...fresh]),
+      opts,
     );
   };
 
@@ -173,7 +190,7 @@ export function UploadProvider({
     const total = photos.length;
     const inBook = photos.filter((p) => p.url).length;
     const hdDone = photos.filter((p) => p.hd !== false).length;
-    const needRepick = photos.filter((p) => p.hd === false && !uploadEngine.holdsFile(p.id)).length;
+    const needRepick = photos.filter((p) => p.hd === false && !uploadEngine.canFinish(p.id)).length;
     return {
       total,
       inBook,
@@ -182,21 +199,8 @@ export function UploadProvider({
       active: snapshot.active,
       fraction: total ? (inBook + hdDone) / (total * 2) : 0,
     };
-    // the snapshot version moves when holdsFile's answer can change
+    // the snapshot version moves when canFinish's answer can change
   }, [photos, snapshot.version, snapshot.active]);
-
-  useWakeLock(snapshot.active);
-
-  // Warn before leaving only while leaving would actually lose something.
-  useEffect(() => {
-    if (!snapshot.active) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [snapshot.active]);
 
   const removePhoto = (id: string) => {
     uploadEngine.forget(id);

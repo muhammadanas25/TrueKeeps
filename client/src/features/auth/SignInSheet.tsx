@@ -6,7 +6,11 @@
  *  - "order": hard gate before checkout — we need a verified email
  *
  * Methods: Google (one tap, if configured server-side) and email magic
- * link (works for everyone, no password to remember or leak). After
+ * link (works for everyone, no password to remember or leak). Google opens
+ * in a new tab, so this page and any photos it's uploading stay put; that
+ * tab reports back over a BroadcastChannel (client.ts). The session is also
+ * checked again whenever the customer comes back to this tab, which covers
+ * a magic link opened from their email app. After
  * sending a link we stay open showing "check your inbox" — the link
  * lands the user back on `callbackURL` with the session cookie set and
  * their guest draft already merged (server/auth.ts onLinkAccount).
@@ -17,10 +21,10 @@
  */
 
 import { EMAIL_RE, suggestEmail } from "./email-check";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Mail, X, Check, ArrowRight } from "lucide-react";
-import { sendMagicLink, signInWithGoogle } from "./client";
+import { AUTH_CHANNEL, sendMagicLink, signInWithGoogleInNewTab } from "./client";
 import { useSession } from "./useSession";
 import "./auth.css";
 
@@ -67,7 +71,33 @@ export function SignInSheet({
   /** where the magic link / Google callback should land */
   callbackURL?: string;
 }) {
-  const { googleEnabled } = useSession();
+  const { googleEnabled, refresh } = useSession();
+  /** a Google tab is open and we're waiting to hear from it */
+  const [googleTab, setGoogleTab] = useState(false);
+
+  // signed in elsewhere (the Google tab, or a magic link): pick it up here
+  useEffect(() => {
+    let ch: BroadcastChannel | null = null;
+    try {
+      ch = new BroadcastChannel(AUTH_CHANNEL);
+      ch.onmessage = (e) => {
+        setGoogleTab(false);
+        setBusy(false);
+        if (e.data === "failed") setError("Google sign-in didn't finish. Try again, or use your email instead.");
+        void refresh();
+      };
+    } catch {
+      ch = null;
+    }
+    const onBack = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onBack);
+    return () => {
+      ch?.close();
+      document.removeEventListener("visibilitychange", onBack);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
@@ -79,12 +109,18 @@ export function SignInSheet({
   const onGoogle = async () => {
     setBusy(true);
     setError(null);
-    const res = await signInWithGoogle(callbackURL);
+    const res = await signInWithGoogleInNewTab(callbackURL);
     if (res.error) {
-      setError(res.error.message ?? "Google sign-in failed. Try email instead.");
+      setError(res.error);
+      setBusy(false);
+      return;
+    }
+    // new tab: wait to hear from it, but let them try again if they closed it
+    if (res.newTab) {
+      setGoogleTab(true);
       setBusy(false);
     }
-    // success = browser navigates away to Google
+    // otherwise the browser is on its way to Google in this tab
   };
 
   const onEmail = async (e: FormEvent) => {
@@ -147,6 +183,11 @@ export function SignInSheet({
                   <button className="au-google" onClick={onGoogle} disabled={busy}>
                     <GoogleMark /> Continue with Google
                   </button>
+                  {googleTab ? (
+                    <p className="au-fine" role="status">
+                      Finish signing in on the Google tab. You'll come straight back here, and nothing on this page stops.
+                    </p>
+                  ) : null}
                   <div className="au-or">
                     <span>or</span>
                   </div>

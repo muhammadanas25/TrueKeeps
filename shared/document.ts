@@ -43,6 +43,12 @@ const photoSchema = z.object({
   hd: z.boolean().optional(),
   /** Fingerprint of the source file, to match it again if the tab closed mid-upload. */
   fp: z.string().max(32).optional(),
+  /**
+   * The file's name and when it was taken (EXIF, local time in ms), so the
+   * re-add list can say exactly which photos to choose again (RepickSheet).
+   */
+  name: z.string().max(255).optional(),
+  taken: z.number().int().positive().optional(),
 });
 
 /** A photo placed in a page slot with its framing (pan/zoom/rotation). */

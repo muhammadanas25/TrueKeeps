@@ -70,6 +70,26 @@ projectsRouter.get(
   }),
 );
 
+/**
+ * Where each of this book's photos stands on the server: its display copy's
+ * address, and whether its HD copy is in.
+ *
+ * Why: the browser may finish a photo's uploads while the builder isn't open
+ * (uploads run on every page now, docs/adr/023), and a reload loses the
+ * updates it was holding for the builder. The builder asks here when it
+ * opens, so a photo that's safe never shows blank or asks to be added again.
+ */
+projectsRouter.get(
+  "/api/projects/:id/photo-status",
+  requireUser,
+  asyncHandler(async (req, res) => {
+    const project = await loadOwnedProject(req, res, req.params.id);
+    if (!project) return;
+    const uploads = await storage.getUploadedPhotos(project.id);
+    res.json({ photos: uploads.map((u) => ({ id: u.id, url: u.previewUrl ?? u.url, hd: Boolean(u.originalUploadedAt) })) });
+  }),
+);
+
 /* ── create ──────────────────────────────────────────────────── */
 
 projectsRouter.post(

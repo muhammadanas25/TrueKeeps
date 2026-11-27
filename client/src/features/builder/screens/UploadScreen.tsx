@@ -20,13 +20,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle2, ImagePlus, Info, Lock, Plus, RotateCcw, X } from "lucide-react";
 import { Ph } from "../book";
-import { generatePages, type BookTheme, type BuilderPhoto, type CopyVoice } from "../data";
+import { coverPhotoIdFor, generatePages, type BookTheme, type BuilderPhoto, type CopyVoice } from "../data";
 import { flagLabel, flaggedPhotos } from "../quality";
 import type { BuilderState } from "../state";
 import { uploadEngine } from "../upload/engine";
 import { BEFORE_TIPS } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
 import { TipLine } from "../upload/UploadStatus";
+import { RepickSheet } from "../upload/RepickSheet";
 import { MIN_PHOTOS } from "./BookScreen";
 import "../flow.css";
 
@@ -58,6 +59,9 @@ export function UploadScreen({
     void addFiles(files);
   };
   const enough = photos.length >= MIN_PHOTOS;
+  // the re-add list (design A4): only photos the phone couldn't keep
+  const [repickOpen, setRepickOpen] = useState(false);
+  const toRepick = photos.filter((p) => p.hd === false && !uploadEngine.canFinish(p.id));
 
   /**
    * Undo for the remove button: what the book looked like just before, for a
@@ -167,10 +171,13 @@ export function UploadScreen({
                   </b>{" "}
                   The page closed before the full-quality {progress.needRepick === 1 ? "copy" : "copies"} finished. Choose the same photos and we'll pick up where we left off.
                 </p>
-                <button type="button" className="bb-btn bb-btn-secondary" onClick={openPicker}>
-                  <RotateCcw size={15} /> Choose photos
+                <button type="button" className="bb-btn bb-btn-secondary" onClick={() => setRepickOpen(true)}>
+                  <RotateCcw size={15} /> See which photos
                 </button>
               </div>
+            ) : null}
+            {repickOpen && toRepick.length ? (
+              <RepickSheet photos={toRepick} pages={state.pages} coverPhotoId={coverPhotoIdFor(state)} onClose={() => setRepickOpen(false)} />
             ) : null}
             {snapshot.rejected.length ? (
               <div className="ck-rejected" role="alert">
@@ -218,7 +225,7 @@ export function UploadScreen({
               {photos.map((p) => {
                 const flag = flags.get(p.id);
                 return (
-                  <div key={p.id} className={"ck-tile" + (p.url ? "" : " waiting")}>
+                  <div key={p.id} className="ck-tile">
                     <Ph photo={p} theme={theme} variant="thumb" showLabel={Boolean(p.url) && !flag} />
                     {/* always visible: phones can't hover */}
                     <button type="button" className="ck-tile-x" aria-label="Remove this photo" onClick={() => remove(p)}>

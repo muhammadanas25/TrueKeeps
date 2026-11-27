@@ -1,22 +1,26 @@
 /**
- * Web Worker wrapper around preparePhoto, so decoding a batch of huge photos
- * never stutters the page the customer is using. One request at a time per
- * worker; the pool lives in pool.ts.
+ * Web Worker wrapper around the photo work in prepare.ts, so decoding a batch
+ * of huge photos never stutters the page the customer is using. One request
+ * at a time per worker; the pool lives in pool.ts.
+ *
+ * Two jobs: "prepare" (the display copy and thumbnail, when a photo is picked)
+ * and "print" (the quality 0.95 print copy, just before its HD upload).
  */
 
-import { preparePhoto, type PreparedPhoto } from "./prepare";
+import { makePrintCopy, preparePhoto, type PreparedPhoto } from "./prepare";
 
-export interface PrepareRequest {
-  source: Blob;
-  makeMaster: boolean;
-}
+export type PrepareRequest =
+  | { op: "prepare"; source: Blob; makeMaster: boolean }
+  | { op: "print"; source: Blob; maxShortEdge: number | null; quality: number };
 
-export type PrepareResponse = { ok: true; result: PreparedPhoto } | { ok: false; error: string };
+export type PrepareResponse = { ok: true; result: PreparedPhoto | Blob | undefined } | { ok: false; error: string };
 
 self.onmessage = async (e: MessageEvent<PrepareRequest>) => {
   let reply: PrepareResponse;
   try {
-    reply = { ok: true, result: await preparePhoto(e.data.source, e.data.makeMaster) };
+    const req = e.data;
+    const result = req.op === "print" ? await makePrintCopy(req.source, req.maxShortEdge, req.quality) : await preparePhoto(req.source, req.makeMaster);
+    reply = { ok: true, result };
   } catch (err) {
     reply = { ok: false, error: err instanceof Error ? err.message : "prepare failed" };
   }

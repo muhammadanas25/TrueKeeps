@@ -13,6 +13,11 @@
  * The signed-in requirement is enforced by the builder shell (hard gate
  * on this screen) and again by the API.
  *
+ * Layout (owner-approved canvas D2/D3, 2026-11-28): decluttered to three
+ * cards (the book in one row, where to send it, how to pay with the total)
+ * and a footer holding Pay. While HD copies finish, Pay is locked and one
+ * line above it says how far along they are (Option 2); nothing else is added.
+ *
  * Double-submit safety: each attempt carries an idempotency key derived
  * from (mount nonce + what's being bought), so a double click returns the
  * same order, while changing the quantity or address makes a new one.
@@ -20,36 +25,63 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, BookOpen, Check, CheckCircle2, Copy, Lock, Minus, Plus, RotateCcw, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CheckCircle2, Copy, Loader2, Lock, Minus, Plus, RotateCcw } from "lucide-react";
 import { MiniBook } from "../book";
-import { DENSITIES, coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
+import { coverPhotoIdFor, occasionById, type CopyVoice } from "../data";
 import { bookTheme } from "../palette";
 import { lowQualityPageCount, photosAwaitingOriginal } from "../print";
 import { uploadEngine } from "../upload/engine";
 import { formatEta } from "../upload/tips";
 import { useUploads } from "../upload/UploadContext";
+import { RepickSheet } from "../upload/RepickSheet";
 import { toDocument } from "../sync";
 import type { BuilderState } from "../state";
-import { DELIVERY_TIME, finishName, formatPKR, INCLUDED_PAGES, PRICE_LIST, printedPageCount, quote } from "@shared/pricing";
+import { finishName, formatPKR, PRICE_LIST, printedPageCount, quote } from "@shared/pricing";
 import { PK_PROVINCES, STATUS_LABEL, shippingAddressSchema, type ShippingAddress } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
 import { discountFor } from "@shared/promo";
-import { BANK_TRANSFER_WINDOW_DAYS, CANCEL_LINE, SUPPORT_WHATSAPP, type PaymentMethod } from "@shared/payments";
+import { BANK_TRANSFER_WINDOW_DAYS, type PaymentMethod } from "@shared/payments";
 import "../flow.css";
+import "./checkout.css";
 import { useSession } from "@/features/auth/useSession";
 
 interface PricingResponse {
-  checkout: { enabled: boolean; livemode: boolean; provider: string | null; methods?: { card: boolean; bankTransfer: boolean } };
+  checkout: {
+    enabled: boolean;
+    livemode: boolean;
+    provider: string | null;
+    methods?: { card: boolean; bankTransfer: boolean };
+  };
 }
 
 const ADDRESS_KEY = "tk_ship_addr_v1";
 type AddressForm = Omit<ShippingAddress, "province"> & { province: string };
-const EMPTY_ADDRESS: AddressForm = { fullName: "", phone: "", line1: "", line2: "", city: "", province: "", postalCode: "" };
+const EMPTY_ADDRESS: AddressForm = {
+  fullName: "",
+  phone: "",
+  line1: "",
+  line2: "",
+  city: "",
+  province: "",
+  postalCode: "",
+};
 
 function loadAddress(): AddressForm | null {
   try {
     const raw = localStorage.getItem(ADDRESS_KEY);
-    return raw ? { ...EMPTY_ADDRESS, ...(JSON.parse(raw) as Partial<AddressForm>) } : null;
+    if (!raw) return null;
+    const saved = {
+      ...EMPTY_ADDRESS,
+      ...(JSON.parse(raw) as Partial<AddressForm>),
+    };
+    // the decluttered form (2026-11-28) has one address line and no postal
+    // code: fold an older saved second line in, so nothing is sent unseen
+    const line1 = [saved.line1, saved.line2]
+      .map((x) => (x ?? "").trim())
+      .filter(Boolean)
+      .join(", ")
+      .slice(0, 160);
+    return { ...saved, line1, line2: "", postalCode: "" };
   } catch {
     return null;
   }
@@ -79,7 +111,6 @@ export function OrderScreen({
   const { user } = useSession();
   const occ = occasionById(state.occasion);
   const theme = bookTheme(state.themeId, state.pageColor);
-  const arrangementName = DENSITIES.find((d) => d.id === state.density)?.name ?? "Classic";
   // Last honest chance to mention print quality before money changes
   // hands. Silent at zero — nobody needs a green tick telling them
   // nothing is wrong.
@@ -87,28 +118,45 @@ export function OrderScreen({
   // We print from the HD originals, so payment waits for all of them. The
   // form stays usable: filling in an address is a good use of the wait.
   const awaiting = photosAwaitingOriginal(state.pages, state.photos, coverPhotoIdFor(state));
-  const { addFiles, snapshot } = useUploads();
-  const repickRef = useRef<HTMLInputElement>(null);
-  const stillSending = awaiting.filter((p) => uploadEngine.holdsFile(p.id)).length;
-  const needRepick = awaiting.length - stillSending;
+  const { snapshot } = useUploads();
+  const [repickOpen, setRepickOpen] = useState(false);
+  const toRepick = awaiting.filter((p) => !uploadEngine.canFinish(p.id));
+  const stillSending = awaiting.length - toRepick.length;
+  const needRepick = toRepick.length;
 
-  const pricing = useQuery<PricingResponse>({ queryKey: ["/api/pricing"], staleTime: 5 * 60_000 });
+  const pricing = useQuery<PricingResponse>({
+    queryKey: ["/api/pricing"],
+    staleTime: 5 * 60_000,
+  });
   const checkout = pricing.data?.checkout;
   // How to pay (shared/payments.ts). The owner switches each method on in the
   // admin; while Safepay is being set up only bank transfer is offered, and
   // the choice appears once both are on.
-  const methods = checkout?.methods ?? { card: Boolean(checkout?.enabled), bankTransfer: false };
+  const methods = checkout?.methods ?? {
+    card: Boolean(checkout?.enabled),
+    bankTransfer: false,
+  };
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const method: PaymentMethod = picked ?? (methods.card ? "card" : "bank_transfer");
   const bank = method === "bank_transfer";
 
   const [addr, setAddr] = useState<AddressForm>(
-    () => loadAddress() ?? { ...EMPTY_ADDRESS, fullName: user?.name ?? "", phone: user?.phone ?? "" },
+    () =>
+      loadAddress() ?? {
+        ...EMPTY_ADDRESS,
+        fullName: user?.name ?? "",
+        phone: user?.phone ?? "",
+      },
   );
   // Same quote the server will make: the pages inside the book decide the
   // extra sheets, and the address decides the remote-area delivery charge, so
   // the total updates while the customer types their city and province.
-  const q = quote({ binding: state.binding, qty: state.qty, printedPages: printedPageCount(state.pages), address: addr });
+  const q = quote({
+    binding: state.binding,
+    qty: state.qty,
+    printedPages: printedPageCount(state.pages),
+    address: addr,
+  });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -133,7 +181,12 @@ export function OrderScreen({
    */
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoInput, setPromoInput] = useState("");
-  const [promo, setPromo] = useState<{ code: string; kind: string; value: number; label: string } | null>(null);
+  const [promo, setPromo] = useState<{
+    code: string;
+    kind: string;
+    value: number;
+    label: string;
+  } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoBusy, setPromoBusy] = useState(false);
   const discountMinor = promo ? discountFor(promo, q.subtotalMinor) : 0;
@@ -147,11 +200,25 @@ export function OrderScreen({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoInput, subtotalMinor: q.subtotalMinor }),
+        body: JSON.stringify({
+          code: promoInput,
+          subtotalMinor: q.subtotalMinor,
+        }),
       });
-      const data = (await res.json().catch(() => ({}))) as { code?: string; kind?: string; value?: number; label?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        code?: string;
+        kind?: string;
+        value?: number;
+        label?: string;
+        error?: string;
+      };
       if (!res.ok || !data.code) return setPromoError(data.error ?? "That code didn't work. Try again.");
-      setPromo({ code: data.code, kind: data.kind!, value: data.value!, label: data.label! });
+      setPromo({
+        code: data.code,
+        kind: data.kind!,
+        value: data.value!,
+        label: data.label!,
+      });
       setPromoOpen(false);
     } catch {
       setPromoError("You seem to be offline. Try again in a moment.");
@@ -174,13 +241,28 @@ export function OrderScreen({
 
   /** One field checked on its own, when the customer leaves it (not on every key). */
   const check = (k: keyof AddressForm) => {
-    if (k === "province") return setFieldErrors((fe) => ({ ...fe, province: addr.province ? "" : "Choose a province" }));
-    const shape = shippingAddressSchema.shape as Record<string, { safeParse: (v: unknown) => { success: boolean; error?: { issues: Array<{ message: string }> } } }>;
+    if (k === "province")
+      return setFieldErrors((fe) => ({
+        ...fe,
+        province: addr.province ? "" : "Choose a province",
+      }));
+    const shape = shippingAddressSchema.shape as Record<
+      string,
+      {
+        safeParse: (v: unknown) => {
+          success: boolean;
+          error?: { issues: Array<{ message: string }> };
+        };
+      }
+    >;
     const one = shape[k]?.safeParse(addr[k] ?? "");
     if (!one) return;
     // an optional field left empty is fine; a required one waits for the button
     if (!(addr[k] ?? "").trim()) return;
-    setFieldErrors((fe) => ({ ...fe, [k]: one.success ? "" : one.error?.issues[0]?.message ?? "Check this" }));
+    setFieldErrors((fe) => ({
+      ...fe,
+      [k]: one.success ? "" : (one.error?.issues[0]?.message ?? "Check this"),
+    }));
   };
 
   const field = (k: keyof AddressForm) => ({
@@ -239,7 +321,12 @@ export function OrderScreen({
           promoCode: promo?.code,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { checkoutUrl?: string | null; order?: { id: string }; error?: string; fields?: Record<string, string> };
+      const data = (await res.json().catch(() => ({}))) as {
+        checkoutUrl?: string | null;
+        order?: { id: string };
+        error?: string;
+        fields?: Record<string, string>;
+      };
       // bank transfer: no payment page; the order page shows how to pay
       if (res.ok && bank && data.order) {
         window.location.assign(`/orders/${data.order.id}?placed=1`);
@@ -302,76 +389,60 @@ export function OrderScreen({
     );
   }
 
+  const hdLeft = awaiting.length;
+  const fine = bank
+    ? `We'll hold your order for ${BANK_TRANSFER_WINDOW_DAYS} days while you make the transfer.`
+    : "Printed in 2–3 days, delivered in 2–4. Cancel within 6 support hours of paying. Secure payment by Safepay.";
+
   return (
-    <div className="bb-screen bb-order">
-      <div className="bb-order-inner">
-        <div style={{ textAlign: "center" }}>
-          <div className="bb-kicker">Final step</div>
-          <h1>{copy.orderTitle}</h1>
-          <p className="bb-sub">{copy.orderSub}</p>
-        </div>
+    <div className="bb-screen bb-order co">
+      <div className="co-inner">
+        <h1 className="co-title">{copy.orderTitle}</h1>
 
         {checkout && !checkout.livemode && !bank ? (
           <div className="bb-testmode" role="note">
-            <b>Test mode.</b> Payments go to Safepay's sandbox — use test card 4456 5300 0000 1005, any future expiry, CVC 111.
-            No money moves and nothing will be printed.
+            <b>Test mode.</b> Payments go to Safepay's sandbox — use test card 4456 5300 0000 1005, any future expiry, CVC 111. No money moves and nothing will be printed.
           </div>
         ) : null}
 
-        <form className="bb-order-card" onSubmit={onPay} noValidate>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
-            <MiniBook theme={theme} coverStyle={state.coverStyle} title={state.title} occasion={occ} photos={state.photos} size={200} />
-            <button type="button" className="bb-btn bb-btn-ghost" onClick={onBack}>
-              <BookOpen size={15} /> Flip through it again
-            </button>
-          </div>
+        <form className="co-form" onSubmit={onPay} noValidate>
+          {/* the book, in one row: what it is, a way back to it, and how many */}
+          <section className="co-card co-book" aria-label="Your book">
+            <MiniBook theme={theme} coverStyle={state.coverStyle} title={state.title} occasion={occ} photos={state.photos} size={72} />
+            <div className="co-book-text">
+              <b>{state.title}</b>
+              <span>
+                12×12 hardcover · {state.pages.length} pages · {finishName(state.finish)}
+              </span>
+              <button type="button" className="co-link" onClick={onBack}>
+                See it again
+              </button>
+            </div>
+            <div className="bb-qty" aria-label="Copies">
+              <button type="button" onClick={() => set({ qty: Math.max(1, state.qty - 1) })} aria-label="Fewer copies">
+                <Minus size={15} />
+              </button>
+              <span>{q.qty}</span>
+              <button type="button" onClick={() => set({ qty: Math.min(PRICE_LIST.maxQty, state.qty + 1) })} aria-label="More copies">
+                <Plus size={15} />
+              </button>
+            </div>
+          </section>
+          {/* last honest chance to mention print quality; silent at zero */}
+          {softPages > 0 ? (
+            <p className="co-warn">
+              Some photos may not print sharp. You can still order.{" "}
+              <button type="button" className="co-link" onClick={onBack}>
+                See which ones
+              </button>
+            </p>
+          ) : null}
 
-          <div className="bb-order-specs">
-            <div className="bb-spec-row">
-              <b>Album</b>
-              <span style={{ fontFamily: "var(--font-display)", fontWeight: 600 }}>{state.title}</span>
-            </div>
-            <div className="bb-spec-row">
-              <b>Details</b>
-              <span>12x12 inch hardcover · {state.pages.length} pages · {arrangementName}</span>
-            </div>
-            {/* chosen with the book on step 5, so here it is a fact, not a question */}
-            <div className="bb-spec-row">
-              <b>Finish</b>
-              <span>{finishName(state.finish)}</span>
-            </div>
-            {softPages > 0 ? (
-              <div className="bb-spec-row bb-spec-warn">
-                <b>Heads up</b>
-                <span>
-                  Some photos may not print sharp. You can still order.{" "}
-                  <button type="button" className="bb-inline-link" onClick={onBack}>
-                    See which ones
-                  </button>
-                </span>
-              </div>
-            ) : null}
-            {/* one binding now, hardcover (owner, 2026-11-26): no binding choice */}
-            <div className="bb-spec-row" style={{ alignItems: "center" }}>
-              <b>Copies</b>
-              <div className="bb-qty">
-                <button type="button" onClick={() => set({ qty: Math.max(1, state.qty - 1) })} aria-label="Fewer">
-                  <Minus size={15} />
-                </button>
-                <span>{q.qty}</span>
-                <button type="button" onClick={() => set({ qty: Math.min(PRICE_LIST.maxQty, state.qty + 1) })} aria-label="More">
-                  <Plus size={15} />
-                </button>
-              </div>
-            </div>
-
-            <fieldset className="bb-ship" disabled={busy}>
-              <legend className="bb-panel-label">Delivery details</legend>
-              {user?.email ? (
-                <p className="bb-ship-email">
-                  Order updates go to <b>{user.email}</b>
-                </p>
-              ) : null}
+          <section className="co-card" aria-labelledby="co-ship-h">
+            <h2 className="co-h" id="co-ship-h">
+              Where should we send it?
+            </h2>
+            <fieldset className="bb-ship co-ship" disabled={busy} aria-labelledby="co-ship-h">
               <label className="bb-ship-field wide">
                 <span>Full name</span>
                 <input autoComplete="name" {...field("fullName")} />
@@ -380,18 +451,12 @@ export function OrderScreen({
               <label className="bb-ship-field wide">
                 <span>Mobile number</span>
                 <input type="tel" inputMode="tel" autoComplete="tel" placeholder="0300 1234567" {...field("phone")} />
-                {fieldErrors.phone ? <em>{fieldErrors.phone}</em> : <small>For the courier and your order updates.</small>}
+                {fieldErrors.phone ? <em>{fieldErrors.phone}</em> : null}
               </label>
               <label className="bb-ship-field wide">
                 <span>Address</span>
-                <input autoComplete="address-line1" placeholder="House, street, area" {...field("line1")} />
+                <input autoComplete="street-address" placeholder="House, street, area, landmark" {...field("line1")} />
                 {fieldErrors.line1 ? <em>{fieldErrors.line1}</em> : null}
-              </label>
-              <label className="bb-ship-field wide">
-                <span>
-                  Apartment, landmark <i>(optional)</i>
-                </span>
-                <input autoComplete="address-line2" {...field("line2")} />
               </label>
               <label className="bb-ship-field">
                 <span>City</span>
@@ -410,174 +475,144 @@ export function OrderScreen({
                 </select>
                 {fieldErrors.province ? <em>{fieldErrors.province}</em> : null}
               </label>
-              <label className="bb-ship-field">
-                <span>
-                  Postal code <i>(optional)</i>
-                </span>
-                <input inputMode="numeric" autoComplete="postal-code" maxLength={5} {...field("postalCode")} />
-                {fieldErrors.postalCode ? <em>{fieldErrors.postalCode}</em> : null}
-              </label>
             </fieldset>
+          </section>
 
-            <div className="bb-price-rows">
-              <div className="bb-spec-row">
-                <b>
-                  {q.qty === 1 ? "Album" : `Albums (${q.qty} × ${formatPKR(q.unitMinor)})`}
-                </b>
+          <section className="co-card co-pay" aria-label="Payment">
+            {methods.card && methods.bankTransfer ? (
+              <fieldset className="co-methods" disabled={busy}>
+                <legend className="co-h">How to pay</legend>
+                <div className="co-choices" role="radiogroup" aria-label="How to pay">
+                  {(
+                    [
+                      ["card", "Card or Google Pay"],
+                      ["bank_transfer", "Bank transfer"],
+                    ] as const
+                  ).map(([id, name]) => (
+                    <button key={id} type="button" role="radio" aria-checked={method === id} className={"co-choice" + (method === id ? " on" : "")} onClick={() => setPicked(id)}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
+            {/* the explanation only for the method that needs one */}
+            {bank ? <p className="co-note">Place your order to see our bank details. WhatsApp us the receipt, and your album goes to print once we see the payment.</p> : null}
+
+            <div className="co-prices">
+              <div className="co-row">
+                <span>
+                  {q.qty === 1 ? "Book" : `${q.qty} books`}
+                  {q.extraSheets > 0 ? (
+                    <small>
+                      {" "}
+                      · includes {q.extraSheets} extra {q.extraSheets === 1 ? "sheet" : "sheets"}
+                    </small>
+                  ) : null}
+                </span>
                 <span>{formatPKR(q.subtotalMinor)}</span>
               </div>
-              <span className="bb-price-note">
-                {q.extraSheets > 0
-                  ? `${formatPKR(PRICE_LIST.bookMinor)} for the first ${INCLUDED_PAGES} pages, plus ${q.extraSheets} extra ${q.extraSheets === 1 ? "sheet" : "sheets"} at ${formatPKR(PRICE_LIST.extraSheetMinor)} each (a sheet is 2 pages)`
-                  : `Includes up to ${INCLUDED_PAGES} pages. Each extra sheet of 2 pages is ${formatPKR(PRICE_LIST.extraSheetMinor)}.`}
-              </span>
-              <div className="bb-spec-row">
-                <b>Delivery</b>
-                <span>{!q.deliveryKnown ? "Add your city to see" : q.shippingMinor ? formatPKR(q.shippingMinor) : "Free"}</span>
+              <div className="co-row">
+                <span>{q.deliveryKnown ? `Delivery to ${addr.city.trim()}` : "Delivery"}</span>
+                <span>{!q.deliveryKnown ? "Add your city" : q.shippingMinor ? formatPKR(q.shippingMinor) : "Free"}</span>
               </div>
-              {/* website copy v1 (2026-11-26): Karachi free, Rs 200 elsewhere, Rs 500 remote (shared/pricing.ts deliveryFor) */}
-              <span className="bb-price-note">
-                <Truck size={14} />
-                <span>
-                  Delivery cost depends on your city. {DELIVERY_TIME} In a hurry? Call us first to see if we can make it
-                  faster: <a href={`tel:+${SUPPORT_WHATSAPP.digits}`}>{SUPPORT_WHATSAPP.display}</a>
-                </span>
-              </span>
               {promo ? (
-                <div className="bb-spec-row bb-promo-line">
-                  <b>
+                <div className="co-row bb-promo-line">
+                  <span>
                     {promo.code} · {promo.label}{" "}
                     <button type="button" className="bb-promo-remove" onClick={() => setPromo(null)}>
                       Remove
                     </button>
-                  </b>
+                  </span>
                   <span>− {formatPKR(discountMinor)}</span>
                 </div>
-              ) : promoOpen ? (
-                <div className="bb-promo">
-                  <label className="bb-ship-field wide">
-                    <span>Promo code</span>
-                    <span className="bb-promo-row">
-                      <input
-                        value={promoInput}
-                        onChange={(e) => {
-                          setPromoInput(e.target.value.toUpperCase());
-                          setPromoError(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void applyPromo();
-                          }
-                        }}
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                        maxLength={24}
-                        aria-invalid={Boolean(promoError) || undefined}
-                      />
-                      <button type="button" className="bb-btn bb-btn-secondary" disabled={promoBusy || !promoInput.trim()} onClick={() => void applyPromo()}>
-                        Apply
-                      </button>
-                    </span>
-                    {promoError ? <em>{promoError}</em> : null}
-                  </label>
-                </div>
+              ) : null}
+              <div className="co-row co-total">
+                <span>Total</span>
+                <span>{formatPKR(totalMinor)}</span>
+              </div>
+              {promo ? null : promoOpen ? (
+                <label className="bb-ship-field wide">
+                  <span>Promo code</span>
+                  <span className="bb-promo-row">
+                    <input
+                      value={promoInput}
+                      onChange={(e) => {
+                        setPromoInput(e.target.value.toUpperCase());
+                        setPromoError(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void applyPromo();
+                        }
+                      }}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      maxLength={24}
+                      aria-invalid={Boolean(promoError) || undefined}
+                    />
+                    <button type="button" className="bb-btn bb-btn-secondary" disabled={promoBusy || !promoInput.trim()} onClick={() => void applyPromo()}>
+                      Apply
+                    </button>
+                  </span>
+                  {promoError ? <em>{promoError}</em> : null}
+                </label>
               ) : (
                 <button type="button" className="bb-promo-open" onClick={() => setPromoOpen(true)}>
                   Have a promo code?
                 </button>
               )}
-              <div className="bb-spec-row total">
-                <span>Total</span>
-                <span>{formatPKR(totalMinor)}</span>
-              </div>
             </div>
+          </section>
 
-            {error ? (
-              <p className="bb-pay-error" role="alert">
-                {error}
+          {error ? (
+            <p className="bb-pay-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {checkout && !checkout.enabled ? (
+            <p className="bb-pay-error" role="alert">
+              Ordering is paused for a moment. Your book is saved, so please try again soon.
+            </p>
+          ) : null}
+          {needRepick ? (
+            <div className="ck-order-wait" role="status">
+              <p>
+                <b>
+                  {needRepick} {needRepick === 1 ? "photo needs" : "photos need"} adding again before you can pay.
+                </b>
+              </p>
+              <button type="button" className="bb-btn bb-btn-secondary" onClick={() => setRepickOpen(true)}>
+                <RotateCcw size={15} /> See which photos
+              </button>
+              {repickOpen ? <RepickSheet photos={toRepick} pages={state.pages} coverPhotoId={coverPhotoIdFor(state)} onClose={() => setRepickOpen(false)} /> : null}
+            </div>
+          ) : null}
+
+          {/* Option 2 (owner, 2026-11-28): Pay waits for the HD copies, with one line saying how far along */}
+          <div className="co-foot">
+            {hdLeft && !needRepick ? (
+              <p className="co-hd" role="status">
+                <Loader2 size={14} className="au-spin" aria-hidden="true" />
+                {snapshot.offline
+                  ? "Waiting for a connection. We'll carry on by ourselves."
+                  : `Saving HD copies · ${stillSending} left${snapshot.etaSeconds !== null ? ` · ${formatEta(snapshot.etaSeconds)}` : ""}`}
               </p>
             ) : null}
-            {awaiting.length ? (
-              <div className="ck-order-wait" role="status">
-                {needRepick ? (
-                  <>
-                    <p>
-                      <b>
-                        {needRepick} {needRepick === 1 ? "photo needs" : "photos need"} adding again before you can pay.
-                      </b>{" "}
-                      The page closed before the full-quality {needRepick === 1 ? "copy" : "copies"} we print from finished. Choose the same photos and we'll pick up where we left off.
-                    </p>
-                    <input
-                      ref={repickRef}
-                      type="file"
-                      accept="image/*,.heic,.heif"
-                      multiple
-                      style={{ display: "none" }}
-                      onChange={(e) => {
-                        void addFiles(e.target.files ? Array.from(e.target.files) : null);
-                        e.target.value = "";
-                      }}
-                    />
-                    <button type="button" className="bb-btn bb-btn-secondary" onClick={() => repickRef.current?.click()}>
-                      <RotateCcw size={15} /> Choose photos
-                    </button>
-                  </>
-                ) : (
-                  <p>
-                    <b>
-                      {stillSending} {stillSending === 1 ? "photo is" : "photos are"} still uploading
-                      {snapshot.etaSeconds !== null ? `, ${formatEta(snapshot.etaSeconds)} left` : ""}.
-                    </b>{" "}
-                    {snapshot.offline
-                      ? "Waiting for a connection. We'll carry on by ourselves."
-                      : "We print from these full-quality copies, so you can pay as soon as they finish. Please keep this page open."}
-                  </p>
-                )}
-              </div>
-            ) : null}
-            {checkout && !checkout.enabled ? (
-              <p className="bb-pay-error" role="alert">
-                Ordering is paused for a moment. Your book is saved, so please try again soon.
-              </p>
-            ) : null}
-
-            <fieldset className="pay-methods" disabled={busy}>
-              <legend className="bb-panel-label">How would you like to pay?</legend>
-              <p className="pay-note">Each album is printed just for you, so we print once your payment is in. No cash on delivery.</p>
-              {methods.card && methods.bankTransfer ? (
-                <div className="pay-choices" role="radiogroup" aria-label="How to pay">
-                  {(
-                    [
-                      ["card", "Card or Google Pay", "Pay now on Safepay's secure page. Your order is confirmed straight away."],
-                      ["bank_transfer", "Bank transfer", "Transfer from your bank app and send us the screenshot. We confirm once we see the payment."],
-                    ] as const
-                  ).map(([id, name, line]) => (
-                    <button key={id} type="button" role="radio" aria-checked={method === id} className={"pay-choice" + (method === id ? " on" : "")} onClick={() => setPicked(id)}>
-                      <span className="pay-dot" aria-hidden="true" />
-                      <span>
-                        <b>{name}</b>
-                        <i>{line}</i>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              {bank ? (
-                <ol className="pay-steps">
-                  <li>Place your order to see our bank details.</li>
-                  <li>Pay {formatPKR(totalMinor)} by bank transfer.</li>
-                  {/* the doc's "Upload your receipt" waits for receipt upload to be built */}
-                  <li>WhatsApp your receipt to us.</li>
-                  <li>Once we confirm it, your album goes to print.</li>
-                </ol>
-              ) : null}
-              <p className="pay-note">{CANCEL_LINE}</p>
-            </fieldset>
-
             <button type="submit" className="bb-btn bb-btn-primary bb-btn-lg" disabled={disabled}>
               {busy ? (
-                bank ? "Placing your order…" : "Opening secure payment…"
+                bank ? (
+                  "Placing your order…"
+                ) : (
+                  "Opening secure payment…"
+                )
+              ) : hdLeft ? (
+                bank ? (
+                  "Ordering opens when your photos finish"
+                ) : (
+                  "Pay opens when your photos finish"
+                )
               ) : bank ? (
                 <>
                   Order now <ArrowRight size={17} />
@@ -588,15 +623,7 @@ export function OrderScreen({
                 </>
               )}
             </button>
-            <p className="bb-pay-trust">
-              {bank ? (
-                <>We'll save your order for {BANK_TRANSFER_WINDOW_DAYS} days while you make the transfer.</>
-              ) : (
-                <>
-                  <ShieldCheck size={14} /> Secure checkout by Safepay. Your card details never touch our servers.
-                </>
-              )}
-            </p>
+            <p className="co-fine">{fine}</p>
           </div>
         </form>
       </div>

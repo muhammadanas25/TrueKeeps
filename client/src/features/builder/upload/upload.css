@@ -215,3 +215,32 @@ button.ck-pill { cursor: pointer; }
   .ck-book, .ck-hairline i, .ck-rail i, .ck-tile { transition: none; }
   .motion-ok .ck-tip-text { animation: none; }
 }
+
+/* ── Re-add list (RepickSheet, design A4) ───────────────────── */
+.rp-veil { position: fixed; inset: 0; z-index: 70; background: rgba(22, 20, 41, 0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.rp-sheet { width: 100%; max-width: 440px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--tk-paper); color: var(--tk-heading); border-radius: var(--tk-radius-card); box-shadow: 0 24px 60px -24px rgba(22, 20, 41, 0.5); overflow: hidden; }
+.rp-head { height: 56px; flex: none; display: flex; align-items: center; padding: 0 8px; border-bottom: 1px solid var(--tk-mist-200); }
+.rp-back { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.rp-back:hover { background: var(--tk-indigo-50); }
+.rp-body { flex: 1; overflow-y: auto; padding: 22px 16px 8px; display: flex; flex-direction: column; gap: 16px; }
+.rp-intro { display: flex; flex-direction: column; gap: 6px; }
+.rp-intro h2 { margin: 0; font-size: 24px; line-height: 30px; font-weight: 800; }
+.rp-intro p { margin: 0; font-size: 15px; line-height: 22px; color: var(--tk-ink-400); }
+.rp-tip { display: flex; gap: 12px; padding: 14px; border-radius: 12px; background: var(--tk-indigo-50); }
+.rp-tip svg { flex: none; margin-top: 1px; }
+.rp-tip p { margin: 0; font-size: 14px; line-height: 21px; }
+.rp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.rp-list li { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.rp-list img, .rp-noimg { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; flex: none; background: var(--tk-indigo-50); }
+.rp-list li > span { display: flex; flex-direction: column; min-width: 0; }
+.rp-list b { font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-list li > span > span { font-size: 13px; line-height: 18px; color: var(--tk-indigo-400); }
+.rp-list .rp-more { font-size: 14px; line-height: 20px; color: var(--tk-indigo-400); padding-left: 68px; }
+.rp-note { margin: 0; font-size: 14px; line-height: 21px; color: var(--tk-indigo-500); background: var(--tk-surface); border: 1px solid var(--tk-mist-200); border-radius: 10px; padding: 10px 12px; }
+.rp-foot { flex: none; padding: 16px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--tk-mist-200); }
+.rp-foot .bb-btn { width: 100%; justify-content: center; }
+.rp-foot > span { font-size: 13px; line-height: 18px; color: var(--tk-indigo-400); text-align: center; }
+@media (max-width: 560px) {
+  .rp-veil { padding: 0; align-items: stretch; }
+  .rp-sheet { max-width: none; max-height: none; border-radius: 0; }
+}

@@ -48,6 +48,52 @@ export function signInWithGoogle(callbackURL = window.location.pathname + window
   return authClient.signIn.social({ provider: "google", callbackURL });
 }
 
+/** Where the Google tab lands when it's done (pages/auth-done.tsx). */
+export const AUTH_DONE_PATH = "/auth/done";
+/** The channel the Google tab uses to tell this one it has signed in. */
+export const AUTH_CHANNEL = "tk-auth";
+
+/**
+ * Google sign-in in a new tab, so this page, and the photos it's uploading,
+ * stay exactly where they are (owner, 2026-11-28; docs/adr/023).
+ *
+ * Step by step:
+ *   1. Open an empty tab straight away, inside the tap, or the browser's
+ *      pop-up blocker refuses it.
+ *   2. Ask the server for Google's address without being sent there.
+ *   3. Point the new tab at it. Google sends it back to /auth/done, which
+ *      tells this tab over a BroadcastChannel and closes itself.
+ * If the tab couldn't be opened, sign in the usual way in this tab instead.
+ * Uploads survive that too, since photos are kept on the phone (stash.ts).
+ */
+export async function signInWithGoogleInNewTab(callbackURL = window.location.pathname + window.location.search): Promise<{ newTab: boolean; error?: string }> {
+  let tab: Window | null = null;
+  try {
+    tab = window.open("", "tk-google");
+    if (tab) tab.opener = null; // Google's page gets no handle on this one
+  } catch {
+    tab = null;
+  }
+  if (!tab) {
+    window.dispatchEvent(new Event("tk:leaving")); // a deliberate hand-over: no "Leave site?" box
+    const res = await signInWithGoogle(callbackURL);
+    return { newTab: false, error: res.error?.message };
+  }
+  const res = await authClient.signIn.social({
+    provider: "google",
+    callbackURL: AUTH_DONE_PATH,
+    errorCallbackURL: `${AUTH_DONE_PATH}?error=1`,
+    disableRedirect: true,
+  });
+  const url = (res.data as { url?: string } | null)?.url;
+  if (res.error || !url) {
+    tab.close();
+    return { newTab: true, error: res.error?.message ?? "Google sign-in failed. Try email instead." };
+  }
+  tab.location.href = url;
+  return { newTab: true };
+}
+
 export function sendMagicLink(email: string, callbackURL = window.location.pathname + window.location.search) {
   return authClient.signIn.magicLink({ email, callbackURL });
 }

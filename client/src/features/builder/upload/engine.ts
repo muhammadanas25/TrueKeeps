@@ -13,9 +13,12 @@
  *      The photo is usable in the book from this moment.
  *   2. DISPLAY (3 at a time): upload those two small copies, about 250 KB, so
  *      the book exists on the server and survives a reload.
- *   3. ORIGINAL (2 at a time): upload the untouched file. This lane only runs
- *      while lanes 1 and 2 are empty, so adding more photos during a long HD
- *      upload still feels instant.
+ *   3. ORIGINAL (2 at a time): upload the HD copy we print from. That is the
+ *      file itself, or a quality 0.95 re-save of it when print-copy.ts says
+ *      that can't cost any quality (about half the bytes; docs/adr/023). The
+ *      re-save happens here, just before the upload, so it never delays the
+ *      book. This lane only runs while lanes 1 and 2 are empty, so adding
+ *      more photos during a long HD upload still feels instant.
  * Three and two rather than more because more gained nothing in the test
  * above, and a few at once stops one stuck file blocking the others.
  *
@@ -28,19 +31,31 @@
  * There is deliberately no fallback that keeps a photo only in this tab,
  * because that used to mean a photo could silently miss the printed book.
  *
- * It lives outside React so uploads carry on through route changes. While no
- * builder is mounted, photo updates are held and delivered when one returns.
- * After a full reload the File objects are gone, so the photos waiting on an
- * original are matched again by fingerprint when the customer re-picks them.
+ * It lives outside React so uploads carry on through route changes, on every
+ * page of the site (owner, 2026-11-27: opening another page paused them).
+ * While no builder is mounted, photo updates are held and delivered when one
+ * returns; only a photo whose book has no project yet waits for the builder.
+ *
+ * Surviving a closed tab: each photo is also copied into the browser's
+ * private file storage (stash.ts) until its HD copy is up, with a list of
+ * what's there (pending.ts). The next page load anywhere on the site calls
+ * claim(), which carries on by itself. One tab at a time does this, using a
+ * Web Lock, so two open tabs never upload the same photo twice. Where the
+ * storage isn't available, photos are matched again by fingerprint when the
+ * customer re-picks them, as before.
  */
 
 import { originalUrlOf } from "@shared/media";
 import { apiRequest } from "@/lib/queryClient";
 import type { BuilderPhoto } from "../data";
-import { preparePhotoOffThread, prepareConcurrency } from "./pool";
+import { preparePhotoOffThread, prepareConcurrency, printCopyOffThread } from "./pool";
 import { setLocalPreview } from "./previews";
 import type { PreparedPhoto } from "./prepare";
 import { BatchTracker } from "./metrics";
+import { HEADER_BYTES, readJpegInfo } from "./jpeg-info";
+import { PRINT_QUALITY, MAX_COPY_FRACTION, expectedPrintBytes, printPlan, type PrintPlan } from "./print-copy";
+import { stashClear, stashGet, stashPut, stashRemove } from "./stash";
+import { clearPending, isPending, listPending, removePending, updatePending, writePending, type PendingEntry } from "./pending";
 
 const DISPLAY_CONCURRENCY = 3;
 const ORIGINAL_CONCURRENCY = 2;
@@ -70,7 +85,11 @@ interface Item {
   file: File;
   fp: string;
   stage: Stage;
-  /** blob to send as the original; the file itself unless it had to be converted */
+  /** what to send for printing (print-copy.ts) */
+  plan: PrintPlan;
+  /** the book's project, when known before the builder says (a photo carried over from an earlier visit) */
+  projectId: string | null;
+  /** blob to send as the original: the file itself, unless it was converted or re-saved */
   original?: Blob;
   prepared?: PreparedPhoto;
   key?: string;
@@ -106,6 +125,16 @@ export interface UploadSnapshot {
   rejected: string[];
   duplicates: number;
   notices: PhotoNotices;
+  /** photos carried over from an earlier visit by claim(): how many, and how many are still going */
+  restored: { total: number; left: number } | null;
+  /** HD bytes sent so far this visit, to tell a paused upload from a slow one */
+  sentBytes: number;
+}
+
+/** What add() passes to makePhoto, read from the file's header. */
+export interface PhotoMeta {
+  /** when the photo was taken (EXIF), local time in ms */
+  taken?: number;
 }
 
 /** What the builder shell supplies so the engine can reach its state. */
@@ -187,7 +216,12 @@ async function post<T>(url: string, data: unknown): Promise<T> {
 
 /** Stable id for a file's contents: same photo, same fingerprint, whatever it's called. */
 export async function fingerprint(file: File): Promise<string> {
-  const head = await file.slice(0, FINGERPRINT_BYTES).arrayBuffer();
+  return fingerprintOf(file, await file.slice(0, FINGERPRINT_BYTES).arrayBuffer());
+}
+
+/** The fingerprint from a header already read. Only the first FINGERPRINT_BYTES count, so it matches fingerprint(). */
+async function fingerprintOf(file: File, header: ArrayBuffer): Promise<string> {
+  const head = header.byteLength > FINGERPRINT_BYTES ? header.slice(0, FINGERPRINT_BYTES) : header;
   if (crypto.subtle) {
     const digest = await crypto.subtle.digest("SHA-256", head);
     const hex = Array.from(new Uint8Array(digest).slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -200,6 +234,16 @@ export async function fingerprint(file: File): Promise<string> {
   });
   return `${file.size.toString(36)}-${(h >>> 0).toString(36)}`.slice(0, 32);
 }
+
+/** Read a file's header once: its fingerprint, and what its JPEG header says. */
+async function inspect(file: File) {
+  const head = await file.slice(0, HEADER_BYTES).arrayBuffer();
+  const info = readJpegInfo(head);
+  return { fp: await fingerprintOf(file, head), info, plan: printPlan(file, info) };
+}
+
+/** A photo that no longer exists for this account (deleted, or a different sign-in). */
+const isGone = (err: unknown) => err instanceof Error && /^404:/.test(err.message);
 
 const isHeic = (file: File) => /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
 
@@ -234,6 +278,11 @@ class UploadEngine {
   /** recent {t, bytes} samples of total bytes sent, for the time estimate */
   private samples: Array<{ t: number; total: number }> = [];
   private sentTotal = 0;
+  /** photos claim() carried over from an earlier visit */
+  private restoredIds = new Set<string>();
+  /** claim() has run, or is waiting for another tab to finish */
+  private claimed = false;
+  // last: computeSnapshot reads the fields above
   private snapshot: UploadSnapshot = this.computeSnapshot(0);
   private emitQueued = false;
 
@@ -287,6 +336,16 @@ class UploadEngine {
     return Boolean(item && item.stage !== "done");
   }
 
+  /**
+   * Can this photo's HD copy still finish without the customer's help? True
+   * while this tab holds the file, and while a copy is kept on the phone
+   * (stash.ts) for this tab or another to carry on with. Only when this is
+   * false does the photo belong on the re-add list.
+   */
+  canFinish(id: string): boolean {
+    return this.holdsFile(id) || isPending(id);
+  }
+
   /** A file we refused before it ever reached the queue. */
   noteRejected(names: string[]) {
     this.rejected.push(...names);
@@ -318,6 +377,7 @@ class UploadEngine {
   forget(id: string) {
     const item = this.items.get(id);
     this.held.delete(id);
+    this.unstash(id);
     if (!item) return;
     this.items.delete(id);
     item.batch.reject(id);
@@ -330,6 +390,9 @@ class UploadEngine {
   reset() {
     this.items.clear();
     this.batches.clear();
+    this.restoredIds.clear();
+    stashClear();
+    clearPending();
     this.held.clear();
     this.heldRemovals.clear();
     this.rejected = [];
@@ -347,13 +410,20 @@ class UploadEngine {
    *  - a re-pick of a photo whose original was lost when the tab closed, which
    *    resumes where that photo left off
    *  - a duplicate of a photo already in the book, which is skipped and counted
+   *
+   * With `onlyMissing` (the re-add list, RepickSheet), only re-picks count:
+   * the customer may select a whole album to find the few photos that were
+   * lost, and everything else is quietly ignored rather than added.
    */
   async add(
     files: File[],
     existing: BuilderPhoto[],
-    makePhoto: (file: File, id: string, fp: string, index: number) => BuilderPhoto,
+    makePhoto: (file: File, id: string, fp: string, index: number, meta: PhotoMeta) => BuilderPhoto,
     addPhotos: (photos: BuilderPhoto[]) => void,
-  ): Promise<void> {
+    opts: { onlyMissing?: boolean } = {},
+  ): Promise<{ added: number; resumed: number }> {
+    let resumed = 0;
+    void this.claim(); // anything left from an earlier visit carries on too
     const byFp = new Map(existing.filter((p) => p.fp).map((p) => [p.fp!, p]));
     const fresh: BuilderPhoto[] = [];
     const seen = new Set<string>();
@@ -361,7 +431,7 @@ class UploadEngine {
     const batch = new BatchTracker(newPhotoId(), resumes ? "resume" : "new", () => this.projectId ?? this.host?.projectId() ?? null);
 
     for (const file of files) {
-      const fp = await fingerprint(file);
+      const { fp, info, plan } = await inspect(file);
       if (seen.has(fp)) {
         this.duplicates++;
         batch.duplicate();
@@ -371,40 +441,129 @@ class UploadEngine {
       const match = byFp.get(fp);
       if (match) {
         if (match.hd === false && !this.holdsFile(match.id)) {
-          this.resume(match, file, fp, batch);
-        } else {
+          this.resume(match, file, fp, plan, batch);
+          resumed++;
+        } else if (!opts.onlyMissing) {
           this.duplicates++;
           batch.duplicate();
         }
         continue;
       }
+      if (opts.onlyMissing) continue;
       const id = newPhotoId();
-      fresh.push(makePhoto(file, id, fp, existing.length + fresh.length));
-      this.items.set(id, this.newItem(id, file, fp, batch));
+      fresh.push(makePhoto(file, id, fp, existing.length + fresh.length, { taken: info?.takenAt }));
+      const item = this.newItem(id, file, fp, plan, batch);
+      this.items.set(id, item);
       batch.add(id, file);
       this.countNotices(file);
+      this.stash(item, null);
     }
     if (batch.size) this.batches.add(batch);
     if (fresh.length) addPhotos(fresh);
     this.emit();
     this.pump();
+    return { added: fresh.length, resumed };
   }
 
-  private newItem(id: string, file: File, fp: string, batch: BatchTracker): Item {
-    return { id, file, fp, stage: "queued", sent: 0, attempts: 0, retryAt: 0, batch };
+  private newItem(id: string, file: File, fp: string, plan: PrintPlan, batch: BatchTracker, projectId: string | null = null): Item {
+    return { id, file, fp, plan, projectId, stage: "queued", sent: 0, attempts: 0, retryAt: 0, batch };
   }
 
   /** Pick a photo back up from a fresh file: skip whatever already reached the server. */
-  private resume(photo: BuilderPhoto, file: File, fp: string, batch: BatchTracker) {
-    const item = this.newItem(photo.id, file, fp, batch);
+  private resume(photo: BuilderPhoto, file: File, fp: string, plan: PrintPlan, batch: BatchTracker) {
+    const item = this.newItem(photo.id, file, fp, plan, batch);
     this.items.set(photo.id, item);
     batch.add(photo.id, file);
+    let key: string | null = null;
     if (photo.url?.startsWith("/media/")) {
-      item.stage = needsMaster(file) ? "queued" : "in"; // HEIC still has to be converted first
-      item.key = originalUrlOf(photo.url).slice("/media/".length);
-      // already in the book from before the page closed: in from the start
-      batch.mark(photo.id, "inBook");
+      key = originalUrlOf(photo.url).slice("/media/".length);
+      this.skipToOriginal(item, key);
     }
+    this.stash(item, key);
+  }
+
+  /** The display copies are already on the server: only the HD copy is left. */
+  private skipToOriginal(item: Item, key: string) {
+    item.stage = needsMaster(item.file) ? "queued" : "in"; // HEIC still has to be converted first
+    item.key = key;
+    // already in the book from before the page closed: in from the start
+    item.batch.mark(item.id, "inBook");
+  }
+
+  /* ── keeping photos on the phone (stash.ts) ─────────────── */
+
+  /** Copy a photo into the browser's storage, and list it, until its HD copy is up. */
+  private stash(item: Item, key: string | null) {
+    const entry: PendingEntry = {
+      id: item.id,
+      fp: item.fp,
+      name: item.file.name,
+      type: item.file.type,
+      lastModified: item.file.lastModified,
+      size: item.file.size,
+      projectId: item.projectId ?? this.projectId ?? this.host?.projectId() ?? null,
+      key,
+      at: Date.now(),
+    };
+    void stashPut(item.id, item.file).then((ok) => {
+      // listed only once the file is safely written, and only if the photo is still wanted
+      if (ok && this.isCurrent(item) && item.stage !== "done") writePending({ ...entry, key: item.key ?? key, projectId: item.projectId ?? entry.projectId });
+      else if (ok) stashRemove(item.id);
+    });
+  }
+
+  private unstash(id: string) {
+    removePending(id);
+    stashRemove(id);
+  }
+
+  /**
+   * Carry on with photos left from an earlier visit or a closed tab. Called on
+   * the first page load that finds any (UploadNotices), and before adding
+   * photos. Only one tab at a time does this: the Web Lock is held for as long
+   * as the tab is open, and a second tab waits for it, then takes over
+   * whatever the first left behind.
+   */
+  claim(): Promise<void> {
+    if (this.claimed || typeof window === "undefined") return Promise.resolve();
+    this.claimed = true;
+    const locks = (navigator as Navigator & { locks?: { request: (name: string, cb: () => Promise<void>) => Promise<void> } }).locks;
+    if (!locks) return this.restore();
+    return new Promise((resolve) => {
+      void locks
+        .request("tk-uploads", async () => {
+          await this.restore();
+          resolve();
+          await new Promise<never>(() => undefined); // held until the tab closes
+        })
+        .catch(() => resolve());
+    });
+  }
+
+  private async restore() {
+    const entries = listPending().filter((e) => !this.items.has(e.id));
+    if (!entries.length) return;
+    const batch = new BatchTracker(newPhotoId(), "resume", () => this.projectId ?? this.host?.projectId() ?? null);
+    for (const entry of entries) {
+      const stored = await stashGet(entry.id);
+      if (!stored || stored.size !== entry.size) {
+        // the browser cleared it: the re-add list will ask for this one
+        this.unstash(entry.id);
+        continue;
+      }
+      if (this.items.has(entry.id)) continue; // re-picked while we were reading
+      const file = new File([stored], entry.name, { type: entry.type, lastModified: entry.lastModified });
+      const { plan } = await inspect(file);
+      const item = this.newItem(entry.id, file, entry.fp, plan, batch, entry.projectId);
+      this.items.set(entry.id, item);
+      batch.add(entry.id, file);
+      if (entry.key) this.skipToOriginal(item, entry.key);
+      this.projectId ??= entry.projectId;
+      this.restoredIds.add(entry.id);
+    }
+    if (batch.size) this.batches.add(batch);
+    this.emit();
+    this.pump();
   }
 
   /** A new object each time, so the screen's memoised lines see the change. */
@@ -420,7 +579,6 @@ class UploadEngine {
   /* ── the scheduler ──────────────────────────────────────── */
 
   private pump() {
-    if (!this.host) return; // nothing to report results to; attach() restarts
     const now = Date.now();
     const ready = (i: Item) => i.retryAt <= now;
     const all = Array.from(this.items.values());
@@ -431,7 +589,8 @@ class UploadEngine {
     }
     for (const item of all) {
       if (this.running.display >= DISPLAY_CONCURRENCY) break;
-      if (item.stage === "prepared" && ready(item)) void this.runDisplay(item);
+      // a book with no project yet needs the builder to make one; attach() restarts
+      if (item.stage === "prepared" && ready(item) && (this.host || this.projectFor(item))) void this.runDisplay(item);
     }
     // originals wait for the fast lanes to clear: see the header
     const fastLaneBusy = all.some((i) => i.stage === "queued" || i.stage === "preparing" || i.stage === "prepared" || i.stage === "uploading-display");
@@ -450,6 +609,10 @@ class UploadEngine {
       .filter((i) => i.retryAt > Date.now())
       .map((i) => i.retryAt);
     if (waits.length) this.retryTimer = setTimeout(() => this.pump(), Math.max(50, Math.min(...waits) - Date.now()));
+  }
+
+  private projectFor(item: Item): string | null {
+    return item.projectId ?? this.host?.projectId() ?? this.projectId;
   }
 
   private isCurrent(item: Item) {
@@ -472,6 +635,7 @@ class UploadEngine {
   private reject(item: Item) {
     if (!this.isCurrent(item)) return;
     this.items.delete(item.id);
+    this.unstash(item.id);
     this.rejected.push(item.file.name);
     item.batch.reject(item.id);
     this.settle(item.batch);
@@ -484,6 +648,15 @@ class UploadEngine {
     if (!batch.settled) return;
     batch.send(true);
     this.batches.delete(batch);
+  }
+
+  /** The photo is gone from the server (deleted, or another account): stop quietly, there's nobody to tell. */
+  private drop(item: Item) {
+    if (!this.isCurrent(item)) return;
+    this.items.delete(item.id);
+    this.unstash(item.id);
+    item.batch.reject(item.id);
+    this.settle(item.batch);
   }
 
   private patch(id: string, patch: Partial<BuilderPhoto>) {
@@ -549,8 +722,10 @@ class UploadEngine {
     this.emit();
     const { display, thumb, w, h } = item.prepared!;
     try {
-      const projectId = await withTimeout(this.host!.ensureProject(), API_TIMEOUT_MS, "creating the book");
-      this.projectId = projectId;
+      const known = item.projectId ?? (this.host ? null : this.projectId);
+      const projectId = known ?? (await withTimeout(this.host!.ensureProject(), API_TIMEOUT_MS, "creating the book"));
+      this.projectId ??= projectId;
+      item.projectId = projectId;
       const prep = await post<{
         key: string;
         ext: "webp" | "jpg";
@@ -572,6 +747,7 @@ class UploadEngine {
       item.stage = "in";
       item.attempts = 0;
       this.offline = false;
+      updatePending(item.id, { key: prep.key, projectId });
       item.batch.mark(item.id, "inBook", { displayBytes: display.size + thumb.size });
       this.patch(item.id, { url: `/media/${prep.key}.preview.${prep.ext}` });
       this.landedListeners.forEach((fn) => fn(item.id));
@@ -594,8 +770,9 @@ class UploadEngine {
     item.stage = "uploading-original";
     item.batch.mark(item.id, "originalStart");
     this.emit();
-    const body = item.original ?? item.file;
     try {
+      const body = await this.printBody(item);
+      if (!this.isCurrent(item)) return;
       const contentType = ORIGINAL_TYPES.has(body.type) ? body.type : isHeic(item.file) ? "image/heic" : "image/jpeg";
       const signed = await post<{ uploadUrl: string; headers: Record<string, string> }>(`/api/uploads/${item.id}/original/presign`, {
         contentType,
@@ -609,6 +786,7 @@ class UploadEngine {
       await post(`/api/uploads/${item.id}/original/complete`, {});
       if (!this.isCurrent(item)) return;
       item.stage = "done";
+      this.unstash(item.id);
       item.prepared = undefined; // the display blobs are held by previews.ts
       item.original = undefined;
       this.offline = false;
@@ -618,12 +796,36 @@ class UploadEngine {
     } catch (err) {
       // 413 or 415: this one file can't be stored as it is, and never will be
       if (err instanceof Error && /^(413|415):/.test(err.message)) this.reject(item);
+      else if (isGone(err)) this.drop(item);
       else this.failAttempt(item, "in", err);
     } finally {
       this.running.original--;
       this.emit();
       this.pump();
     }
+  }
+
+  /**
+   * The bytes to send for printing: the converted master (HEIC, oversize), or
+   * a quality 0.95 re-save when print-copy.ts allows it, or the file itself.
+   * The re-save is kept on the item, so a retry doesn't redo it. Any failure
+   * sends the file itself: never a worse file, at worst a bigger one.
+   */
+  private async printBody(item: Item): Promise<Blob> {
+    if (item.original) return item.original;
+    if (!item.plan.reencode) return item.file;
+    let copy: Blob | undefined;
+    try {
+      copy = await withTimeout(printCopyOffThread(item.file, item.plan.maxShortEdge, PRINT_QUALITY), PREPARE_TIMEOUT_MS, "making a print copy");
+    } catch {
+      copy = undefined;
+    }
+    if (copy && copy.size <= item.file.size * MAX_COPY_FRACTION) {
+      item.original = copy;
+      return copy;
+    }
+    item.plan = { reencode: false, reason: "failed" };
+    return item.file;
   }
 
   /* ── reporting ──────────────────────────────────────────── */
@@ -644,7 +846,11 @@ class UploadEngine {
     const all = Array.from(this.items.values());
     const displayPending = all.filter((i) => ["queued", "preparing", "prepared", "uploading-display"].includes(i.stage)).length;
     const originals = all.filter((i) => i.stage !== "done");
-    const pendingBytes = originals.reduce((sum, i) => sum + ((i.original ?? i.file).size - i.sent), 0);
+    const pendingBytes = originals.reduce((sum, i) => sum + Math.max(0, (i.original ? i.original.size : expectedPrintBytes(i.file, i.plan)) - i.sent), 0);
+    const restoredLeft = Array.from(this.restoredIds).filter((id) => {
+      const item = this.items.get(id);
+      return item && item.stage !== "done";
+    }).length;
     return {
       version,
       active: originals.length > 0,
@@ -655,6 +861,8 @@ class UploadEngine {
       rejected: this.rejected,
       duplicates: this.duplicates,
       notices: this.notices,
+      restored: this.restoredIds.size ? { total: this.restoredIds.size, left: restoredLeft } : null,
+      sentBytes: this.sentTotal,
     };
   }
 

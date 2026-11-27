@@ -1,0 +1,278 @@
+/*
+ * Checkout, decluttered (owner-approved canvas D2/D3, 2026-11-28).
+ *
+ * Three cards and a footer that holds Pay. Selectors start at `.bb-order.co`
+ * so they win over builder.css whichever file the production build loads
+ * first (see the CSS load-order note in docs; flow.css and builder.css
+ * share classes with this page).
+ */
+
+.bb-order.co {
+  padding: 28px 16px 0;
+}
+
+.bb-order.co .co-inner {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.bb-order.co .co-title {
+  margin: 0;
+  text-align: left;
+  font-size: clamp(26px, 3.2vw, 32px);
+  line-height: 1.2;
+}
+
+.bb-order.co .bb-testmode {
+  margin: 0;
+}
+
+.bb-order.co .co-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bb-order.co .co-card {
+  margin: 0;
+  min-width: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+/* the section headings inside cards */
+.bb-order.co .co-h {
+  display: block;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.bb-order.co .co-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* ── the book, in one row ─────────────────────────────────── */
+.bb-order.co .co-book {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+}
+
+.bb-order.co .co-book > :first-child {
+  flex: none;
+}
+
+.bb-order.co .co-book-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bb-order.co .co-book-text b {
+  font-size: 16px;
+  line-height: 21px;
+  color: var(--heading);
+  overflow-wrap: anywhere;
+}
+
+.bb-order.co .co-book-text span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--color-fg2);
+}
+
+.bb-order.co .co-book .bb-qty {
+  flex: none;
+}
+
+.bb-order.co .co-book .bb-qty button {
+  width: 34px;
+  height: 34px;
+}
+
+.bb-order.co .co-book .bb-qty span {
+  min-width: 26px;
+}
+
+.bb-order.co .co-warn {
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--error-fg);
+  background: var(--error-bg);
+}
+
+.bb-order.co .co-warn .co-link {
+  color: inherit;
+}
+
+/* ── where to send it ─────────────────────────────────────── */
+.bb-order.co .co-ship {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── how to pay, and the total ────────────────────────────── */
+.bb-order.co .co-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bb-order.co .co-methods {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* a legend needs the float to sit inside its fieldset's box like a heading */
+.bb-order.co .co-methods legend {
+  float: left;
+  width: 100%;
+}
+
+.bb-order.co .co-choices {
+  clear: both;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bb-order.co .co-choice {
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border);
+  background: var(--surface-card);
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--heading);
+  text-align: center;
+  cursor: pointer;
+}
+
+.bb-order.co .co-choice.on {
+  border-color: var(--selected);
+  background: var(--selected-bg);
+  box-shadow: 0 0 0 1px var(--selected);
+}
+
+.bb-order.co .co-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--color-fg2);
+}
+
+.bb-order.co .co-prices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bb-order.co .co-methods + .co-prices,
+.bb-order.co .co-note + .co-prices {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.bb-order.co .co-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--color-fg1);
+}
+
+.bb-order.co .co-row small {
+  font-size: 12.5px;
+  color: var(--color-fg3);
+}
+
+.bb-order.co .co-total {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--heading);
+}
+
+/* ── the footer that holds Pay: on phones it stays in reach while scrolling ── */
+.bb-order.co .co-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 4px -16px 0;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface-card);
+  border-top: 1px solid var(--color-border);
+}
+
+.bb-order.co .co-foot .bb-btn-lg {
+  width: 100%;
+  justify-content: center;
+}
+
+.bb-order.co .co-hd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--heading);
+}
+
+.bb-order.co .co-fine {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--color-fg2);
+  text-align: center;
+}
+
+@media (min-width: 600px) {
+  .bb-order.co {
+    padding-top: 40px;
+  }
+
+  .bb-order.co .co-foot {
+    position: static;
+    margin: 4px 0 24px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+  }
+}

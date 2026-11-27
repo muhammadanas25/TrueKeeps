@@ -25,6 +25,10 @@
  *   5. Optionally make a full-size JPEG "master", for the rare files that
  *      cannot go to the printer as they are (HEIC, or over the upload limit).
  *
+ * makePrintCopy() is separate: it re-saves a photo at quality 0.95 for
+ * printing, and runs later, just before that photo's HD upload, so it never
+ * delays the book. Which photos qualify is decided in print-copy.ts.
+ *
  * Anything that fails throws: the caller decides what the customer sees.
  */
 
@@ -183,6 +187,37 @@ export async function preparePhoto(source: Blob, makeMaster: boolean): Promise<P
       }
     }
     return { display, thumb, w, h, luma, sharp, master };
+  } finally {
+    if ("close" in image) image.close();
+  }
+}
+
+/**
+ * Re-save a photo for printing at JPEG quality 0.95 (print-copy.ts decides
+ * which photos qualify). Every pixel is kept unless `maxShortEdge` is given,
+ * for the 48 to 50 MP photos that are far bigger than any page.
+ *
+ * Returns undefined, never a worse file, when the browser can't do it: iOS
+ * refuses canvases above about 16.7 MP, and some browsers hand back a blank
+ * image instead of an error, which is caught by the size check.
+ */
+export async function makePrintCopy(source: Blob, maxShortEdge: number | null, quality: number): Promise<Blob | undefined> {
+  const image = await decode(source);
+  try {
+    const w = "naturalWidth" in image ? image.naturalWidth : image.width;
+    const h = "naturalHeight" in image ? image.naturalHeight : image.height;
+    if (!(w > 0 && h > 0)) return undefined;
+    const k = maxShortEdge ? Math.min(1, maxShortEdge / Math.min(w, h)) : 1;
+    const cw = Math.round(w * k);
+    const ch = Math.round(h * k);
+    const canvas = makeCanvas(cw, ch);
+    context(canvas).drawImage(image, 0, 0, cw, ch);
+    const copy = await encode(canvas, "image/jpeg", quality);
+    // a blank canvas encodes to almost nothing; a real photo at 0.95 never does
+    if (copy.type !== "image/jpeg" || copy.size < (cw * ch) / 40) return undefined;
+    return copy;
+  } catch {
+    return undefined;
   } finally {
     if ("close" in image) image.close();
   }
