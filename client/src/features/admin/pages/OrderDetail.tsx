@@ -199,7 +199,9 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
                       <b style={{ color: "#2A1E5C" }}>{f.key.split("/").pop()}</b>
                       <div className="oc-small">
                         {f.kind === "jpegs"
-                          ? `${f.pages} JPEGs: front cover, every page by sheet, back cover · 300 dpi`
+                          ? f.sheets
+                            ? `${f.sheets} sheet${f.sheets > 1 ? "s" : ""} (two pages side by side) + front and back cover · ${f.dpi ?? 300} dpi`
+                            : `${f.pages} JPEGs: front cover, every page by sheet, back cover · 300 dpi (made before sheets)`
                           : f.kind === "cover"
                             ? `${f.pages} page${f.pages > 1 ? "s" : ""}${f.pages > 1 ? ": front, back" : ""}`
                             : `${f.pages} page${f.pages > 1 ? "s" : ""}`}{" "}

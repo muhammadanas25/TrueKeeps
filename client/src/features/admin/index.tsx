@@ -34,7 +34,7 @@ export default function AdminConsole() {
           <Route path="/">{() => <OverviewPage me={me} />}</Route>
           <Route path="/orders">{() => <OrdersPage me={me} />}</Route>
           <Route path="/orders/:id">{(p) => <OrderDetailPage id={p.id} me={me} />}</Route>
-          <Route path="/print">{() => <PrintQueuePage />}</Route>
+          <Route path="/print">{() => <PrintQueuePage me={me} />}</Route>
           <Route path="/analytics">{() => (me.role === "admin" ? <AnalyticsPage /> : <OwnerOnly />)}</Route>
           <Route path="/notifications">{() => <NotificationsPage me={me} />}</Route>
           <Route path="/promos">{() => (me.role === "admin" ? <PromosPage /> : <OwnerOnly />)}</Route>

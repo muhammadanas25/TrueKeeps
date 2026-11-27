@@ -19,7 +19,8 @@
  *   GET  /api/admin/ops/export/orders.csv*       (audited)
  *   GET  /api/admin/ops/messages/to-send         customer messages due and not sent (docs/adr/025)
  *   POST|DELETE /api/admin/ops/orders/:id/messages/:key   mark sent / undo (audited)
- *   GET|PUT /api/admin/ops/messages/templates*   the owner's words for the three messages
+ *   GET|PUT /api/admin/ops/messages/templates*   the owner's words for the customer messages
+ *   GET|PUT /api/admin/ops/print-settings*       sheet JPEG resolution, 300 or 640 dpi (docs/adr/026)
  *                                                * Owner only
  *
  * Money (revenue, totals in summaries) is Owner-only; Ops sees orders,
@@ -66,6 +67,7 @@ import { orderAffiliateInfo } from "./affiliates";
 import { DEFAULT_MESSAGES, MESSAGE_KEYS, MESSAGE_LABEL, markMessageSchema, messageTemplatesSchema, type MessageKey } from "@shared/messages";
 import { getTemplates, messagesForOrder, messagesToSend, TEMPLATES_SETTING } from "../notify/manual";
 import { storage } from "../storage";
+import { getPrintSettings, printSettingsSchema, PRINT_SETTINGS_KEY } from "../print/settings";
 
 export const adminConsoleRouter = Router();
 const owner = requireStaff(["admin"]);
@@ -998,5 +1000,28 @@ adminConsoleRouter.put(
     await storage.setSetting(TEMPLATES_SETTING, body, req.staff?.userId ?? null);
     void audit(req, "messages.templates", { type: "setting", id: TEMPLATES_SETTING }, {});
     res.json({ templates: await getTemplates() });
+  }),
+);
+
+/* ── print settings (owner, docs/adr/026) ──────────────────────── */
+
+adminConsoleRouter.get(
+  "/api/admin/ops/print-settings",
+  owner,
+  asyncHandler(async (_req, res) => {
+    res.json(await getPrintSettings());
+  }),
+);
+
+adminConsoleRouter.put(
+  "/api/admin/ops/print-settings",
+  owner,
+  asyncHandler(async (req, res) => {
+    const body = parse(printSettingsSchema, req.body, res);
+    if (!body) return;
+    const before = await getPrintSettings();
+    await storage.setSetting(PRINT_SETTINGS_KEY, body, req.staff?.userId ?? null);
+    void audit(req, "print.settings", { type: "setting", id: PRINT_SETTINGS_KEY }, { sheetDpi: `${before.sheetDpi} → ${body.sheetDpi}` });
+    res.json(await getPrintSettings());
   }),
 );

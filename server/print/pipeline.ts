@@ -10,8 +10,9 @@
  *   1. rendering  — cut every placed photo from its HD original
  *                   (server/print/render.ts, writes manifest.json last)
  *   2. composing  — interior.pdf + cover.pdf to a temp folder
- *                   (server/print/pdf.ts), then jpegs.zip: every printed
- *                   side as a 300 DPI JPEG, rendered from those two PDFs
+ *                   (server/print/pdf.ts), then jpegs.zip: the covers and
+ *                   one JPEG per sheet (two pages side by side, for the
+ *                   Noritsu), at 300 or 640 dpi, rendered from those two PDFs
  *                   (server/print/jpegs.ts); SHA-256 of each
  *   3. upload     — to an IMMUTABLE key: …/print/<order>/v<version>/<file>.
  *                   A rebuild is a new version; a file a printer downloaded
@@ -48,8 +49,10 @@ import { log } from "../logger";
 import { opsDb, requireOpsDb } from "../ops/db";
 import { notifyOrder } from "../notify/outbox";
 import { printPrefix, renderOrder } from "./render";
-import { composeCover, composeInterior } from "./pdf";
-import { composeJpegZip } from "./jpegs";
+import { PRINT_SPEC, composeCover, composeInterior } from "./pdf";
+import { composeJpegZip, jpegCount } from "./jpegs";
+import { getPrintSettings } from "./settings";
+import { bookTheme } from "../../client/src/features/builder/palette";
 
 /** Orders in these states should have a print file. */
 const PRINTABLE_STATUSES = ["paid", "in_production", "shipped", "delivered"];
@@ -141,19 +144,26 @@ async function buildJob(data: unknown): Promise<void> {
     const interior = await composeInterior(doc, manifest, interiorPath);
     const cover = await composeCover(doc, manifest, coverPath);
     const zipPath = path.join(work, "jpegs.zip");
-    const jpegs = await composeJpegZip(interiorPath, coverPath, zipPath, { orderNumber: order.orderNumber, title: doc.title || "Untitled book" });
+    // one JPEG per sheet (two pages side by side) at the owner's resolution (docs/adr/026)
+    const jpegs = await composeJpegZip(interiorPath, coverPath, zipPath, {
+      orderNumber: order.orderNumber,
+      title: doc.title || "Untitled book",
+      dpi: (await getPrintSettings()).sheetDpi,
+      paper: bookTheme(doc.themeId, doc.pageColor).page,
+      bleedMm: PRINT_SPEC.bleedMm,
+    });
 
     await setState(job.id, "verifying");
     const files: PrintJobFile[] = [];
     for (const [kind, local, pages, file, type] of [
       ["interior", interiorPath, interior.pages, "interior.pdf", "application/pdf"],
       ["cover", coverPath, cover.pages, "cover.pdf", "application/pdf"],
-      // "pages" of the ZIP is how many JPEGs it holds (cover front and back + every page)
+      // "pages" of the ZIP is how many JPEGs it holds (cover front and back + one per sheet)
       ["jpegs", zipPath, jpegs.files, "jpegs.zip", "application/zip"],
     ] as const) {
       const local_ = await digest(createReadStream(local));
       if (type === "application/pdf" && local_.pages !== pages) throw new Error(`${file} has ${local_.pages} pages, expected ${pages}`);
-      if (kind === "jpegs" && pages !== interior.pages + cover.pages) throw new Error(`jpegs.zip holds ${pages} pictures, expected ${interior.pages + cover.pages}`);
+      if (kind === "jpegs" && pages !== jpegCount(interior.pages, cover.pages)) throw new Error(`jpegs.zip holds ${pages} pictures, expected ${jpegCount(interior.pages, cover.pages)}`);
       const key = versionKey(order.projectId, order.id, job.version, file);
       await storeAndVerify(mediaStore, key, local, local_, type);
       let backupKey: string | null = null;
@@ -161,7 +171,7 @@ async function buildJob(data: unknown): Promise<void> {
         await storeAndVerify(backupStore, key, local, local_, type);
         backupKey = key;
       }
-      files.push({ kind, key, bytes: (await stat(local)).size, sha256: local_.sha256, pages, backupKey });
+      files.push({ kind, key, bytes: (await stat(local)).size, sha256: local_.sha256, pages, backupKey, ...(kind === "jpegs" ? { dpi: jpegs.dpi, sheets: jpegs.sheets } : {}) });
     }
 
     const problems = [

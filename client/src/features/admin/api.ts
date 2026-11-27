@@ -130,6 +130,9 @@ export interface PrintJobFile {
   sha256: string;
   pages: number;
   backupKey?: string | null;
+  /** jpegs only: resolution and sheet count (docs/adr/026); older ZIPs have neither */
+  dpi?: number;
+  sheets?: number;
 }
 
 export interface PrintJob {

@@ -790,7 +790,7 @@ export const auditLog = pgTable(
 
 /** One stored, checked file of a print job (see `print_jobs.files`). */
 export interface PrintJobFile {
-  /** `interior` | `cover` (PDFs) | `jpegs` (a ZIP of 300 DPI JPEGs; `pages` = how many) */
+  /** `interior` | `cover` (PDFs) | `jpegs` (a ZIP of the covers and one JPEG per sheet; `pages` = how many) */
   kind: string;
   key: string;
   bytes: number;
@@ -798,6 +798,9 @@ export interface PrintJobFile {
   pages: number;
   /** a second copy, in the backup bucket, checked the same way */
   backupKey?: string | null;
+  /** jpegs only: the resolution and how many sheets (docs/adr/026) */
+  dpi?: number;
+  sheets?: number;
 }
 
 /**

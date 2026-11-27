@@ -6,12 +6,16 @@
  *
  * "Send to printer" is the real status change (paid → in_production), the
  * same as on the order page, and is refused for test orders by the server.
+ *
+ * Print settings (owner only, docs/adr/026): the resolution of the sheet
+ * JPEGs for the Noritsu, 300 dpi (default) or 640 dpi. Applies to print files
+ * built from then on; "Rebuild as a new version" on an order remakes one.
  */
 
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { adminFetch, useAdminQuery, type OrderRow } from "../api";
+import { adminFetch, useAdminQuery, type OrderRow, type StaffMe } from "../api";
 import { ago, day, printTone } from "../format";
 import { ErrorNote, Loading, Pill } from "../parts";
 
@@ -25,7 +29,7 @@ const COLUMNS = [
   ["failed", "Failed, needs you", "#CA3A58"],
 ] as const;
 
-export function PrintQueuePage() {
+export function PrintQueuePage({ me }: { me: StaffMe }) {
   const q = useAdminQuery<{ cards: Card[] }>(["print-board"], "/api/admin/ops/print", { refetchInterval: 30_000 });
   const qc = useQueryClient();
   const [err, setErr] = useState<string | null>(null);
@@ -96,6 +100,58 @@ export function PrintQueuePage() {
           </div>
         </div>
       )}
+      {me.role === "admin" ? <PrintSettings /> : null}
     </>
+  );
+}
+
+/** The sheet resolution switch (owner only). */
+function PrintSettings() {
+  const q = useAdminQuery<{ sheetDpi: 300 | 640 }>(["print-settings"], "/api/admin/ops/print-settings");
+  const qc = useQueryClient();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const choose = async (sheetDpi: 300 | 640) => {
+    setMsg(null);
+    try {
+      await adminFetch("/api/admin/ops/print-settings", { method: "PUT", body: { sheetDpi } });
+      await qc.invalidateQueries({ queryKey: ["print-settings"] });
+      setMsg({ ok: true, text: `Saved. New print files will be ${sheetDpi} dpi. To remake an order's files, use "Rebuild as a new version" on it.` });
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    }
+  };
+  return (
+    <section className="oc-card" aria-labelledby="ps" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <h2 id="ps">Print settings</h2>
+      <p className="oc-sub" style={{ margin: 0 }}>
+        The ZIP for the printer has one JPEG per sheet: two pages side by side, 12 in tall (the full paper width) and 24 in plus 3 mm at each end long, plus the front and back cover.
+      </p>
+      {q.error ? <ErrorNote error={q.error} /> : null}
+      {q.data ? (
+        <div className="oc-field" role="group" aria-label="Sheet resolution">
+          Sheet resolution
+          <div className="oc-row">
+            {(
+              [
+                [300, "300 dpi", "photo-lab standard, smaller files"],
+                [640, "640 dpi", "the Noritsu's own resolution, files about 4 times larger"],
+              ] as const
+            ).map(([dpi, label, hint]) => (
+              <button key={dpi} type="button" className="oc-btn" aria-pressed={q.data!.sheetDpi === dpi} style={q.data!.sheetDpi === dpi ? { background: "#2A1E5C", color: "#fff" } : undefined} onClick={() => void choose(dpi)}>
+                {label}
+                <span className="oc-small" style={{ fontWeight: 500, color: "inherit", opacity: 0.85 }}>
+                  {hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {msg ? (
+        <p className={`oc-note ${msg.ok ? "ok" : "bad"}`} role="status">
+          {msg.text}
+        </p>
+      ) : null}
+    </section>
   );
 }
