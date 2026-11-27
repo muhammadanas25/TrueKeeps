@@ -71,6 +71,13 @@
       "when": 1795410039322,
       "tag": "0009_promo_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795710068792,
+      "tag": "0010_affiliates",
+      "breakpoints": true
     }
   ]
 }

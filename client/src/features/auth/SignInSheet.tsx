@@ -24,7 +24,7 @@ import { sendMagicLink, signInWithGoogle } from "./client";
 import { useSession } from "./useSession";
 import "./auth.css";
 
-export type SignInIntent = "save" | "order" | "generic";
+export type SignInIntent = "save" | "order" | "generic" | "partner";
 
 const COPY: Record<SignInIntent, { title: string; sub: string }> = {
   save: {
@@ -34,6 +34,10 @@ const COPY: Record<SignInIntent, { title: string; sub: string }> = {
   order: {
     title: "Sign in to place your order",
     sub: "We'll send your order confirmation and shipping updates to this email.",
+  },
+  partner: {
+    title: "Sign in to your partner page",
+    sub: "Use the email TrueKeeps added you with to see your link, orders and payouts.",
   },
   generic: {
     title: "Sign in to TrueKeeps",

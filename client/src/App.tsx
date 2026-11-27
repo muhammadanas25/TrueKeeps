@@ -25,6 +25,7 @@ const Orders = lazy(() => import("@/pages/orders"));
 const Order = lazy(() => import("@/pages/order"));
 const AdminOrders = lazy(() => import("@/pages/admin-orders"));
 const AdminConsole = lazy(() => import("@/features/admin"));
+const Partners = lazy(() => import("@/features/partners"));
 const Feedback = lazy(() => import("@/features/feedback"));
 const AdminFeedback = lazy(() => import("@/pages/admin-feedback"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -134,6 +135,7 @@ function Router() {
         <Route path="/admin/legacy-orders" component={AdminOrders} />
         {/* private customer reviews (docs/adr/015); the first addresses redirect */}
         <Route path="/review" component={Feedback} />
+        <Route path="/partners" component={Partners} />
         <Route path="/admin/reviews" component={AdminFeedback} />
         <Route path="/feedback">
           <RedirectKeepingQuery to="/review" />

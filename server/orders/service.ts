@@ -45,6 +45,8 @@ import { storage } from "../storage";
 import { applyPromo, PromoError } from "./promo";
 import { startPrintJob } from "../print/pipeline";
 import { notifyOrder } from "../notify/outbox";
+import { syncCommissionSoon } from "../affiliates/commissions";
+import type { OrderCredit } from "../affiliates/attribution";
 import { config } from "../config";
 import { log } from "../logger";
 import { register, schedule } from "../jobs";
@@ -157,6 +159,8 @@ export async function photosWithoutOriginals(projectId: string, doc: BuilderDocu
 export async function createOrder(
   user: { id: string; email: string; phone?: string | null },
   body: CreateOrderBody,
+  /** the affiliate to credit (server/affiliates/attribution.ts), worked out by the route */
+  credit: OrderCredit | null = null,
 ): Promise<{ order: Order; checkoutUrl: string | null }> {
   const methods = await availableMethods();
   const bank = body.method === "bank_transfer";
@@ -226,6 +230,8 @@ export async function createOrder(
           totalMinor: q.totalMinor - discountMinor,
           promoCode: promo?.promo.code ?? null,
           discountMinor,
+          affiliateId: credit?.affiliateId ?? null,
+          affiliateSource: credit?.source ?? null,
           priceListVersion: q.priceListVersion,
           binding: q.binding,
           finish: body.finish,
@@ -333,6 +339,7 @@ export async function confirmPayment(orderId: string, actor: ConfirmActor, provi
   // The customer's confirmation and the staff alert go through the outbox
   // (stored, retried, routed by Admin → Notifications).
   void notifyOrder("order_paid", paid);
+  if (paid.affiliateId) syncCommissionSoon(paid.id);
   // Paid means it will be printed: start the print job now. It is a database
   // row, so the reconciler finishes it even if this process dies right here.
   void startPrintJob(paid.id).catch((err) => log.error({ err, orderId: paid.id }, "[orders] print job not started; the reconciler will"));
@@ -374,6 +381,7 @@ export async function markBankTransferPaid(orderId: string, adminId: string, ref
   log.info({ orderId, orderNumber: order.orderNumber, adminId }, "[orders] bank transfer marked paid");
   // same as a card payment: confirmation + staff alert via the outbox, then the print job
   void notifyOrder("order_paid", paid);
+  if (paid.affiliateId) syncCommissionSoon(paid.id);
   void startPrintJob(paid.id).catch((err) => log.error({ err, orderId: paid.id }, "[orders] print job not started; the reconciler will"));
   return paid;
 }
