@@ -95,7 +95,14 @@
   --focus:             var(--tk-indigo-500); /* keyboard focus outline; white on dark surfaces */
   --heading:           var(--tk-indigo-500); /* 13.58 */
   --highlight:         var(--tk-rose-500);   /* block behind one phrase; big bold white text only */
-  --surface-page:      var(--tk-paper);
+  /* The page ground moved from Paper to a pale lavender (owner, 2026-11-26).
+     Paper is now the builder's stage, the area the book sits on in steps
+     3 to 6 (owner, 2026-11-27: it replaced the darker tan board). The
+     landing's second ground is landing.css --lp-band. */
+  --surface-page:      #F7F5FF;
+  --surface-page-glass: rgba(247, 245, 255, 0.92); /* sticky headers and bars over the page */
+  --surface-stage:     var(--tk-paper);
+  --surface-stage-glow: #FFFDF9;          /* the soft light behind the book */
   --surface-card:      #FFFFFF;
   --surface-quiet:     var(--tk-indigo-50);  /* calm bands */
   --surface-control:   var(--tk-mist-100);   /* segmented controls, quiet panels */
@@ -116,7 +123,7 @@
   --offer-fg:          var(--tk-rose-700);   /* 6.01 on Rose 50 */
 
   /* ─── shadcn/ui semantic variables ─────────────────────────────── */
-  --background: var(--tk-paper);
+  --background: var(--surface-page);
   --foreground: var(--tk-ink-400);
   --card: #FFFFFF;
   --card-foreground: var(--tk-ink-400);

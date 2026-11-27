@@ -3,7 +3,7 @@
  *
  * Composition ported verbatim from the updated prototype shell
  * (`~/Downloads/landing.jsx`): Nav → Hero → TrustStrip → HowItWorks →
- * KnowAlbum → Occasions → PlainFacts → FinalCTA → Footer (plus the phone-only StickyCTA), with
+ * BookDivider → KnowAlbum → BookDivider → Occasions → PlainFacts → FinalCTA → Footer (plus the phone-only StickyCTA), with
  * reveal-on-scroll handled by useScrollReveal (see that hook for the
  * motion-gating rationale).
  *
@@ -13,7 +13,7 @@
 
 import "./landing.css";
 import { useScrollReveal } from "./use-scroll-reveal";
-import { FinalCTA, Footer, Hero, HowItWorks, KnowAlbum, Nav, Occasions, PlainFacts, StickyCTA, TrustStrip } from "./sections";
+import { BookDivider, FinalCTA, Footer, Hero, HowItWorks, KnowAlbum, Nav, Occasions, PlainFacts, StickyCTA, TrustStrip } from "./sections";
 
 export default function LandingPage() {
   useScrollReveal();
@@ -23,7 +23,10 @@ export default function LandingPage() {
       <Hero />
       <TrustStrip />
       <HowItWorks />
+      {/* the two grey chapters open with a hairline divider (owner, 2026-11-26/27) */}
+      <BookDivider tone="warm" />
       <KnowAlbum />
+      <BookDivider tone="warm" />
       <Occasions />
       <PlainFacts />
       <FinalCTA />

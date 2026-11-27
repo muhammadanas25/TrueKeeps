@@ -39,7 +39,7 @@ import {
   type Spread,
 } from "./data";
 import { clampTilt, slotAspect, tiltCover } from "./print";
-import { contrastRatio, deriveTheme, mix } from "./palette";
+import { contrastRatio, deriveTheme } from "./palette";
 import { LOGO_PATHS, LOGO_VIEWBOX } from "@shared/logo";
 import { lookClasses, usePageLook } from "./looks";
 import { SlotHit } from "./reframe";
@@ -646,6 +646,21 @@ function PageFaceImpl({
 export const PageFace = memo(PageFaceImpl);
 
 /**
+ * The layout pictures' colours: one fixed set, whatever the album's look
+ * (owner, 2026-11-26: the pictures changed colour with the look, so the same
+ * layout looked different from album to album). White page, grey photos, and
+ * the selected one in a soft Indigo. They used to be mixed from the look's page and
+ * ink so they stayed visible on the dark papers; a fixed white page is
+ * visible on every background these pickers sit on.
+ */
+const WIRE_STYLE = {
+  background: "#FFFFFF",
+  "--wire-edge": "rgba(42, 30, 92, 0.14)",
+  "--wire-tile": "#C9C6D3",
+  "--wire-accent": "#8F89AB", // Indigo at about 50% on white, as the selected wire looked on the default look
+} as CSSProperties;
+
+/**
  * A tiny wireframe of one layout, for the picker.
  *
  * It is built from the REAL page classes — same `.bb-page`, same
@@ -657,31 +672,11 @@ export const PageFace = memo(PageFaceImpl);
  *
  * Nobody reads "Framed". Everybody recognises the shape.
  */
-export function LayoutWire({ id, theme, mirror }: { id: PageLayoutId; theme: BookTheme; mirror?: boolean }) {
+export function LayoutWire({ id, mirror }: { id: PageLayoutId; mirror?: boolean }) {
   const tiles = LAYOUT_SLOTS[id];
   const collage = id === "collage";
   return (
-    <span
-      className={"bb-wire bb-page bb-page-" + id + (collage && mirror ? " bb-mirror" : "")}
-      /*
-       * The wire's tiles and hairline used to be fixed translucent
-       * greys, which was fine while every page was near-white. On the
-       * Ink or Slate paper a translucent grey on a dark page is a dark
-       * square on a dark square, and the whole layout picker goes
-       * blank. Mixing them off the page toward the theme's own ink and
-       * accent keeps exactly the old appearance on light paper and
-       * inverts by itself on dark.
-       */
-      style={
-        {
-          background: theme.page,
-          "--wire-edge": mix(theme.page, theme.ink, 0.1),
-          "--wire-tile": mix(theme.page, theme.ink, 0.24),
-          "--wire-accent": mix(theme.page, theme.accent, 0.45),
-        } as CSSProperties
-      }
-      aria-hidden="true"
-    >
+    <span className={"bb-wire bb-page bb-page-" + id + (collage && mirror ? " bb-mirror" : "")} style={WIRE_STYLE} aria-hidden="true">
       {Array.from({ length: tiles }, (_, i) => (
         <span key={i} className={"bb-ph" + (collage ? " c" + i : "")} />
       ))}
@@ -694,20 +689,9 @@ export function LayoutWire({ id, theme, mirror }: { id: PageLayoutId; theme: Boo
  * pickers: the page's own rectangles, drawn with the same wire colours as
  * LayoutWire so the two sit side by side.
  */
-export function GridWire({ frames, theme }: { frames: PageFrame[]; theme: BookTheme }) {
+export function GridWire({ frames }: { frames: PageFrame[] }) {
   return (
-    <span
-      className="bb-wire bb-page bb-page-grid"
-      style={
-        {
-          background: theme.page,
-          "--wire-edge": mix(theme.page, theme.ink, 0.1),
-          "--wire-tile": mix(theme.page, theme.ink, 0.24),
-          "--wire-accent": mix(theme.page, theme.accent, 0.45),
-        } as CSSProperties
-      }
-      aria-hidden="true"
-    >
+    <span className="bb-wire bb-page bb-page-grid" style={WIRE_STYLE} aria-hidden="true">
       {frames.map((f, i) => (
         <span
           key={i}

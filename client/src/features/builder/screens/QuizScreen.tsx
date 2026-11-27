@@ -8,9 +8,8 @@
  */
 
 import { ArrowRight, Baby, Cake, Heart, Plane, Sparkles } from "lucide-react";
-import { MiniBook } from "../book";
 import { BOOK_IMAGES } from "@/features/landing/book-images";
-import { OCCASIONS, occasionById, themeById, type CopyVoice } from "../data";
+import { OCCASIONS, occasionById, type CopyVoice } from "../data";
 import { pairForOccasion } from "@shared/fonts";
 import { INCLUDED_PAGES, STARTING_PRICE_MINOR, formatPKR } from "@shared/pricing";
 import "../flow.css";
@@ -55,10 +54,6 @@ export function QuizScreen({
     set({ occasion: id, title: title || occasionById(id).suggestedTitle, fontId });
     setTimeout(onDone, 260);
   };
-  const occ = occasionById(occasion);
-  const theme = themeById(state.vibe || "ivory");
-  const previewTitle = (title && title.trim()) || occ.suggestedTitle;
-  const stageCaption = occasion ? previewTitle : "Your live preview starts here";
 
   return (
     <div className="bb-screen bb-quiz">
@@ -97,13 +92,8 @@ export function QuizScreen({
       <div className="bb-quiz-stage">
         <div className="bb-quiz-stage-art">
           <img className="bb-quiz-sample" src={BOOK_IMAGES[SAMPLE_BOOK[occasion || "baby"] ?? "baby"]} alt="" />
-          {/* the minimal cover has no photo slot: the customer's title and look, nothing to fill in */}
-          <div className="bb-quiz-stage-book">
-            <MiniBook theme={theme} coverStyle="minimal" title={previewTitle} occasion={occ} photos={[]} size={168} />
-          </div>
-        </div>
-        <div className="bb-quiz-stage-cap">
-          <Sparkles size={14} /> {stageCaption}
+          {/* The small "live preview" book that sat over this photo is gone (owner, 2026-11-26):
+              the photo of a real album says it better, and the live preview starts on step 3. */}
         </div>
         {/* step 1 of the owner's flow: the price before anything else is asked */}
         <p className="qz-price">

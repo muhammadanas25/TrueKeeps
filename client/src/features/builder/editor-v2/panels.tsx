@@ -174,9 +174,9 @@ export function LayoutPanel({
                   {[p.left, p.right].map((side, i) => (
                     <span key={i} className="tke-wire-pg">
                       {"template" in side ? (
-                        <GridWire frames={PICKER_TEMPLATES.find((t) => t.id === side.template)?.frames ?? []} theme={theme} />
+                        <GridWire frames={PICKER_TEMPLATES.find((t) => t.id === side.template)?.frames ?? []} />
                       ) : (
-                        <LayoutWire id={side.layout} theme={theme} mirror={false} />
+                        <LayoutWire id={side.layout} mirror={false} />
                       )}
                     </span>
                   ))}
@@ -197,7 +197,7 @@ export function LayoutPanel({
             <div className="tke-wire-row">
               <button className={"tke-wire" + (activePage.layout === "grid" ? " on" : "")} onClick={() => onLayout("grid")} aria-pressed={activePage.layout === "grid"}>
                 <span className="tke-wire-pg">
-                  {activePage.layout === "grid" ? <GridWire frames={activePage.frames ?? []} theme={theme} /> : <span className="tke-wire-auto"><Sparkles size={18} /></span>}
+                  {activePage.layout === "grid" ? <GridWire frames={activePage.frames ?? []} /> : <span className="tke-wire-auto"><Sparkles size={18} /></span>}
                 </span>
                 <span className="tke-wire-l">Auto</span>
               </button>
@@ -212,7 +212,7 @@ export function LayoutPanel({
                 {LAYOUTS.filter((l) => l.slots === n).map((l) => (
                   <button key={l.id} className={"tke-wire" + (activePage.layout === l.id ? " on" : "")} onClick={() => onLayout(l.id)} aria-pressed={activePage.layout === l.id}>
                     <span className="tke-wire-pg">
-                      <LayoutWire id={l.id} theme={theme} mirror={l.id === activePage.layout ? activePage.mirror : false} />
+                      <LayoutWire id={l.id} mirror={l.id === activePage.layout ? activePage.mirror : false} />
                     </span>
                     <span className="tke-wire-l">{l.name}</span>
                   </button>
@@ -230,7 +230,7 @@ export function LayoutPanel({
                 {PICKER_TEMPLATES.filter((t) => t.n === n).map((t) => (
                   <button key={t.id} className="tke-wire" onClick={() => onTemplate({ id: t.id, n: t.n })}>
                     <span className="tke-wire-pg">
-                      <GridWire frames={t.frames} theme={theme} />
+                      <GridWire frames={t.frames} />
                     </span>
                     <span className="tke-wire-l">{t.name}</span>
                   </button>

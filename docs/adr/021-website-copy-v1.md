@@ -70,3 +70,32 @@ brand spelling, 3-day vs 24-hour hold).
   Facts are read from the price list and layout engine: the page range shows
   10 to 32 (the design said 11 to 29), and the button says "Start my album"
   (the design said "Make my book", which the word table retired).
+
+## Follow-up, 2026-11-26 (evening): ground colour, dividers, step 1, layout pictures
+
+- **Page ground is now #F7F5FF** (`--surface-page`, index.css), headers and
+  sticky bars too (`--surface-page-glass`). Paper (#FBF6F0) stays as
+  `--surface-warm` in the two places the owner kept beige: the landing's
+  occasions band (`.lp-warm`) and builder step 3, "Pick a cover style"
+  (`.ck-compose.ck-warm` re-points the page token, so the phone's sticky
+  action bar follows). Know your album keeps its own beige.
+- **The Rose dash before section labels is gone**; it read as a generic
+  template. Chapters are marked by `BookDivider` (sections.tsx), the owner's
+  pick of three options: a hairline with a tiny album that opens, draws its
+  line out and turns a page as it scrolls in, and turns a page again on
+  hover. Open and still without motion (prerender, headless, reduced motion).
+- **Step 1's small "live preview" book is gone**, with its caption, which
+  described that book. The real album photo and the price remain.
+- **Layout pictures keep one colour set** (book.tsx `WIRE_STYLE`): they had
+  been mixed from the album's look, so the same layout looked different from
+  album to album (step 5 cards, both editors' layout pickers).
+
+**Revised 2026-11-27:** the owner found the opening book and the beige band
+too strong on the landing. The divider is now a single hairline that draws
+out from the centre on scroll, and Know your album plus the occasions sit on
+#F4F4F4 (landing.css `--lp-band`). Builder step 3 keeps beige.
+
+**Corrected 2026-11-27:** "the current beige on the pick a cover section"
+meant the stage behind the book. The tan board (#E8DCCD) on steps 3 to 6 is
+now Paper beige (`--surface-stage`), and step 3's question side is lavender
+like every other step; the `ck-warm` exception was removed.

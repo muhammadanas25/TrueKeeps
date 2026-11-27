@@ -355,6 +355,27 @@ export function HowItWorks() {
   );
 }
 
+/* ── Book divider ──────────────────────────────────────────── */
+
+/**
+ * BookDivider — the separator between the landing's chapters, replacing the
+ * Rose dash before section labels (owner, 2026-11-26: "too generic").
+ *
+ * What: one centred hairline that draws out from the middle as it scrolls
+ * into view (owner, 2026-11-27: the opening-book version was too busy, "keep
+ * it single line"). The scroll observer (useScrollReveal) stamps `.in`; the
+ * line is drawn and still without motion. Decorative, so aria-hidden.
+ *
+ * `tone` paints the band behind it to match the sections either side.
+ */
+export function BookDivider({ tone = "page" }: { tone?: "page" | "warm" }) {
+  return (
+    <div className={"lp-divider-band" + (tone === "warm" ? " lp-warm" : "")}>
+      <div className="lp-divider" aria-hidden="true" />
+    </div>
+  );
+}
+
 /* ── Know your album ─────────────────────────────────────── */
 
 /**
@@ -440,7 +461,8 @@ export function KnowAlbum() {
 
 export function Occasions() {
   return (
-    <section className="lp-section" id="occasions">
+    // the second ground (landing.css --lp-band), shared with Know your album
+    <section className="lp-section lp-warm" id="occasions">
       <div className="lp-wrap lp-center">
         <div className="lp-eyebrow center">Pick your occasion</div>
         <h2 className="lp-h2">

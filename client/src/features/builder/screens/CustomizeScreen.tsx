@@ -535,7 +535,7 @@ export function CustomizeScreen({
                       aria-pressed={selPage.layout === "grid"}
                       onClick={() => changeLayout(sel as number, "grid")}
                     >
-                      {selPage.layout === "grid" ? <GridWire frames={selPage.frames ?? []} theme={theme} /> : <span className="bb-wire bb-wire-auto"><Sparkles size={18} /></span>}
+                      {selPage.layout === "grid" ? <GridWire frames={selPage.frames ?? []} /> : <span className="bb-wire bb-wire-auto"><Sparkles size={18} /></span>}
                       Auto
                     </button>
                   </div>
@@ -553,7 +553,7 @@ export function CustomizeScreen({
                           aria-pressed={selPage.layout === l.id}
                           onClick={() => changeLayout(sel as number, l.id)}
                         >
-                          <LayoutWire id={l.id} theme={theme} mirror={selPage.mirror} />
+                          <LayoutWire id={l.id} mirror={selPage.mirror} />
                           {l.name}
                         </button>
                       ))}

@@ -19,6 +19,11 @@
    frames are rendering; `prefers-reduced-motion` disables it.
    ============================================================ */
 
+/* The landing's second ground, behind Know your album and the occasions:
+   a light neutral grey, a slight step from the lavender page (owner,
+   2026-11-27; beige was too strong a switch here). Beige lives on in the
+   builder, as the stage behind the book (--surface-stage). */
+.lp { --lp-band: #F4F4F4; }
 .lp { font-family: var(--font-body); font-size: 16px; line-height: 26px; color: var(--color-fg1); background: var(--surface-page); -webkit-font-smoothing: antialiased; }
 .lp * { box-sizing: border-box; }
 .lp img, .lp svg { display: block; }
@@ -35,8 +40,10 @@
    opened tracking and wider word spacing. */
 .lp h1, .lp-h2, .lp-page-h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.005em; word-spacing: normal; color: var(--heading); text-wrap: balance; }
 .lp h3, .lp h4 { font-family: var(--font-body); font-weight: 700; color: var(--heading); }
+/* Section labels. The short Rose dash before each one is gone (owner,
+   2026-11-26: it read as a generic template); chapters are marked by the
+   book divider instead. */
 .lp-eyebrow { font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-fg2); display: inline-flex; align-items: center; gap: 10px; }
-.lp-eyebrow::before { content: ''; width: 22px; height: 2px; background: var(--highlight); }
 .lp-eyebrow.center { justify-content: center; }
 .lp-h2 { font-size: clamp(30px, 4vw, 50px); line-height: 1.1; margin: 18px 0 0; }
 .lp-lede { color: var(--color-fg2); font-size: clamp(16px, 1.5vw, 19px); line-height: 1.6; margin: 16px 0 0; max-width: 56ch; }
@@ -55,7 +62,7 @@
 .lp-hero, .lp-cta, .lp-footer { --focus: #fff; }
 
 /* ── sticky nav ─────────────────────────────── */
-.lp-nav { position: sticky; top: 0; z-index: 50; height: 70px; display: flex; align-items: center; background: rgba(251, 246, 240, 0.92); backdrop-filter: blur(14px); border-bottom: 1px solid transparent; transition: border-color .2s; }
+.lp-nav { position: sticky; top: 0; z-index: 50; height: 70px; display: flex; align-items: center; background: var(--surface-page-glass); backdrop-filter: blur(14px); border-bottom: 1px solid transparent; transition: border-color .2s; }
 .lp-nav.scrolled { border-color: var(--color-border); }
 .lp-nav .lp-wrap { display: flex; align-items: center; justify-content: space-between; }
 .lp-nav-links { display: flex; align-items: center; gap: 30px; }
@@ -135,7 +142,7 @@ a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px
    Paper section, facts in white cards on the left (max 420px), photos on the
    right. Values are the design's: Figtree 800 headings, Mist 200 card lines,
    12px radii, 16px gaps. Replaces the old full-bleed "What you get" banner. */
-.lp-know { background: var(--tk-paper); color: var(--tk-ink-500); padding: 64px 0 72px; }
+.lp-know { background: var(--lp-band); color: var(--tk-ink-500); padding: 64px 0 72px; }
 .lp-know .lp-wrap { display: flex; flex-direction: column; gap: 32px; }
 .lp-know-head { display: flex; flex-direction: column; gap: 10px; }
 .lp-know-eyebrow { font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--tk-rose-700); }
@@ -260,6 +267,22 @@ a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px
 .lp-sticky-cta { display: none; }
 
 /* ── reveal-on-scroll ───────────────────────── */
+/* ── divider (sections.tsx BookDivider) ──
+   One hairline, centred. Under html.motion-ok it starts at zero width and
+   draws out from the middle when the scroll observer stamps .in; open and
+   still otherwise (prerender, headless, reduced motion). The owner tried
+   the opening-book version and asked for a single line (2026-11-27). */
+.lp-warm { background: var(--lp-band); }
+.lp-divider-band { padding: clamp(40px, 5vw, 64px) 0 0; }
+.lp-divider-band + .lp-know { padding-top: 40px; }
+.lp-divider-band + .lp-section { padding-top: clamp(40px, 5vw, 64px); }
+.lp-divider { width: min(560px, 100% - 48px); height: 1px; margin: 0 auto; background: linear-gradient(90deg, transparent, var(--tk-indigo-200) 30%, var(--tk-indigo-200) 70%, transparent); transition: transform 1s cubic-bezier(0.2, 0.7, 0.2, 1); }
+html.motion-ok .lp-divider:not(.in) { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) {
+  html.motion-ok .lp-divider:not(.in) { transform: none; }
+  .lp-divider { transition: none; }
+}
+
 .lp-reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s cubic-bezier(0, 0, 0.2, 1), transform .6s cubic-bezier(0, 0, 0.2, 1); }
 .lp-reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) { .lp-reveal { opacity: 1; transform: none; transition: none; } }
@@ -318,7 +341,7 @@ a.lp-trust-item:hover b { text-decoration: underline; text-underline-offset: 4px
   .lp-footer-bar a { display: inline-block; padding: 13px 0; }
 
   /* slides up once the hero button has scrolled away (StickyCTA) */
-  .lp-sticky-cta { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(251, 246, 240, 0.94); backdrop-filter: blur(14px); border-top: 1px solid var(--color-border); transform: translateY(100%); visibility: hidden; transition: transform .25s cubic-bezier(0, 0, 0.2, 1), visibility .25s; }
+  .lp-sticky-cta { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface-page-glass); backdrop-filter: blur(14px); border-top: 1px solid var(--color-border); transform: translateY(100%); visibility: hidden; transition: transform .25s cubic-bezier(0, 0, 0.2, 1), visibility .25s; }
   .lp-sticky-cta.on { transform: none; visibility: visible; }
   .lp-sticky-cta .lp-btn { width: 100%; }
 

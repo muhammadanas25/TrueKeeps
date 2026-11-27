@@ -171,7 +171,7 @@
 .bk-stage {
   position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
   padding: 40px clamp(16px, 3vw, 40px);
-  background: radial-gradient(60% 50% at 50% 42%, #F0E6D9 0%, transparent 72%), #E8DCCD;
+  background: radial-gradient(60% 50% at 50% 42%, var(--surface-stage-glow) 0%, transparent 72%), var(--surface-stage);
 }
 .bk-book { display: flex; align-items: center; gap: clamp(8px, 2vw, 24px); }
 /* two pages, two 48px arrows and their gaps inside the stage (54% of the width, less padding) */
@@ -198,7 +198,7 @@
 
 /* wide: the book left, everything to check and approve right, all on one screen */
 .bb-screen.pv-wide { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.7fr); min-height: calc(100vh - 64px); background: var(--surface-page); }
-.pv-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; background: radial-gradient(60% 50% at 50% 42%, #F0E6D9 0%, transparent 72%), #E8DCCD; }
+.pv-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; background: radial-gradient(60% 50% at 50% 42%, var(--surface-stage-glow) 0%, transparent 72%), var(--surface-stage); }
 .bb-preview-stage.pv-book { margin-top: 0; }
 .pv-book .bb-book { --pw: min(calc((65vw - 260px) / 2), 52vh, 330px); }
 .pv-stage .bb-page-indicator { margin-top: 28px; color: var(--heading); font-weight: 600; }

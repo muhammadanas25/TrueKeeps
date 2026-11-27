@@ -40,7 +40,7 @@
 .bb-nav {
   height: 64px; flex: none; display: flex; align-items: center; justify-content: space-between;
   padding: 0 clamp(16px, 4vw, 40px);
-  background: rgba(251, 246, 240, 0.92); backdrop-filter: blur(12px);
+  background: var(--surface-page-glass); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-border);
   position: sticky; top: 0; z-index: 40;
 }
@@ -141,15 +141,13 @@
 .bb-hint { font-size: 13px; color: var(--color-fg3); margin-top: 14px; }
 .bb-quiz-actions { display: flex; gap: 12px; justify-content: flex-start; margin-top: 36px; }
 
-/* preview stage (right): a real printed book for the chosen occasion, with a
-   small book carrying the customer's own title and the look they picked. No
-   placeholder frames: this is the moment we ask people to trust us. */
+/* preview stage (right): a real printed album for the chosen occasion, and
+   the price. No placeholder frames: this is the moment we ask people to trust
+   us. (The small book with the customer's title that sat on top was removed,
+   owner 2026-11-26.) */
 .bb-quiz-stage { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 40px 48px; background: var(--surface-quiet); }
 .bb-quiz-stage-art { position: relative; width: min(100%, 440px); aspect-ratio: 1; flex: none; }
 .bb-quiz-sample { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
-.bb-quiz-stage-book { position: absolute; right: -26px; bottom: -22px; }
-.bb-quiz-stage-cap { display: flex; align-items: center; gap: 8px; background: var(--surface-card); border-radius: 99px; padding: 9px 17px; font-size: 14px; font-weight: var(--fw-medium); color: var(--heading); white-space: nowrap; max-width: 80%; }
-.bb-quiz-stage-cap svg { color: var(--selected); flex: none; }
 
 @media (max-width: 880px) {
   .bb-quiz { grid-template-columns: 1fr; }
@@ -181,7 +179,7 @@
 .bb-actionbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   display: flex; justify-content: center; align-items: center; gap: 12px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
-  background: rgba(251, 246, 240, 0.94); backdrop-filter: blur(12px); border-top: 1px solid var(--color-border);
+  background: var(--surface-page-glass); backdrop-filter: blur(12px); border-top: 1px solid var(--color-border);
 }
 
 /* ── Photo tile ────────────────────────────────────── */

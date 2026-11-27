@@ -210,8 +210,8 @@ export function BookScreen({
         <span className="bk-card-top">
           {/* a typical spread of this arrangement, so the difference shows before the tap */}
           <span className="bk-card-art" aria-hidden="true">
-            <GridWire frames={SAMPLE_SPREADS[a.id][0]} theme={theme} />
-            <GridWire frames={SAMPLE_SPREADS[a.id][1]} theme={theme} />
+            <GridWire frames={SAMPLE_SPREADS[a.id][0]} />
+            <GridWire frames={SAMPLE_SPREADS[a.id][1]} />
           </span>
           <b>{a.name}</b>
           {a.id === "classic" && vis.shown.length > 1 ? <i className="bk-pick">Our pick</i> : null}

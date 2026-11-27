@@ -21,7 +21,8 @@ export function useScrollReveal() {
     // gate idle animations on real frames
     const raf = requestAnimationFrame(() => document.documentElement.classList.add("motion-ok"));
 
-    const els = document.querySelectorAll(".lp-reveal");
+    // the dividers draw in the same way (sections.tsx BookDivider)
+    const els = document.querySelectorAll(".lp-reveal, .lp-divider");
     if (!("IntersectionObserver" in window)) {
       els.forEach((e) => e.classList.add("in"));
       return () => cancelAnimationFrame(raf);
