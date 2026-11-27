@@ -16,7 +16,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { NOTIFY_EVENT_INFO, type NotifyEvent } from "@shared/ops";
 import { adminFetch, useAdminQuery, type NotifyRule, type StaffMe } from "../api";
 import { when } from "../format";
-import { ErrorNote, Kpi, Loading, Pill } from "../parts";
+import { ErrorNote, Kpi, Loading, Pill, Seg } from "../parts";
+import { CustomerMessages } from "./CustomerMessages";
+
+type View = "alerts" | "messages" | "log";
+const VIEWS: ReadonlyArray<readonly [View, string]> = [
+  ["alerts", "Who gets alerts"],
+  ["messages", "Customer messages"],
+  ["log", "Message log"],
+];
 
 type Log = {
   list: Array<{ id: string; event: string; channel: string; audience: string; recipient: string; orderId: string | null; orderNumber: string | null; status: string; attempts: number; error: string | null; createdAt: string }>;
@@ -197,6 +205,9 @@ export function NotificationsPage({ me }: { me: StaffMe }) {
     void qc.invalidateQueries({ queryKey: ["notify-log"] });
   };
   const h = log.data?.health;
+  const [view, setView] = useState<View>("alerts");
+  const owner = me.role === "admin";
+  const show = (v: View) => (owner ? view === v : v === "log");
 
   return (
     <>
@@ -212,7 +223,11 @@ export function NotificationsPage({ me }: { me: StaffMe }) {
         </div>
       ) : null}
 
-      {me.role === "admin" ? (
+      {owner ? <Seg label="Notifications sections" value={view} options={VIEWS} onChange={setView} /> : null}
+
+      {show("messages") ? <CustomerMessages /> : null}
+
+      {show("alerts") ? (
         <>
           <h2 style={{ fontSize: 18, marginTop: 8 }}>Who gets what</h2>
           {rules.data && !rules.data.whatsappConnected ? (
@@ -225,9 +240,9 @@ export function NotificationsPage({ me }: { me: StaffMe }) {
         </>
       ) : null}
 
-      <h2 style={{ fontSize: 18, marginTop: 8 }}>Sent messages</h2>
-      {log.error ? <ErrorNote error={log.error} /> : null}
-      {!log.data ? (
+      {!show("log") ? null : <h2 style={{ fontSize: 18, marginTop: 8 }}>Sent messages</h2>}
+      {!show("log") ? null : log.error ? <ErrorNote error={log.error} /> : null}
+      {!show("log") ? null : !log.data ? (
         <Loading />
       ) : (
         <section className="oc-card flush">

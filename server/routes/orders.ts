@@ -21,7 +21,7 @@
  */
 
 import express, { Router, type Response } from "express";
-import type { Order } from "@shared/schema";
+import type { Order, OrderEvent } from "@shared/schema";
 import { PRICE_LIST } from "@shared/pricing";
 import { adminUpdateOrderSchema, canTransition, createOrderSchema, ORDER_STATUSES, type OrderStatus } from "@shared/orders";
 import { storage } from "../storage";
@@ -51,6 +51,18 @@ export const ordersRouter = Router();
 /* ── helpers ───────────────────────────────────────────────────── */
 
 /** What a customer may see. Internal keys and the full book snapshot stay server-side. */
+/**
+ * The timeline a customer sees: order placed, status changes and declined
+ * payments, WITHOUT notes. Staff notes, affiliate changes, payment
+ * mismatches and admin comments on status changes are for the team only
+ * (the admin promises "customers never see it").
+ */
+function customerEvents(events: OrderEvent[]) {
+  return events
+    .filter((e) => e.kind === "created" || e.kind === "status" || e.kind === "payment_failed")
+    .map((e) => ({ ...e, note: null, actor: e.actor === "user" ? "user" : "system" }));
+}
+
 function publicOrder(o: Order) {
   const { idempotencyKey: _k, documentSnapshot: _d, paymentProvider: _p, providerRef: _r, userId: _u, ...rest } = o;
   // how it is paid, so the order page can show bank details for a transfer
@@ -152,8 +164,7 @@ ordersRouter.get(
   asyncHandler(async (req, res) => {
     const order = await loadOwnedOrder(req, res);
     if (!order) return;
-    const events = await storage.listOrderEvents(order.id);
-    res.json({ order: publicOrder(order), events });
+    res.json({ order: publicOrder(order), events: customerEvents(await storage.listOrderEvents(order.id)) });
   }),
 );
 

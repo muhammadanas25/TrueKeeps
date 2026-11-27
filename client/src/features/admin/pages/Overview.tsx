@@ -10,7 +10,9 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { AlertTriangle } from "lucide-react";
-import { useAdminQuery, type Overview, type StaffMe } from "../api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAdminQuery, type Overview, type StaffMe, type ToSendRow } from "../api";
+import { MessageButtons } from "../Messages";
 import { ACTION_KIND, ago, delta, money, pct } from "../format";
 import { Bars, ErrorNote, Kpi, Legend, Line, Loading, PERIODS, Pill, Seg } from "../parts";
 
@@ -52,6 +54,8 @@ export function OverviewPage({ me }: { me: StaffMe }) {
         <Loading />
       ) : (
         <>
+          <ToSend />
+
           <section className="oc-card flush oc-action" aria-labelledby="na">
             <div className="top">
               <AlertTriangle size={18} aria-hidden />
@@ -137,3 +141,44 @@ export function OverviewPage({ me }: { me: StaffMe }) {
 }
 
 const tone = (x: { text: string; tone: "ok" | "bad" | "muted" | "warn" | "info" }) => ({ delta: x.text, tone: x.tone });
+
+/**
+ * Messages to send (canvas M3, docs/adr/025): each customer message appears
+ * here by itself when it is due (order paid, marked shipped, 3 days after
+ * delivery) and leaves once someone taps WhatsApp or Email for it. Hidden
+ * when there is nothing to send.
+ */
+function ToSend() {
+  const qc = useQueryClient();
+  const q = useAdminQuery<{ rows: ToSendRow[] }>(["to-send"], "/api/admin/ops/messages/to-send", { refetchInterval: 60_000 });
+  const rows = q.data?.rows ?? [];
+  if (!rows.length) return null;
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["to-send"] });
+  return (
+    <section className="oc-card flush oc-tosend" aria-labelledby="ts">
+      <div className="oc-card-head" style={{ padding: "14px 16px 8px" }}>
+        <h2 id="ts">Messages to send ({rows.length})</h2>
+        <span className="oc-small">Each appears on its own: a bank transfer not received in 24 hours, an order paid, shipped, or 3 days after delivery</span>
+      </div>
+      {rows.map((r) => (
+        <div className="oc-tosend-row" key={`${r.orderId}-${r.key}`}>
+          <Link href={`/orders/${r.orderId}`}>
+            <b>{r.orderNumber}</b>
+          </Link>
+          <span className="who">
+            <b style={{ color: "#2A1E5C" }}>{r.name}</b>
+            <span className="oc-small">{r.phone}</span>
+          </span>
+          <Pill tone={r.key === "bank" ? "bad" : r.key === "confirm" ? "warn" : r.key === "shipped" ? "info" : "ok"}>{r.label}</Pill>
+          <span className="since">
+            {r.since} {ago(r.sinceAt)} ago
+          </span>
+          <MessageButtons orderId={r.orderId} msgKey={r.key} whatsappUrl={r.whatsappUrl} mailtoUrl={r.mailtoUrl} text={r.text} name={r.name.split(/\s+/)[0] || "them"} onSent={refresh} size="sm" />
+        </div>
+      ))}
+      <p className="oc-small" style={{ margin: 0, padding: "10px 16px 14px", borderTop: "1px solid #EAECEC" }}>
+        A message leaves this list when someone taps WhatsApp or Email for it, or marks it sent on the order page.
+      </p>
+    </section>
+  );
+}

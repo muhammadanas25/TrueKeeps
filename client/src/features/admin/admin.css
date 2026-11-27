@@ -186,3 +186,17 @@
 .oc-skel { height: 120px; border-radius: 14px; background: linear-gradient(90deg, #f2eee8, #f8f5f0, #f2eee8); background-size: 200% 100%; animation: oc-shine 1.2s infinite; }
 @keyframes oc-shine { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .oc-skel { animation: none; } }
+
+/* ── customer messages (docs/adr/025, canvas M1–M3) ──────────────── */
+.oc-msgs { border: 1.5px solid var(--oc-indigo); display: flex; flex-direction: column; gap: 12px; }
+.oc-msg-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.oc-msg-tabs button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 52px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--oc-line); background: #fff; color: var(--oc-indigo); font: inherit; cursor: pointer; text-align: left; }
+.oc-msg-tabs button[aria-selected="true"] { border-color: var(--oc-indigo); background: #f5f4f8; }
+.oc-msg-tabs button span { font-size: 12px; font-weight: 600; }
+.oc-msg-tabs button:focus-visible { outline: 2px solid var(--oc-indigo); outline-offset: 2px; }
+.oc-msg-preview { padding: 12px 14px; border-radius: 12px; background: #e7f8ee; border: 1px solid #c9ebd6; }
+.oc-msg-text { white-space: pre-line; font-size: 15px; line-height: 22px; color: #1f2523; margin-top: 6px; overflow-wrap: anywhere; }
+.oc-tosend { border: 1.5px solid var(--oc-indigo); }
+.oc-tosend-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 12px 16px; border-top: 1px solid var(--oc-line-soft); }
+.oc-tosend-row .who { display: flex; flex-direction: column; min-width: 140px; }
+.oc-tosend-row .since { flex: 1 1 180px; font-size: 13px; color: var(--oc-indigo-soft); }

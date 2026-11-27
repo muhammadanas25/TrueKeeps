@@ -26,6 +26,7 @@ import { TRANSITIONS, STATUS_LABEL, type OrderStatus } from "@shared/orders";
 import { adminFetch, useAdminQuery, type OrderDetail, type StaffMe } from "../api";
 import { day, money, printTone, STATUS, waLink, when } from "../format";
 import { ErrorNote, Loading, Pill } from "../parts";
+import { MessagesCard } from "../Messages";
 
 const MOVE_LABEL: Partial<Record<OrderStatus, string>> = {
   in_production: "Send to printer",
@@ -116,6 +117,14 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
       who: `${e.actor}${e.toStatus && e.note ? ` · ${e.note}` : ""}`,
       tone: e.kind === "amount_mismatch" ? "#9E1F3B" : e.toStatus ? "#2A1E5C" : "#888F8E",
     })),
+    ...(q.data.messages ?? [])
+      .filter((m) => m.sent)
+      .map((m) => ({
+        at: m.sent!.at,
+        what: `${m.label} message sent${m.sent!.channel === "whatsapp" ? " on WhatsApp" : m.sent!.channel === "email" ? " by email" : ""}`,
+        who: m.sent!.by ?? "staff",
+        tone: "#1C4D48",
+      })),
     ...notifications.map((n) => ({
       at: n.createdAt,
       what: `${n.channel === "whatsapp" ? "WhatsApp" : "Email"} to ${n.audience === "customer" ? "customer" : n.recipient}: ${n.event.replace(/_/g, " ")}`,
@@ -152,6 +161,15 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
 
       <div className="oc-row" style={{ alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "999 1 520px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          {q.data.messages?.length ? (
+            <MessagesCard
+              orderId={o.id}
+              name={(o.shippingAddress.fullName || "the customer").trim().split(/\s+/)[0]}
+              contact={[o.shippingAddress.phone || o.contactPhone, o.contactEmail].filter(Boolean).join(" · ")}
+              messages={q.data.messages}
+              onChanged={() => void qc.invalidateQueries({ queryKey: ["order", id] })}
+            />
+          ) : null}
           <section className="oc-card" aria-labelledby="pf">
             <div className="oc-card-head">
               <h2 id="pf">Print file</h2>

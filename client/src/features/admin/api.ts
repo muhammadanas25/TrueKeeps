@@ -190,6 +190,8 @@ export interface OrderDetail {
   printJobs: PrintJob[];
   notifications: Array<{ id: string; event: string; channel: string; audience: string; recipient: string; status: string; error: string | null; createdAt: string }>;
   payments: Array<{ id: string; provider: string; amountMinor: number; status: string; source: string; createdAt: string }>;
+  /** the customer messages, filled in (docs/adr/025) */
+  messages?: OrderMessageView[];
   customer: { orders: number; spentMinor: number | null; since: string | null };
   canSeeMoney: boolean;
 }
@@ -205,4 +207,32 @@ export interface NotifyRule {
   staffTemplate: string | null;
   customerTemplate: string | null;
   templateLang: string;
+}
+
+/* ── customer messages sent by hand (docs/adr/025) ─────────────── */
+
+export interface OrderMessageView {
+  key: "bank" | "confirm" | "shipped" | "review";
+  label: string;
+  when: string;
+  ready: boolean;
+  subject: string;
+  text: string;
+  whatsappUrl: string | null;
+  mailtoUrl: string;
+  sent: { channel: string; by: string | null; at: string } | null;
+}
+
+export interface ToSendRow {
+  orderId: string;
+  orderNumber: string;
+  name: string;
+  phone: string;
+  key: "bank" | "confirm" | "shipped" | "review";
+  label: string;
+  since: string;
+  sinceAt: string;
+  whatsappUrl: string | null;
+  mailtoUrl: string;
+  text: string;
 }

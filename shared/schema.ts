@@ -458,6 +458,30 @@ export const orderEvents = pgTable(
 );
 
 /**
+ * Customer messages the team sent by hand (shared/messages.ts, docs/adr/025):
+ * one row per order and message once someone taps WhatsApp or Email for it.
+ * Undo deletes the row. Kept apart from order_events, which the customer sees.
+ */
+export const orderMessages = pgTable(
+  "order_messages",
+  {
+    id: uuidPk(),
+    orderId: varchar("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    /** `confirm` | `shipped` | `review` */
+    key: text("key").notNull(),
+    /** `whatsapp` | `email` | `other` */
+    channel: text("channel").notNull(),
+    /** the staff member's name or email */
+    sentBy: text("sent_by"),
+    sentAt: ts("sent_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("order_messages_order_key_unique").on(t.orderId, t.key)],
+);
+export type OrderMessage = typeof orderMessages.$inferSelect;
+
+/**
  * Customer feedback from /feedback (docs/adr/015). Private: read on
  * /admin/feedback, never shown publicly. `user_id` links a signed-in (or
  * guest) visitor when there is one and survives the user being deleted.

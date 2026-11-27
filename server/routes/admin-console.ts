@@ -17,6 +17,9 @@
  *   POST /api/admin/ops/team/:userId/reset-2fa*
  *   GET  /api/admin/ops/audit*
  *   GET  /api/admin/ops/export/orders.csv*       (audited)
+ *   GET  /api/admin/ops/messages/to-send         customer messages due and not sent (docs/adr/025)
+ *   POST|DELETE /api/admin/ops/orders/:id/messages/:key   mark sent / undo (audited)
+ *   GET|PUT /api/admin/ops/messages/templates*   the owner's words for the three messages
  *                                                * Owner only
  *
  * Money (revenue, totals in summaries) is Owner-only; Ops sees orders,
@@ -32,6 +35,7 @@ import {
   auditLog,
   notifications,
   orderEvents,
+  orderMessages,
   orders,
   payments,
   printJobs,
@@ -59,6 +63,9 @@ import { register, schedule } from "../jobs";
 import { log } from "../logger";
 import { asyncHandler, parse } from "./helpers";
 import { orderAffiliateInfo } from "./affiliates";
+import { DEFAULT_MESSAGES, MESSAGE_KEYS, MESSAGE_LABEL, markMessageSchema, messageTemplatesSchema, type MessageKey } from "@shared/messages";
+import { getTemplates, messagesForOrder, messagesToSend, TEMPLATES_SETTING } from "../notify/manual";
+import { storage } from "../storage";
 
 export const adminConsoleRouter = Router();
 const owner = requireStaff(["admin"]);
@@ -332,6 +339,8 @@ adminConsoleRouter.get(
       customer: { orders: num(history[0]?.orders), spentMinor: isOwner(req) ? num(history[0]?.spent) : null, since: history[0]?.first ?? null },
       // affiliate credit and commission: money, so owner only (docs/adr/022)
       affiliate: isOwner(req) ? await orderAffiliateInfo(order.id, order.affiliateId) : null,
+      // the three customer messages, filled in, with WhatsApp/email links (docs/adr/025)
+      messages: await messagesForOrder(db, order),
       canSeeMoney: isOwner(req),
     });
   }),
@@ -924,5 +933,70 @@ adminConsoleRouter.patch(
     if (!row) return res.status(404).json({ error: "No such code" });
     void audit(req, "promo.update", { type: "promo", id: row.id }, { code: row.code, active: row.active, kind: row.kind, value: row.value });
     res.json(row);
+  }),
+);
+
+/* ── customer messages sent by hand (docs/adr/025) ─────────────── */
+
+/** Due messages nobody has sent yet (Overview › Messages to send). */
+adminConsoleRouter.get(
+  "/api/admin/ops/messages/to-send",
+  asyncHandler(async (_req, res) => {
+    res.json({ rows: await messagesToSend(requireOpsDb()) });
+  }),
+);
+
+const keyOf = (k: string): MessageKey | null => ((MESSAGE_KEYS as readonly string[]).includes(k) ? (k as MessageKey) : null);
+
+/** Someone tapped WhatsApp or Email for a message (or ticked it): it is sent. */
+adminConsoleRouter.post(
+  "/api/admin/ops/orders/:id/messages/:key",
+  asyncHandler(async (req, res) => {
+    const key = keyOf(req.params.key);
+    if (!key) return res.status(404).json({ error: "No such message" });
+    const body = parse(markMessageSchema, req.body, res);
+    if (!body) return;
+    const db = requireOpsDb();
+    const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, req.params.id)).limit(1);
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    const by = req.staff?.name || req.staff?.email || "staff";
+    // the first send counts; a second tap (WhatsApp, then email) keeps it
+    await db.insert(orderMessages).values({ orderId: order.id, key, channel: body.channel, sentBy: by }).onConflictDoNothing();
+    void audit(req, "message.sent", { type: "order", id: order.id }, { message: key, channel: body.channel });
+    const [row] = await db.select().from(orderMessages).where(and(eq(orderMessages.orderId, order.id), eq(orderMessages.key, key))).limit(1);
+    res.status(201).json({ sent: row ? { channel: row.channel, by: row.sentBy, at: row.sentAt } : null });
+  }),
+);
+
+/** Undo: the message goes back to "to send". */
+adminConsoleRouter.delete(
+  "/api/admin/ops/orders/:id/messages/:key",
+  asyncHandler(async (req, res) => {
+    const key = keyOf(req.params.key);
+    if (!key) return res.status(404).json({ error: "No such message" });
+    await requireOpsDb().delete(orderMessages).where(and(eq(orderMessages.orderId, req.params.id), eq(orderMessages.key, key)));
+    void audit(req, "message.unsent", { type: "order", id: req.params.id }, { message: key });
+    res.json({ ok: true });
+  }),
+);
+
+/** The owner's words for the three messages (Admin › Notifications › Customer messages). */
+adminConsoleRouter.get(
+  "/api/admin/ops/messages/templates",
+  owner,
+  asyncHandler(async (_req, res) => {
+    res.json({ templates: await getTemplates(), defaults: DEFAULT_MESSAGES, labels: MESSAGE_LABEL });
+  }),
+);
+
+adminConsoleRouter.put(
+  "/api/admin/ops/messages/templates",
+  owner,
+  asyncHandler(async (req, res) => {
+    const body = parse(messageTemplatesSchema, req.body, res);
+    if (!body) return;
+    await storage.setSetting(TEMPLATES_SETTING, body, req.staff?.userId ?? null);
+    void audit(req, "messages.templates", { type: "setting", id: TEMPLATES_SETTING }, {});
+    res.json({ templates: await getTemplates() });
   }),
 );

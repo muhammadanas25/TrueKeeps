@@ -27,6 +27,7 @@ import { emailProvider } from "../email";
 import { enqueue, register } from "../jobs";
 import { opsDb } from "../ops/db";
 import { getRule } from "./rules";
+import { confirmWhatsappUrl } from "./manual";
 import { renderEmail, whatsappParams, type Audience, type EmailBody, type Vars } from "./templates";
 import { toWhatsappNumber, whatsapp } from "./whatsapp";
 
@@ -68,7 +69,12 @@ export function orderVars(order: Order): Vars {
 }
 
 /** Send `event` about an order to whoever its rule names. */
-export function notifyOrder(event: NotifyEvent, order: Order, extra: Vars = {}): Promise<number> {
+export async function notifyOrder(event: NotifyEvent, order: Order, extra: Vars = {}): Promise<number> {
+  // the staff "new order" email carries a one-tap WhatsApp to the customer
+  // with the owner's confirmation typed in (docs/adr/025)
+  if (event === "order_paid" && extra.waConfirm === undefined) {
+    extra = { ...extra, waConfirm: await confirmWhatsappUrl(order).catch(() => null) };
+  }
   return notifyEvent(event, {
     key: order.id,
     orderId: order.id,

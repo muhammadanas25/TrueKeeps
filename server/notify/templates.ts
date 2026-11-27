@@ -30,18 +30,39 @@ export interface EmailBody {
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const s = (v: unknown) => String(v ?? "");
 
-function shell(title: string, lines: string[], cta?: { href: string; label: string }): string {
+/** A green box with its own button, e.g. "Send confirmation on WhatsApp". */
+interface Callout {
+  title: string;
+  text: string;
+  href: string;
+  label: string;
+}
+
+function shell(title: string, lines: string[], cta?: { href: string; label: string }, callout?: Callout): string {
   const body = lines.map((l) => `<tr><td style="font-size:16px;line-height:26px;padding:4px 0">${l}</td></tr>`).join("");
+  const box = callout
+    ? `<tr><td style="padding:14px 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#E7F8EE;border:1px solid #C9EBD6;border-radius:12px"><tr><td style="padding:14px 16px">` +
+      `<div style="font-size:15px;font-weight:700;color:#1C4D48">${esc(callout.title)}</div>` +
+      `<div style="font-size:14px;line-height:21px;color:#1F2523;padding:4px 0 12px">${esc(callout.text)}</div>` +
+      `<a href="${esc(callout.href)}" style="display:inline-block;background:#CA3A58;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:999px">${esc(callout.label)}</a>` +
+      `</td></tr></table></td></tr>`
+    : "";
   const btn = cta
     ? `<tr><td style="padding:18px 0"><a href="${esc(cta.href)}" style="display:inline-block;background:#CA3A58;color:#fff;text-decoration:none;font-weight:700;padding:14px 24px;border-radius:999px">${esc(cta.label)}</a></td></tr>`
     : "";
   // the same frame as the order emails (server/email/templates.ts)
-  return emailFrame(esc(title), body + btn);
+  return emailFrame(esc(title), body + box + btn);
 }
 
-function make(title: string, subject: string, lines: string[], cta?: { href: string; label: string }): EmailBody {
-  const text = [title, "", ...lines.map((l) => l.replace(/<[^>]+>/g, "")), ...(cta ? ["", `${cta.label}: ${cta.href}`] : [])].join("\n");
-  return { subject, html: shell(title, lines.map(esc), cta), text };
+function make(title: string, subject: string, lines: string[], cta?: { href: string; label: string }, callout?: Callout): EmailBody {
+  const text = [
+    title,
+    "",
+    ...lines.map((l) => l.replace(/<[^>]+>/g, "")),
+    ...(callout ? ["", `${callout.title}: ${callout.href}`] : []),
+    ...(cta ? ["", `${cta.label}: ${cta.href}`] : []),
+  ].join("\n");
+  return { subject, html: shell(title, lines.map(esc), cta, callout), text };
 }
 
 const test = (v: Vars) => (v.testMode ? "[TEST] " : "");
@@ -89,7 +110,20 @@ export function renderEmail(event: NotifyEvent, audience: Audience, v: Vars): Em
   }
   switch (event) {
     case "order_paid":
-      return make(`New order ${s(v.orderNumber)}`, `${test(v)}New order ${s(v.orderNumber)} · ${s(v.total)}`, [`"${s(v.title)}" · ${s(v.book)}`, `Total ${s(v.total)} · ${s(v.city)}`], admin);
+      return make(
+        `New order ${s(v.orderNumber)}`,
+        `${test(v)}New order ${s(v.orderNumber)} · ${s(v.total)}`,
+        [`"${s(v.title)}" · ${s(v.book)}`, `Total ${s(v.total)} · ${s(v.city)}`],
+        { href: s(v.adminUrl), label: "Open the order" },
+        v.waConfirm
+          ? {
+              title: `Send ${s(v.firstName)} the order confirmation`,
+              text: "Tap below: WhatsApp opens to the customer with your \"order confirmed\" message already typed. Just press send, then tick it on the order page.",
+              href: s(v.waConfirm),
+              label: "Send confirmation on WhatsApp",
+            }
+          : undefined,
+      );
     case "print_ready":
       return make(`Print file ready: ${s(v.orderNumber)}`, `Print file ready · ${s(v.orderNumber)}`, [`"${s(v.title)}": ${s(v.pages)} pages, checked and stored.`], admin);
     case "print_failed":
