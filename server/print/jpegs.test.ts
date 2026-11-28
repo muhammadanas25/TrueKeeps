@@ -143,4 +143,21 @@ console.log(
   `sheets at ${dpi} dpi: ${g.width} x ${g.height} px; sheet-01 ${mb(files.get("sheet-01-pages-01-02.jpg")!.length)} MB; ` +
     `${secs.toFixed(1)} s for 3 sheets + 2 covers; peak memory ${mb(peak)} MB (${mb(peak - base)} MB above the ${mb(base)} MB at start)`,
 );
+// covers on one sheet (owner, 2026-11-28): back | front, same size as a page sheet, one fewer file
+const zip2 = path.join(work, "jpegs-covers.zip");
+const res2 = await composeJpegZip(interior, cover, zip2, { orderNumber: "TK-TEST02", title: "Test", dpi, paper: PAPER, bleedMm: BLEED_MM, coversTogether: true });
+const files2 = unzip(zip2);
+assert.equal(res2.coversTogether, true);
+assert.equal(res2.files, jpegCount(5, 2, true));
+assert.equal(res2.files, res.files - 1, "one print saved");
+assert.deepEqual(Array.from(files2.keys()), ["00-covers-back-front.jpg", "sheet-01-pages-01-02.jpg", "sheet-02-pages-03-04.jpg", "sheet-03-pages-05.jpg", "readme.txt"]);
+const cs = await pixels(files2.get("00-covers-back-front.jpg")!);
+assert.equal(cs.info.width, g.width);
+assert.equal(cs.info.height, g.height);
+const cmid = Math.round(g.height / 2);
+assert.ok(near(cs.at(g.fold - 3, cmid), "#475569"), "back cover on the left");
+assert.ok(near(cs.at(g.fold + 3, cmid), "#334155"), "front cover on the right");
+assert.ok(near(cs.at(1, cmid), "#ff0000") && near(cs.at(g.width - 2, cmid), "#ff0000"), "cover sheet keeps its end margins");
+assert.ok(files2.get("readme.txt")!.toString().includes("BACK cover on the left"));
+
 console.log("jpegs: all checks passed");

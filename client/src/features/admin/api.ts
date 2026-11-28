@@ -133,6 +133,7 @@ export interface PrintJobFile {
   /** jpegs only: resolution and sheet count (docs/adr/026); older ZIPs have neither */
   dpi?: number;
   sheets?: number;
+  coversTogether?: boolean;
 }
 
 export interface PrintJob {

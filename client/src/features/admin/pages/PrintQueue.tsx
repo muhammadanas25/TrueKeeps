@@ -8,8 +8,9 @@
  * same as on the order page, and is refused for test orders by the server.
  *
  * Print settings (owner only, docs/adr/026): the resolution of the sheet
- * JPEGs for the Noritsu, 300 dpi (default) or 640 dpi. Applies to print files
- * built from then on; "Rebuild as a new version" on an order remakes one.
+ * JPEGs for the Noritsu, 300 dpi (default) or 640 dpi, and whether the front
+ * and back cover share one sheet (default, saves a print). Applies to print
+ * files built from then on; "Rebuild as a new version" on an order remakes one.
  */
 
 import { Link } from "wouter";
@@ -105,17 +106,23 @@ export function PrintQueuePage({ me }: { me: StaffMe }) {
   );
 }
 
-/** The sheet resolution switch (owner only). */
+type Settings = { sheetDpi: 300 | 640; coversTogether: boolean };
+
+/** The printer switches (owner only): sheet resolution, and covers on one sheet or two. */
 function PrintSettings() {
-  const q = useAdminQuery<{ sheetDpi: 300 | 640 }>(["print-settings"], "/api/admin/ops/print-settings");
+  const q = useAdminQuery<Settings>(["print-settings"], "/api/admin/ops/print-settings");
   const qc = useQueryClient();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const choose = async (sheetDpi: 300 | 640) => {
+  const choose = async (patch: Partial<Settings>) => {
     setMsg(null);
+    const next = { ...q.data!, ...patch };
     try {
-      await adminFetch("/api/admin/ops/print-settings", { method: "PUT", body: { sheetDpi } });
+      await adminFetch("/api/admin/ops/print-settings", { method: "PUT", body: next });
       await qc.invalidateQueries({ queryKey: ["print-settings"] });
-      setMsg({ ok: true, text: `Saved. New print files will be ${sheetDpi} dpi. To remake an order's files, use "Rebuild as a new version" on it.` });
+      setMsg({
+        ok: true,
+        text: `Saved. New print files: ${next.sheetDpi} dpi, ${next.coversTogether ? "both covers on one sheet" : "each cover on its own"}. To remake an order's files, use "Rebuild as a new version" on it.`,
+      });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     }
@@ -124,7 +131,7 @@ function PrintSettings() {
     <section className="oc-card" aria-labelledby="ps" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <h2 id="ps">Print settings</h2>
       <p className="oc-sub" style={{ margin: 0 }}>
-        The ZIP for the printer has one JPEG per sheet: two pages side by side, 12 in tall (the full paper width) and 24 in plus 3 mm at each end long, plus the front and back cover.
+        The ZIP for the printer has one JPEG per sheet: two pages side by side, 12 in tall (the full paper width) and 24 in plus 3 mm at each end long, plus the covers.
       </p>
       {q.error ? <ErrorNote error={q.error} /> : null}
       {q.data ? (
@@ -137,7 +144,34 @@ function PrintSettings() {
                 [640, "640 dpi", "the Noritsu's own resolution, files about 4 times larger"],
               ] as const
             ).map(([dpi, label, hint]) => (
-              <button key={dpi} type="button" className="oc-btn" aria-pressed={q.data!.sheetDpi === dpi} style={q.data!.sheetDpi === dpi ? { background: "#2A1E5C", color: "#fff" } : undefined} onClick={() => void choose(dpi)}>
+              <button key={dpi} type="button" className="oc-btn" aria-pressed={q.data!.sheetDpi === dpi} style={q.data!.sheetDpi === dpi ? { background: "#2A1E5C", color: "#fff" } : undefined} onClick={() => void choose({ sheetDpi: dpi })}>
+                {label}
+                <span className="oc-small" style={{ fontWeight: 500, color: "inherit", opacity: 0.85 }}>
+                  {hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {q.data ? (
+        <div className="oc-field" role="group" aria-label="Covers">
+          Covers
+          <div className="oc-row">
+            {(
+              [
+                [true, "Both on one sheet", "back cover left, front right: saves a print"],
+                [false, "Separate", "front and back each on their own print"],
+              ] as const
+            ).map(([together, label, hint]) => (
+              <button
+                key={label}
+                type="button"
+                className="oc-btn"
+                aria-pressed={q.data!.coversTogether === together}
+                style={q.data!.coversTogether === together ? { background: "#2A1E5C", color: "#fff" } : undefined}
+                onClick={() => void choose({ coversTogether: together })}
+              >
                 {label}
                 <span className="oc-small" style={{ fontWeight: 500, color: "inherit", opacity: 0.85 }}>
                   {hint}

@@ -20,7 +20,7 @@
  *   GET  /api/admin/ops/messages/to-send         customer messages due and not sent (docs/adr/025)
  *   POST|DELETE /api/admin/ops/orders/:id/messages/:key   mark sent / undo (audited)
  *   GET|PUT /api/admin/ops/messages/templates*   the owner's words for the customer messages
- *   GET|PUT /api/admin/ops/print-settings*       sheet JPEG resolution, 300 or 640 dpi (docs/adr/026)
+ *   GET|PUT /api/admin/ops/print-settings*       sheet JPEG resolution (300/640 dpi), covers on one sheet (docs/adr/026)
  *                                                * Owner only
  *
  * Money (revenue, totals in summaries) is Owner-only; Ops sees orders,
@@ -1021,7 +1021,7 @@ adminConsoleRouter.put(
     if (!body) return;
     const before = await getPrintSettings();
     await storage.setSetting(PRINT_SETTINGS_KEY, body, req.staff?.userId ?? null);
-    void audit(req, "print.settings", { type: "setting", id: PRINT_SETTINGS_KEY }, { sheetDpi: `${before.sheetDpi} → ${body.sheetDpi}` });
+    void audit(req, "print.settings", { type: "setting", id: PRINT_SETTINGS_KEY }, { sheetDpi: `${before.sheetDpi} → ${body.sheetDpi}`, coversTogether: `${before.coversTogether} → ${body.coversTogether}` });
     res.json(await getPrintSettings());
   }),
 );

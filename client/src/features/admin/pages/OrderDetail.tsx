@@ -200,7 +200,7 @@ export function OrderDetailPage({ id, me }: { id: string; me: StaffMe }) {
                       <div className="oc-small">
                         {f.kind === "jpegs"
                           ? f.sheets
-                            ? `${f.sheets} sheet${f.sheets > 1 ? "s" : ""} (two pages side by side) + front and back cover · ${f.dpi ?? 300} dpi`
+                            ? `${f.sheets} sheet${f.sheets > 1 ? "s" : ""} (two pages side by side) + ${f.coversTogether ? "1 sheet with both covers" : "front and back cover"} · ${f.dpi ?? 300} dpi`
                             : `${f.pages} JPEGs: front cover, every page by sheet, back cover · 300 dpi (made before sheets)`
                           : f.kind === "cover"
                             ? `${f.pages} page${f.pages > 1 ? "s" : ""}${f.pages > 1 ? ": front, back" : ""}`

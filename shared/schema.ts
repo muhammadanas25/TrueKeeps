@@ -798,9 +798,10 @@ export interface PrintJobFile {
   pages: number;
   /** a second copy, in the backup bucket, checked the same way */
   backupKey?: string | null;
-  /** jpegs only: the resolution and how many sheets (docs/adr/026) */
+  /** jpegs only: the resolution, how many page sheets, and whether both covers share one sheet (docs/adr/026) */
   dpi?: number;
   sheets?: number;
+  coversTogether?: boolean;
 }
 
 /**

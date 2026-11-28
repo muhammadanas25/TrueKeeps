@@ -145,10 +145,12 @@ async function buildJob(data: unknown): Promise<void> {
     const cover = await composeCover(doc, manifest, coverPath);
     const zipPath = path.join(work, "jpegs.zip");
     // one JPEG per sheet (two pages side by side) at the owner's resolution (docs/adr/026)
+    const printSettings = await getPrintSettings();
     const jpegs = await composeJpegZip(interiorPath, coverPath, zipPath, {
       orderNumber: order.orderNumber,
       title: doc.title || "Untitled book",
-      dpi: (await getPrintSettings()).sheetDpi,
+      dpi: printSettings.sheetDpi,
+      coversTogether: printSettings.coversTogether,
       paper: bookTheme(doc.themeId, doc.pageColor).page,
       bleedMm: PRINT_SPEC.bleedMm,
     });
@@ -163,7 +165,9 @@ async function buildJob(data: unknown): Promise<void> {
     ] as const) {
       const local_ = await digest(createReadStream(local));
       if (type === "application/pdf" && local_.pages !== pages) throw new Error(`${file} has ${local_.pages} pages, expected ${pages}`);
-      if (kind === "jpegs" && pages !== jpegCount(interior.pages, cover.pages)) throw new Error(`jpegs.zip holds ${pages} pictures, expected ${jpegCount(interior.pages, cover.pages)}`);
+      if (kind === "jpegs" && pages !== jpegCount(interior.pages, cover.pages, jpegs.coversTogether)) {
+        throw new Error(`jpegs.zip holds ${pages} pictures, expected ${jpegCount(interior.pages, cover.pages, jpegs.coversTogether)}`);
+      }
       const key = versionKey(order.projectId, order.id, job.version, file);
       await storeAndVerify(mediaStore, key, local, local_, type);
       let backupKey: string | null = null;
@@ -171,7 +175,7 @@ async function buildJob(data: unknown): Promise<void> {
         await storeAndVerify(backupStore, key, local, local_, type);
         backupKey = key;
       }
-      files.push({ kind, key, bytes: (await stat(local)).size, sha256: local_.sha256, pages, backupKey, ...(kind === "jpegs" ? { dpi: jpegs.dpi, sheets: jpegs.sheets } : {}) });
+      files.push({ kind, key, bytes: (await stat(local)).size, sha256: local_.sha256, pages, backupKey, ...(kind === "jpegs" ? { dpi: jpegs.dpi, sheets: jpegs.sheets, coversTogether: jpegs.coversTogether } : {}) });
     }
 
     const problems = [

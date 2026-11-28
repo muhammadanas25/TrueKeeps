@@ -22,8 +22,12 @@ page height, so the 3 mm cutting margin cannot also fit above and below.
   BB on the right. That is the builder's own pairing (`toSpreads`: pages
   1|2, 3|4, …), so a sheet is exactly what the customer saw open on screen. A
   last sheet with one page keeps the right half in the book's paper colour.
-  Covers stay separate files (`00-cover-front.jpg`, `99-cover-back.jpg`)
-  with bleed on every side: a hardcover wrap is wider than any roll.
+- **Covers on one sheet (owner, 2026-11-28, "to save sheet on print"):**
+  by default both covers share one print, `00-covers-back-front.jpg`: the
+  back cover on the left and the front on the right, as a cover reads laid
+  out flat, the same size as a page sheet (the shop can also cut it in the
+  middle). "Separate" in Print settings gives the earlier two pictures,
+  `00-cover-front.jpg` and `99-cover-back.jpg`, with bleed on every side.
 - **Size (owner's choice):** 12 in tall, the full paper width, edge to edge,
   and 24 in plus the 3 mm margin at each outer end long (24.24 × 12 in).
   The book stays 12 × 12. The binder trims a hair off the top and bottom,
@@ -31,7 +35,7 @@ page height, so the 3 mm cutting margin cannot also fit above and below.
   margin.
 - **Resolution:** 300 dpi by default, switchable to 640 dpi (the printer's
   native) in Admin › Print queue › Print settings (`app_settings.print`,
-  audited). A change applies to files built afterwards; versions are
+  audited, next to the Covers switch). A change applies to files built afterwards; versions are
   immutable, so "Rebuild as a new version" remakes an order at the new
   setting. The ZIP records the dpi and sheet count, shown on the order page.
 - **Rendering:** sheets are still rendered from interior.pdf with pdf.js, so

@@ -7,10 +7,11 @@
  * What a sheet is: one photo print of an open spread, folded in the middle:
  * the two pages the customer saw side by side in the builder (toSpreads:
  * pages 1|2, 3|4, …). The files:
- *   00-cover-front.jpg                 the front cover, with its 3 mm bleed
+ *   00-covers-back-front.jpg            both covers on one sheet, back | front
+ *                                       (default; saves a print), or instead
+ *   00-cover-front.jpg + 99-cover-back.jpg   each with its 3 mm bleed
  *   sheet-01-pages-01-02.jpg            pages 1 (left) and 2 (right)
  *   sheet-02-pages-03-04.jpg            …
- *   99-cover-back.jpg                   the back cover, with its 3 mm bleed
  *   readme.txt                          what the files are, for the printer
  *
  * Sheet size, from the printer's paper (owner's choice, 2026-11-28): the
@@ -250,15 +251,17 @@ export function sheetGeometry(pagePt: { w: number; h: number }, bleedMm: number,
 const two = (n: number) => String(n).padStart(2, "0");
 
 /** File names for the printer, in the ZIP's order. `sheet` counts from 1. */
-export function jpegName(kind: "cover-front" | "cover-back" | "sheet", sheet = 1, pages = 2): string {
+export function jpegName(kind: "covers" | "cover-front" | "cover-back" | "sheet", sheet = 1, pages = 2): string {
+  if (kind === "covers") return "00-covers-back-front.jpg";
   if (kind === "cover-front") return "00-cover-front.jpg";
   if (kind === "cover-back") return "99-cover-back.jpg";
   const first = sheet * 2 - 1;
   return `sheet-${two(sheet)}-pages-${two(first)}${pages > 1 ? `-${two(first + 1)}` : ""}.jpg`;
 }
 
-/** How many JPEGs a book's ZIP holds: one per sheet, plus the covers. */
-export const jpegCount = (interiorPages: number, coverPages: number) => Math.ceil(interiorPages / 2) + coverPages;
+/** How many JPEGs a book's ZIP holds: one per sheet, plus the covers (one print when together). */
+export const jpegCount = (interiorPages: number, coverPages: number, coversTogether = false) =>
+  Math.ceil(interiorPages / 2) + (coversTogether && coverPages >= 2 ? 1 : coverPages);
 
 export interface JpegZipOptions {
   orderNumber: string;
@@ -269,14 +272,26 @@ export interface JpegZipOptions {
   paper?: string;
   /** the bleed composeInterior drew, in mm (PRINT_SPEC.bleedMm) */
   bleedMm: number;
+  /**
+   * Front and back cover on ONE print, saving a sheet (owner, 2026-11-28):
+   * back on the left, front on the right, as a cover reads laid out flat;
+   * same size as a page sheet. False: each cover its own picture with bleed.
+   */
+  coversTogether?: boolean;
 }
 
 /**
- * Write the ZIP of JPEGs for one order: the covers as pages (with bleed), the
- * inside as sheets of two pages side by side. `coverPdf` has the front on page
- * 1 and the back on page 2 (composeCover). Returns how many JPEGs it holds.
+ * Write the ZIP of JPEGs for one order: the inside as sheets of two pages side
+ * by side, and the covers either on one sheet of their own (back | front) or
+ * as two pictures with bleed. `coverPdf` has the front on page 1 and the back
+ * on page 2 (composeCover). Returns how many JPEGs it holds.
  */
-export async function composeJpegZip(interiorPdf: string, coverPdf: string, zipPath: string, info: JpegZipOptions): Promise<{ files: number; sheets: number; dpi: SheetDpi }> {
+export async function composeJpegZip(
+  interiorPdf: string,
+  coverPdf: string,
+  zipPath: string,
+  info: JpegZipOptions,
+): Promise<{ files: number; sheets: number; dpi: SheetDpi; coversTogether: boolean }> {
   const dpi: SheetDpi = info.dpi ?? DEFAULT_SHEET_DPI;
   const r = await renderer();
   const open = (file: string) => r.pdfjs.getDocument({ data: new Uint8Array(readFileSync(file)), disableFontFace: true, standardFontDataUrl: r.fonts, verbosity: 0 }).promise;
@@ -294,39 +309,52 @@ export async function composeJpegZip(interiorPdf: string, coverPdf: string, zipP
     return toJpeg(t, dpi);
   };
 
+  const together = Boolean(info.coversTogether) && coverDoc.numPages >= 2;
+  /** Two PDF pages side by side on one sheet (the fold between them). */
+  const sheetOf = async (leftPage: PdfPage, rightPage: PdfPage | null, reuse: Target | undefined, paper: string) => {
+    const [, , pw, ph] = leftPage.view;
+    const g = sheetGeometry({ w: pw, h: ph }, info.bleedMm, dpi);
+    const t = blankTarget(g.width, g.height, paper, reuse);
+    await renderInto(r, leftPage, dpi, t, g.left.x, g.left.y, 0, g.fold);
+    if (rightPage) await renderInto(r, rightPage, dpi, t, g.right.x, g.right.y, g.fold, g.width);
+    return { t, g };
+  };
+
   let sheets = 0;
   let size = { width: 0, height: 0 };
   try {
-    if (coverDoc.numPages >= 1) {
+    if (together) {
+      const back = await coverDoc.getPage(2);
+      const front = await coverDoc.getPage(1);
+      const { t } = await sheetOf(back, front, undefined, "#ffffff");
+      back.cleanup();
+      front.cleanup();
+      await zip.add(jpegName("covers"), await toJpeg(t, dpi));
+      jpegs++;
+    } else if (coverDoc.numPages >= 1) {
       await zip.add(jpegName("cover-front"), await coverJpeg(1));
       jpegs++;
     }
     const doc = await open(interiorPdf);
     try {
-      const first = await doc.getPage(1);
-      const [, , pw, ph] = first.view;
-      const g = sheetGeometry({ w: pw, h: ph }, info.bleedMm, dpi);
-      size = { width: g.width, height: g.height };
       let sheet: Target | undefined;
       for (let p = 1; p <= doc.numPages; p += 2) {
         sheets++;
-        const t = (sheet = blankTarget(g.width, g.height, info.paper ?? "#ffffff", sheet));
         const left = await doc.getPage(p);
-        await renderInto(r, left, dpi, t, g.left.x, g.left.y, 0, g.fold);
-        left.cleanup();
         const hasRight = p + 1 <= doc.numPages;
-        if (hasRight) {
-          const right = await doc.getPage(p + 1);
-          await renderInto(r, right, dpi, t, g.right.x, g.right.y, g.fold, g.width);
-          right.cleanup();
-        }
+        const right = hasRight ? await doc.getPage(p + 1) : null;
+        const { t, g } = await sheetOf(left, right, sheet, info.paper ?? "#ffffff");
+        sheet = t;
+        size = { width: g.width, height: g.height };
+        left.cleanup();
+        right?.cleanup();
         await zip.add(jpegName("sheet", sheets, hasRight ? 2 : 1), await toJpeg(t, dpi));
         jpegs++;
       }
     } finally {
       await doc.destroy();
     }
-    if (coverDoc.numPages >= 2) {
+    if (!together && coverDoc.numPages >= 2) {
       await zip.add(jpegName("cover-back"), await coverJpeg(2));
       jpegs++;
     }
@@ -339,12 +367,17 @@ export async function composeJpegZip(interiorPdf: string, coverPdf: string, zipP
     `TrueKeeps order ${info.orderNumber}: ${info.title}`,
     "",
     "One JPEG per printed sheet, in book order:",
-    "  00-cover-front.jpg            the front cover (with 3 mm bleed on every side)",
+    ...(together
+      ? [
+          "  00-covers-back-front.jpg      the covers on one sheet: BACK cover on the left,",
+          "                                FRONT cover on the right, same size as a page sheet",
+        ]
+      : ["  00-cover-front.jpg            the front cover (with 3 mm bleed on every side)"]),
     "  sheet-NN-pages-AA-BB.jpg      sheet NN: page AA on the left, page BB on the right,",
     "                                as one print, folded in the middle",
-    "  99-cover-back.jpg             the back cover (with 3 mm bleed on every side)",
+    ...(together ? [] : ["  99-cover-back.jpg             the back cover (with 3 mm bleed on every side)"]),
     "",
-    `Sheets: ${sheets}. Each sheet is 12 in tall (the full paper width, edge to edge)`,
+    `Sheets: ${sheets} for the pages${together ? " + 1 for the covers" : ""}. Each sheet is 12 in tall (the full paper width, edge to edge)`,
     `and 24 in plus 3 mm at each outer end long: ${size.width} x ${size.height} px`,
     `(${inches(size.width)} x ${inches(size.height)} in) at ${dpi} dpi, sRGB.`,
     "The fold is exactly in the middle of the 24 in. Trim 3 mm off each end.",
@@ -354,5 +387,5 @@ export async function composeJpegZip(interiorPdf: string, coverPdf: string, zipP
   ].join("\r\n");
   await zip.add("readme.txt", Buffer.from(readme, "utf8"));
   await zip.end();
-  return { files: jpegs, sheets, dpi };
+  return { files: jpegs, sheets, dpi, coversTogether: together };
 }
