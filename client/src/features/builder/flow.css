@@ -122,6 +122,22 @@
   border-radius: 20px 20px 0 0; background: #fff; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
 }
 .bk-grip { flex: none; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--tk-mist-500); }
+/* the handle as a control (SheetGrip.tsx): a 40px-tall strip that looks like the old handle */
+.bk-grip-btn { flex: none; align-self: stretch; height: 40px; margin: -10px -16px -14px; padding: 0; border: 0 !important; background: none !important; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; }
+.bk-grip-btn:focus-visible { outline: 2px solid var(--selected); outline-offset: -6px; border-radius: 12px; }
+/* tucked (owner, 2026-11-28, board A1): one short bar, the book takes the rest */
+.bk-sheet.bk-tucked { gap: 10px; }
+.bk-tuck-row { display: flex; align-items: center; gap: 10px; }
+.bk-tuck-row .bk-card-art .bb-wire { --pw: 28px; width: 28px; height: 28px; }
+.bk-tuck-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bk-tuck-name b { font-size: 17px; line-height: 22px; color: var(--heading); }
+.bk-tuck-name .bk-fit-line { font-size: 12.5px; line-height: 18px; }
+.bk-tuck-row .bk-price { font-size: 18px; }
+.bb-btn.bk-change { flex: 1; min-width: 0; justify-content: center; padding: 10px 12px; font-size: 14px; gap: 4px; white-space: nowrap; }
+.bk-tuck-row .bk-seg { flex: none; }
+.motion-ok .bk-sheet.bk-tucked { animation: bk-rise 220ms var(--ease-out) both; }
+@keyframes bk-rise { from { transform: translateY(24px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .motion-ok .bk-sheet.bk-tucked { animation: none; } }
 .bk-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .bk-sheet h1 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: 22px; line-height: 28px; }
 .bk-price { flex: none; font-weight: 700; font-size: 20px; line-height: 28px; color: var(--heading); font-variant-numeric: tabular-nums; }
@@ -379,3 +395,7 @@
 /* step 6: flagged photos, said before approval (quality.ts) */
 .pv-soft { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 10px 12px; border-radius: 12px; background: #FFF4D6; color: #5C4200; font-size: 14px; line-height: 20px; }
 .pv-soft svg { flex: none; margin-top: 2px; }
+
+/* step 6 tucked bar (PreviewScreen, owner 2026-11-28) */
+.pv-tuck-sub { font-size: 13px; line-height: 18px; color: var(--color-fg2); }
+.bb-btn.bk-change.pv-tuck-more { flex: none; }

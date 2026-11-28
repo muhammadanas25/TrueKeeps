@@ -1,0 +1,52 @@
+/*
+ * Undo-edit sheets and notes (RevertSheets.tsx, EditorV2, PreviewScreen).
+ * Owner, 2026-11-28: canvas "Truekeeps: Undo edits and step 5 on phones".
+ * Every class is `rv-` so this file can load in any order (see the CSS
+ * load-order pitfall: production orders stylesheets differently from dev).
+ */
+
+.rv-veil {
+  position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(22, 20, 41, 0.55);
+}
+.rv-sheet {
+  width: 100%; max-height: 90dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  padding: 10px 20px calc(22px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0; background: #fff; color: var(--heading); outline: none;
+  box-shadow: 0 -12px 36px rgba(22, 20, 41, 0.3);
+}
+.rv-grip { flex: none; align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--tk-mist-500); }
+.rv-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--selected-bg); color: var(--heading); }
+.rv-sheet h2 { margin: 0; font-family: var(--font-display); font-weight: var(--fw-semibold); font-size: 24px; line-height: 30px; color: var(--heading); }
+.rv-sheet p { margin: 0; font-size: 16px; line-height: 24px; color: var(--color-fg1); }
+.rv-keep { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--surface-page); font-size: 14px; line-height: 20px; color: var(--color-fg1); }
+.rv-keep span { display: flex; gap: 8px; align-items: flex-start; }
+.rv-keep svg { flex: none; margin-top: 2px; color: var(--success-fg); }
+.rv-actions { display: flex; flex-direction: column; gap: 10px; }
+.bb-btn.rv-btn { width: 100%; justify-content: center; }
+/* going back is a deliberate choice, not the page's main action: Indigo, not Rose */
+.bb-btn.rv-indigo { background: var(--heading); border-color: var(--heading); }
+.bb-btn.rv-indigo:hover { background: var(--tk-indigo-700); }
+.rv-link { align-self: center; min-height: 44px; padding: 0 12px; border: 0; background: none; font: inherit; font-weight: 600; font-size: 15px; color: var(--heading); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+
+/* wide screens: a centred dialog instead of a bottom sheet */
+@media (min-width: 760px) {
+  .rv-veil { align-items: center; padding: 24px; }
+  .rv-sheet { max-width: 460px; border-radius: 20px; padding: 28px 28px 24px; box-shadow: 0 24px 60px rgba(22, 20, 41, 0.35); }
+  .rv-grip { display: none; }
+}
+
+/* "Edited" tag beside the book title in the editor (only after a page edit) */
+.rv-chip { display: inline-flex; align-items: center; font-size: 11px; line-height: 16px; font-weight: 700; color: #6A4300; background: #FFF3C4; border-radius: 999px; padding: 0 7px; margin-left: 4px; white-space: nowrap; }
+
+/* step 6: "You changed some pages yourself" (only after a page edit) */
+.rv-edited { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #FFF8DD; border: 1px solid #EBD58A; font-size: 14px; line-height: 20px; color: var(--heading); }
+.rv-edited > svg { flex: none; color: #6A4300; }
+.rv-edited > span { flex: 1; min-width: 0; }
+.rv-edited .bb-btn { flex: none; padding: 8px 12px; font-size: 13px; gap: 6px; }
+
+/* editor More menu: "Start again from the original" with its one-line note */
+.tke-menu-pop .tke-menu-rev { align-items: flex-start; font-weight: 700; }
+.tke-menu-rev > svg { flex: none; margin-top: 2px; }
+.tke-menu-rev > span { display: flex; flex-direction: column; gap: 1px; }
+.tke-menu-rev small { font-size: 12px; line-height: 16px; font-weight: 400; color: var(--color-fg2); }

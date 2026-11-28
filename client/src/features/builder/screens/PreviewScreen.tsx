@@ -19,10 +19,18 @@
  * kept short so the book stays big: one summary line, and the pay button
  * itself says "Tick the box to approve" until the box is ticked.
  * Page colours moved off this step; they stay in the editor ("Make changes").
+ *
+ * 2026-11-28 (owner, canvas "Undo edits and step 5 on phones"):
+ *  - phone: the sheet tucks into a short bar the first time the customer
+ *    turns a page, so the book they are checking fills the screen; the
+ *    handle or "Review and approve" brings the sheet back (as on step 5)
+ *  - only after a hand edit (state.pagesEdited): "You changed some pages
+ *    yourself" with "Back to original", which puts back the book as it was
+ *    before the editor (original.ts), on phone and desktop
  */
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Hand, PenLine, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, ChevronUp, Hand, PenLine, Plus, RotateCcw } from "lucide-react";
 import { STATUS_LABEL } from "@shared/orders";
 import { useOrdered } from "../useOrdered";
 import { flaggedPhotos } from "../quality";
@@ -36,6 +44,9 @@ import type { BuilderState } from "../state";
 import { useNarrow } from "../useNarrow";
 import { spineOf } from "./BookScreen";
 import { finishName, printedPageCount } from "@shared/pricing";
+import { SheetGrip } from "../SheetGrip";
+import { restoreOriginal } from "../original";
+import { RevertConfirm } from "../RevertSheets";
 import "../flow.css";
 
 /** The approval tick (website copy v1, 2026-11-26; matches Policies v1: screen vs paper colour is not covered). */
@@ -63,6 +74,17 @@ export function PreviewScreen({
   const [approved, setApproved] = useState(false);
   const { ordered } = useOrdered(state.projectId);
   const [index, setIndex] = useState(0);
+  // phone: the sheet tucks once the customer starts turning pages (see the header)
+  const [tucked, setTucked] = useState(false);
+  const turned = useRef(false);
+  const onRibbonIndex = (i: number) => {
+    setIndex(i);
+    if (!turned.current && i !== 0) {
+      turned.current = true;
+      setTucked(true);
+    }
+  };
+  const [reverting, setReverting] = useState(false);
   // the "click to turn" hint hides forever after the first flip
   const [flippedOnce, setFlippedOnce] = useState(state.pos > 0);
   const setPos = (p: number) => {
@@ -149,6 +171,30 @@ export function PreviewScreen({
       </span>
     </p>
   ) : null;
+  // only after a hand edit: the way back to the pages as we laid them out
+  const editedNote =
+    state.pagesEdited && !ordered ? (
+      <div className="rv-edited" role="status">
+        <PenLine size={18} aria-hidden="true" />
+        <span>You changed some pages yourself.</span>
+        <button type="button" className="bb-btn bb-btn-secondary" onClick={() => setReverting(true)}>
+          <RotateCcw size={14} /> Back to original
+        </button>
+      </div>
+    ) : null;
+  const revertSheet = reverting ? (
+    <RevertConfirm
+      canUndo={false}
+      onCancel={() => setReverting(false)}
+      onConfirm={() => {
+        setReverting(false);
+        // new pages are a new album: checked and approved again
+        setApproved(false);
+        setIndex(0);
+        set({ ...restoreOriginal(state), pos: 0 });
+      }}
+    />
+  ) : null;
   const approve = (
     <label className={"pv-approve" + (approved ? " on" : "")}>
       <input type="checkbox" checked={approved} onChange={(e) => setApproved(e.target.checked)} />
@@ -170,13 +216,39 @@ export function PreviewScreen({
           back={<BackCoverFace theme={theme} coverStyle={state.coverStyle} />}
           spine={spineOf(state)}
           index={index}
-          onIndex={setIndex}
+          onIndex={onRibbonIndex}
           label="Your album, cover first"
         />
         </div>
+        {tucked ? (
+          <div className="bk-sheet bk-tucked" role="region" aria-label="Check and approve">
+            <SheetGrip tucked onTuck={() => setTucked(true)} onOpen={() => setTucked(false)} />
+            <div className="bk-tuck-row">
+              <span className="bk-tuck-name">
+                <b>Here's your album</b>
+                <span className="pv-tuck-sub">
+                  {pageCount} pages · {finishName(state.finish)}
+                </span>
+              </span>
+              <button type="button" className="bb-btn bb-btn-secondary bk-change pv-tuck-more" onClick={() => setTucked(false)} aria-expanded={false}>
+                Details <ChevronUp size={16} />
+              </button>
+            </div>
+            {ordered ? null : approved ? (
+              <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={onOrder}>
+                Approve and continue <ArrowRight size={18} />
+              </button>
+            ) : (
+              <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={() => setTucked(false)}>
+                Review and approve <ChevronUp size={18} />
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="bk-sheet">
-          <span className="bk-grip" aria-hidden="true" />
+          <SheetGrip tucked={false} onTuck={() => setTucked(true)} onOpen={() => setTucked(false)} />
           <h1 className="pv-title">Here's your album</h1>
+          {editedNote}
           {/* the same details as desktop, as a table (owner, 2026-11-22: not as prominent on the phone) */}
           {detailRows}
           {oddNote}
@@ -197,6 +269,8 @@ export function PreviewScreen({
             </button>
           </div>
         </div>
+        )}
+        {revertSheet}
       </div>
     );
   }
@@ -244,6 +318,7 @@ export function PreviewScreen({
           <h1>Here's your album</h1>
           <p>Check every page carefully. What you approve is what we print.</p>
         </div>
+        {editedNote}
         {detailRows}
         {oddNote}
         {ordered ? null : softNote}
@@ -263,6 +338,7 @@ export function PreviewScreen({
           </button>
         </div>
       </div>
+      {revertSheet}
     </div>
   );
 }

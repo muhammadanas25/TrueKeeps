@@ -29,6 +29,18 @@
  * the title and line, Layout picks the cover style, and Photos picks the
  * cover photo (the cover shows the book's first photo).
  *
+ * Undoing edits (owner, 2026-11-28; canvas "Undo edits and step 5 on
+ * phones", B1–B3). Edits still save as they happen; on top of that:
+ *  - the book as it was when the editor opened is kept (`entry`). Leaving by
+ *    Back, Preview or Order after a change asks "Keep the changes you made?",
+ *    and "Undo these changes" puts that book back
+ *  - the first visit to an unedited book saves it as the original
+ *    (state.original, original.ts). Once the pages have been changed by hand
+ *    (state.pagesEdited) an "Edited" tag shows by "Saved", and the More menu
+ *    offers "Start again from the original", which puts that book back
+ *    exactly. Undo takes it back
+ * Neither shows in the normal flow: no edit, no tag, no question.
+ *
  * Rendering reuses PageFace from book.tsx — the same component the 3-D
  * preview, the order screen and the print snapshot use — so what you
  * edit is exactly what prints. Typeface/edges/subtitle/captions reach it
@@ -66,6 +78,8 @@ import { bookPhotos, coverPhotoIdFor, firstMovablePage, hasTitlePage, occasionBy
 import { hasImage } from "../upload/previews";
 import { CoverAdjustBar, CoverAdjustButton, CoverDragLayer, coverFrameFor, coverPhotoInches } from "./CoverAdjust";
 import { PageLookContext, usePageLook, type EdgeId, type FontId } from "../looks";
+import { ENTRY_KEYS, pickEntry, restoreOriginal, snapshotBook } from "../original";
+import { LeaveEditorSheet, RevertConfirm } from "../RevertSheets";
 import { bookTheme, deriveTheme } from "../palette";
 import { TILT_MAX, clampTilt, effectiveDpi, framedZoom, placedInches, printQuality, slotMaxZoom } from "../print";
 import type { BuilderState } from "../state";
@@ -227,6 +241,49 @@ export function EditorV2({
     h.past.push(slice());
     set(next);
     bump((x) => x + 1);
+  };
+
+  /* ── the book as it was when the editor opened (Keep / Undo on leaving) ── */
+  // Everything the editor can change. Compared by reference: every edit makes
+  // a new value, and undo puts the old one back, so "back to how it was" reads
+  // as unchanged again.
+  const entry = useRef<Partial<BuilderState> | null>(null);
+  if (!entry.current) entry.current = pickEntry(state);
+  const changedSinceOpen = ENTRY_KEYS.some((k) => state[k] !== entry.current![k]);
+  const pagesChanged = (() => {
+    const before = new Map((entry.current!.pages ?? []).map((p) => [p.id, p]));
+    const now = new Set(pages.map((p) => p.id));
+    let n = pages.filter((p) => before.get(p.id) !== p).length;
+    before.forEach((_, id) => {
+      if (!now.has(id)) n++;
+    });
+    return n;
+  })();
+  // the book before any editor: saved on the first visit to an unedited book
+  useEffect(() => {
+    const snap = snapshotBook(stateRef.current);
+    if (snap) set(snap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [leaving, setLeaving] = useState<null | (() => void)>(null);
+  const [reverting, setReverting] = useState(false);
+  /** Back, Preview and Order: ask first, but only when something changed here. */
+  const leave = (go: () => void) => {
+    setMenu(false);
+    if (changedSinceOpen) setLeaving(() => go);
+    else go();
+  };
+  const revertToOriginal = () => {
+    setReverting(false);
+    setMenu(false);
+    // one undo step, so "Changed your mind? Tap undo" holds; it keeps every
+    // field the restore touches (cover, edits flag), not only the book slice
+    hist.current.past.push({ ...slice(), ...pickEntry(stateRef.current) } as ops.BookSlice);
+    hist.current.future = [];
+    set(restoreOriginal(stateRef.current));
+    clearSel();
+    bump((x) => x + 1);
+    say("Back to the original album", true);
   };
 
   /* ── navigation ─────────────────────────────────────────────── */
@@ -443,6 +500,8 @@ export function EditorV2({
   /* ── keyboard ───────────────────────────────────────────────── */
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
+      // an open question (RevertSheets) owns the keyboard
+      if (leaving || reverting) return;
       const t = e.target as HTMLElement;
       if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
@@ -746,7 +805,7 @@ export function EditorV2({
       >
         <header className="tke-top">
           <div className="tke-top-l">
-            <button className="tke-iconbtn" onClick={onBack} aria-label="Back to preview">
+            <button className="tke-iconbtn" onClick={() => leave(onBack)} aria-label="Back to preview">
               <ChevronLeft size={20} />
             </button>
             {!isMobile ? (
@@ -773,6 +832,8 @@ export function EditorV2({
                     <Check size={12} strokeWidth={2.5} /> Saved
                   </>
                 )}
+                {/* only after a hand edit to the pages; sits on the short line so a long title can't hide it */}
+                {state.pagesEdited ? <span className="rv-chip">Edited</span> : null}
               </small>
             </div>
           </div>
@@ -787,7 +848,7 @@ export function EditorV2({
               </button>
             ) : null}
             {!isMobile ? (
-              <button className="tke-btn ghost" onClick={onPreview}>
+              <button className="tke-btn ghost" onClick={() => leave(onPreview)}>
                 <BookOpen size={16} /> Preview
               </button>
             ) : null}
@@ -797,19 +858,28 @@ export function EditorV2({
               </button>
               {menu ? (
                 <div className="tke-menu-pop" role="menu">
-                  <button role="menuitem" onClick={onPreview}>
+                  <button role="menuitem" onClick={() => leave(onPreview)}>
                     <BookOpen size={16} /> Preview the book
                   </button>
                   <button role="menuitem" onClick={() => { setMenu(false); setArrange(true); }}>
                     <LayoutGrid size={16} /> All pages
                   </button>
+                  {state.pagesEdited ? (
+                    <button role="menuitem" className="tke-menu-rev" onClick={() => { setMenu(false); setReverting(true); }}>
+                      <RotateCcw size={16} />
+                      <span>
+                        Start again from the original
+                        <small>Undo every page change you made</small>
+                      </span>
+                    </button>
+                  ) : null}
                   <button role="menuitem" onClick={onSwitchClassic}>
                     <PanelLeftClose size={16} /> Switch to classic editor
                   </button>
                 </div>
               ) : null}
             </div>
-            <button className="tke-btn" onClick={onOrder}>
+            <button className="tke-btn" onClick={() => leave(onOrder)}>
               <span>{isMobile ? "Order" : "Order book"}</span>
               <span className="tke-price">{formatPKR(q.totalMinor)}</span>
             </button>
@@ -1013,6 +1083,24 @@ export function EditorV2({
             onClose={() => setArrange(false)}
           />
         ) : null}
+        {reverting ? <RevertConfirm canUndo onConfirm={revertToOriginal} onCancel={() => setReverting(false)} /> : null}
+        {leaving ? (
+          <LeaveEditorSheet
+            pagesChanged={pagesChanged}
+            onKeep={() => {
+              const go = leaving;
+              setLeaving(null);
+              go();
+            }}
+            onDiscard={() => {
+              const go = leaving;
+              setLeaving(null);
+              set({ ...entry.current! });
+              go();
+            }}
+            onStay={() => setLeaving(null)}
+          />
+        ) : null}
         {toast ? (
           <div key={toast.k} className="tke-toast" role="status">
             {toast.msg}
@@ -1027,3 +1115,4 @@ export function EditorV2({
     </PageLookContext.Provider>
   );
 }
+

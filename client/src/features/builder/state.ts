@@ -102,6 +102,12 @@ export interface BuilderState {
    */
   customized: "none" | "looked" | "changed";
   /**
+   * The album as it was the first time the editor opened on it, before any
+   * hand edit (original.ts): what "Back to original" restores. Kept on this
+   * device only; without it the pages are laid out again instead.
+   */
+  original: Partial<BuilderState> | null;
+  /**
    * The furthest step (1–7) this album has reached, so the step bar can offer
    * every step up to it (StepsBar.tsx, steps.ts). 0 on drafts from before it
    * existed; the builder fills it in from the step they are on.
@@ -170,6 +176,7 @@ export const DEFAULT_STATE: BuilderState = {
   subtitle: null,
   captionsHidden: false,
   recentColors: [],
+  original: null,
 };
 
 /** Where "back" goes from each screen (quiz handles its own sub-steps). */

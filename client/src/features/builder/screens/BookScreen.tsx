@@ -22,13 +22,21 @@
  * dark stage one page at a time (PageRibbon) and the choices sit in a white
  * sheet under it, as the same picture cards as desktop (2026-11-22).
  *
+ * Phone, book first (owner, 2026-11-28, canvas board A1): the sheet opens as
+ * before; tapping a layout tucks it into a short bar after a moment so the
+ * book fills the screen with that layout. The bar keeps the choice, its price,
+ * the finish and Continue; "Change layout" or the handle brings the sheet back
+ * exactly as it was (board A2 dropped: no bigger sheet). It never tucks by
+ * itself while a warning needs reading (photos left out) or while the
+ * customer's own edited pages are showing.
+ *
  * The laid-out pages are written to the book only on "Continue". If
  * the customer changed pages by hand (Customize) and came back here, their
  * pages are kept until they change a choice, and a note says so.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, ImagePlus, Info } from "lucide-react";
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, ChevronUp, ImagePlus, Info } from "lucide-react";
 import { FINISHES, PRICE_LIST, formatPKR, quote } from "@shared/pricing";
 import { Book3D, GridWire, Ph, shiftColor, type Book3DApi } from "../book";
 import { ARRANGEMENTS, arrangeBook, arrangementOf, arrangementThatFits, densityOf, sheetRange, type ArrangementId } from "../arrange";
@@ -38,6 +46,7 @@ import { bookTheme } from "../palette";
 import { PageRibbon } from "../PageRibbon";
 import type { BuilderState } from "../state";
 import { useNarrow } from "../useNarrow";
+import { SheetGrip } from "../SheetGrip";
 import "../flow.css";
 
 /** The line under "Pick a finish" (website copy v1, 2026-11-26). */
@@ -144,12 +153,26 @@ export function BookScreen({
     if (pos > spreads.length + 1) setPos(Math.max(1, spreads.length));
   }, [spreads.length, pos]);
 
+  // phone only: the choices tuck down so the book can be big (see the header)
+  const [tucked, setTucked] = useState(false);
+  const tuckTimer = useRef<ReturnType<typeof setTimeout>>();
+  const holdOpen = useRef(false);
+  useEffect(() => () => clearTimeout(tuckTimer.current), []);
+
   const choose = (patch: Partial<BuilderState>) => {
     setTouched(true);
     set(patch);
     setPos(1);
   };
-  const pick = (id: ArrangementId) => choose({ density: densityOf(id), sheets: null });
+  const pick = (id: ArrangementId) => {
+    choose({ density: densityOf(id), sheets: null });
+    if (!narrow) return;
+    clearTimeout(tuckTimer.current);
+    // long enough to see the card light up; skipped if a warning appeared
+    tuckTimer.current = setTimeout(() => {
+      if (!holdOpen.current) setTucked(true);
+    }, 650);
+  };
   const fits = arrangementThatFits(n);
   const price = formatPKR(unitPrice(sheets));
 
@@ -186,6 +209,8 @@ export function BookScreen({
     return { text: `Fits your ${n} photos in ${sh * 2} pages`, warn: false };
   };
   const leftover = !keepHandEdits && plan.leftover > 0;
+  holdOpen.current = leftover;
+  const canTuck = !keepHandEdits && !leftover;
   const current = ARRANGEMENTS.find((a) => a.id === style)!;
   const shownArrangements = ARRANGEMENTS.filter((a) => vis.shown.includes(a.id));
   // how to unlock the next arrangement, instead of a choice that changes nothing
@@ -292,8 +317,35 @@ export function BookScreen({
           resetKey={bookKey}
           label="Your album, page by page"
         />
+        {canTuck && tucked ? (
+          <div className="bk-sheet bk-tucked" role="region" aria-label="Your choices">
+            <SheetGrip tucked onTuck={() => setTucked(true)} onOpen={() => setTucked(false)} />
+            <div className="bk-tuck-row">
+              <span className="bk-card-art" aria-hidden="true">
+                <GridWire frames={SAMPLE_SPREADS[style][0]} />
+                <GridWire frames={SAMPLE_SPREADS[style][1]} />
+              </span>
+              <span className="bk-tuck-name">
+                <b>{current.name}</b>
+                <span className={"bk-fit-line" + (fitLine(style).warn ? " warn" : "")}>{fitLine(style).text}</span>
+              </span>
+              <span className="bk-price" aria-live="polite">
+                {price}
+              </span>
+            </div>
+            <div className="bk-tuck-row">
+              <button type="button" className="bb-btn bb-btn-secondary bk-change" onClick={() => setTucked(false)} aria-expanded={false}>
+                Change layout <ChevronUp size={16} />
+              </button>
+              {finishes}
+            </div>
+            <button type="button" className="bb-btn bb-btn-primary bb-btn-lg bk-go" onClick={commit}>
+              Continue <ArrowRight size={18} />
+            </button>
+          </div>
+        ) : (
         <div className="bk-sheet">
-          <span className="bk-grip" aria-hidden="true" />
+          {canTuck ? <SheetGrip tucked={false} onTuck={() => setTucked(true)} onOpen={() => setTucked(false)} /> : <span className="bk-grip" aria-hidden="true" />}
           <div className="bk-sheet-head">
             <h1>How should your photos sit?</h1>
             <span className="bk-price" aria-live="polite">
@@ -319,6 +371,7 @@ export function BookScreen({
           </button>
           {saveLink}
         </div>
+        )}
       </div>
     );
   }
